@@ -15,7 +15,7 @@ const istDay = (ts) => ts ? isoDate(ist(ts).toISOString().slice(0, 10)) : null  
 const n = (v) => v == null ? null : Number(v)
 
 // ExcelJS is a vendored script, loaded the first time someone downloads
-function loadExcelJS() {
+export function loadExcelJS() {
   if (window.ExcelJS) return Promise.resolve(window.ExcelJS)
   return new Promise((resolve, reject) => {
     const el = document.createElement('script')
