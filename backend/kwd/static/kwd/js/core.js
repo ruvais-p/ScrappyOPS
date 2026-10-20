@@ -163,35 +163,45 @@ export function patch(root, htmlString) {
   morphChildren(root, t.content)
 }
 
+const keyOf = (n) => (n.nodeType === 1 && n.dataset && n.dataset.key) || ''
+
+/** Make the children of `from` match the children of `to`, walking the live DOM. A child with data-key keeps its identity
+    (and so its focus, widget and state) when it moves; everything else is matched by position. */
 function morphChildren(from, to) {
-  const a = Array.from(from.childNodes), b = Array.from(to.childNodes)
   const keyed = new Map()
-  a.forEach((n) => { if (n.nodeType === 1 && n.dataset && n.dataset.key) keyed.set(n.dataset.key, n) })
-  let i = 0
-  for (; i < b.length; i++) {
-    const nb = b[i]
-    let na = a[i]
-    if (nb.nodeType === 1 && nb.dataset && nb.dataset.key && keyed.has(nb.dataset.key)) {
-      const k = keyed.get(nb.dataset.key)
-      if (k !== na) from.insertBefore(k, na || null)
-      na = k
+  for (const n of from.childNodes) { const k = keyOf(n); if (k) keyed.set(k, n) }
+  let cur = from.firstChild
+  for (const nb of Array.from(to.childNodes)) {
+    const k = keyOf(nb)
+    if (k && keyed.has(k)) {
+      const m = keyed.get(k)
+      if (m === cur) cur = cur.nextSibling
+      else from.insertBefore(m, cur)
+      patchNode(from, m, nb)
+      continue
     }
-    if (!na) { from.appendChild(nb.cloneNode(true)); continue }
-    if (na.nodeType !== nb.nodeType || (na.nodeType === 1 && na.nodeName !== nb.nodeName)) { from.replaceChild(nb.cloneNode(true), na); continue }
-    if (na.nodeType === 3 || na.nodeType === 8) { if (na.nodeValue !== nb.nodeValue) na.nodeValue = nb.nodeValue; continue }
-    // a widget keeps its own content; it is rebuilt only when its key or its props changed
-    if (na.dataset.widget || nb.dataset.widget) {
-      if (na.dataset.widget === nb.dataset.widget && na.dataset.key === nb.dataset.key && na.dataset.sig === nb.dataset.sig) { syncAttrs(na, nb, true); continue }
-      from.replaceChild(nb.cloneNode(true), na); continue
-    }
-    syncAttrs(na, nb)
-    if (na.nodeName === 'TEXTAREA') { if (document.activeElement !== na && na.value !== nb.value) na.value = nb.value; continue }
-    morphChildren(na, nb)
-    if (na.nodeName === 'SELECT') { const v = nb.querySelector('option[selected]'); if (v && na.value !== v.value) na.value = v.value }
+    if (!cur) { from.appendChild(nb.cloneNode(true)); continue }
+    if (keyOf(cur) && keyed.get(keyOf(cur)) === cur) { from.insertBefore(nb.cloneNode(true), cur); continue }   // keep it for later
+    const na = cur
+    cur = cur.nextSibling
+    patchNode(from, na, nb)
   }
-  // remove whatever is left over
-  const rest = Array.from(from.childNodes)
-  for (let j = rest.length - 1; j >= b.length; j--) from.removeChild(rest[j])
+  while (cur) { const n = cur.nextSibling; from.removeChild(cur); cur = n }
+}
+
+function patchNode(from, na, nb) {
+  if (na.nodeType !== nb.nodeType || (na.nodeType === 1 && na.nodeName !== nb.nodeName)) { from.replaceChild(nb.cloneNode(true), na); return }
+  if (na.nodeType === 3 || na.nodeType === 8) { if (na.nodeValue !== nb.nodeValue) na.nodeValue = nb.nodeValue; return }
+  // a widget keeps its own content; it is rebuilt only when its key or its props changed
+  if (na.dataset.widget || nb.dataset.widget) {
+    if (na.dataset.widget === nb.dataset.widget && na.dataset.key === nb.dataset.key && na.dataset.sig === nb.dataset.sig) { syncAttrs(na, nb, true); return }
+    from.replaceChild(nb.cloneNode(true), na)
+    return
+  }
+  syncAttrs(na, nb)
+  if (na.nodeName === 'TEXTAREA') { if (document.activeElement !== na && na.value !== nb.value) na.value = nb.value; return }
+  morphChildren(na, nb)
+  if (na.nodeName === 'SELECT') { const v = nb.querySelector('option[selected]'); if (v && na.value !== v.value) na.value = v.value }
 }
 
 function syncAttrs(a, b, shallow) {

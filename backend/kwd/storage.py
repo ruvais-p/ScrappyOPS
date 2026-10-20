@@ -10,7 +10,8 @@ from django.core import signing
 
 ROOT_NAME = "kwd-photos"
 SALT = "kwd-photo-link"
-NAME_RE = re.compile(r"^[0-9a-f\-]{36}/[A-Za-z0-9_.\-]{1,120}$")
+# <user id>/<file>, or with up to two sub-folders (the visit screen files photos under <user id>/<date>/<file>)
+NAME_RE = re.compile(r"^[0-9a-f\-]{36}(?:/[A-Za-z0-9_.\-]{1,120}){1,3}$")
 
 
 def root():

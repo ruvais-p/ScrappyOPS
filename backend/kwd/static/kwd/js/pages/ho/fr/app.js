@@ -46,14 +46,16 @@ export async function start(root, { profile, onSwitch }) {
     if (mine !== state.token) return
     state.screen = new Screen(el('page'), def, { profile, go, route: state.route, data })
   }
-  root.addEventListener('click', (e) => {
+  const onClick = (e) => {
     const g = e.target.closest('[data-go]')
     if (g && root.contains(g) && !g.closest('[data-r="page"]')) { go(g.dataset.go); return }
     const n = e.target.closest('[data-nav]')
     if (!n) return
     if (n.dataset.nav === 'signout') endSession()
-    else if (n.dataset.nav === 'switch' && onSwitch) { state.token++; if (state.screen) state.screen.destroy(); root.innerHTML = ''; onSwitch() }
-  })
+    else if (n.dataset.nav === 'switch' && onSwitch) { destroy(); onSwitch() }
+  }
+  root.addEventListener('click', onClick)
+  function destroy() { state.token++; if (state.screen) state.screen.destroy(); root.removeEventListener('click', onClick); root.innerHTML = '' }
   go('overview')
 }
 

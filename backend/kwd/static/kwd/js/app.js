@@ -120,7 +120,7 @@ function startShell(root, { profile, kind, onSwitch }) {
     if (mgr) refreshCounts()
   }
 
-  root.addEventListener('click', (e) => {
+  const onClick = (e) => {
     const g = e.target.closest('[data-go]')
     if (g && root.contains(g) && !g.closest('[data-r="page"]')) { go(g.dataset.go); return }
     const n = e.target.closest('[data-nav]')
@@ -128,9 +128,11 @@ function startShell(root, { profile, kind, onSwitch }) {
       if (n.dataset.nav === 'signout') endSession()
       else if (n.dataset.nav === 'switch' && onSwitch) { destroy(); onSwitch() }
     }
-  })
+  }
+  root.addEventListener('click', onClick)
 
-  function destroy() { state.token++; if (state.screen) state.screen.destroy(); root.innerHTML = '' }
+  // the root is shared with whatever the app shows next, so this shell must let go of it completely
+  function destroy() { state.token++; if (state.screen) state.screen.destroy(); root.removeEventListener('click', onClick); root.innerHTML = '' }
   go(home)
   return { destroy }
 }

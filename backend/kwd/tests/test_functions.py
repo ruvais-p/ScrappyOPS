@@ -87,6 +87,16 @@ class StorageTests(KwdCase):
         super().setUp()
         self.make_world()
 
+    def test_photos_can_be_filed_under_dated_sub_folders(self):
+        # the visit screen files each check-in photo under <user id>/<date>/<file>
+        nested = f"{self.tso_id}/2026-10-20/abc123.jpg"
+        r = self.client.post(f"/kwd/api/storage/upload?path={nested}", data=PNG, content_type="image/jpeg", **self.tso.h)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(self.zm.raw("/kwd/api/storage/sign", {"path": nested, "expiresIn": 60}).status_code, 200)
+        self.assertNotEqual(self.tso2.raw("/kwd/api/storage/sign", {"path": nested, "expiresIn": 60}).status_code, 200)
+        too_deep = f"{self.tso_id}/a/b/c/d.jpg"
+        self.assertEqual(self.client.post(f"/kwd/api/storage/upload?path={too_deep}", data=PNG, content_type="image/jpeg", **self.tso.h).status_code, 403)
+
     def test_upload_sign_and_read(self):
         path = self.tso.upload("evidence.png")
         r = self.client.post(f"/kwd/api/storage/upload?path={path}", data=PNG, content_type="image/png", **self.tso.h)

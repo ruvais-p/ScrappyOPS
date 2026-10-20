@@ -104,5 +104,5 @@ export const sel = (cond) => (cond ? raw('selected') : '')
 export const chk = (cond) => (cond ? raw('checked') : '')
 export const dis = (cond) => (cond ? raw('disabled') : '')
 export const options = (pairs, cur) => pairs.map(([k, l]) => html`<option value="${k}" ${sel(String(k) === String(cur))}>${l}</option>`)
-export const err = (e) => (e ? html`<p class="error" role="alert">${e}</p>` : '')
+export const errLine = (e) => (e ? html`<p class="error" role="alert">${e}</p>` : '')
 export { errText }
