@@ -1,0 +1,10 @@
+/* Additions to theme.css for the plain-JS build (theme.css itself is unchanged). */
+
+/* the loader shows only after 300 ms (brand book §09) */
+.loading .late { display: inline-flex; align-items: center; gap: 10px; opacity: 0; animation: late-in 0.01s linear 0.3s forwards; }
+@keyframes late-in { to { opacity: 1; } }
+
+/* data-act buttons that look like rows */
+[data-act] { cursor: pointer; }
+button[disabled][data-act] { cursor: default; }
+.dc { display: contents; }

@@ -32,6 +32,10 @@ def run_together(jobs):
 
 
 class ConcurrencyTests(TransactionTestCase):
+    # The staff app's tables (kwd_*) point at the logins table. Naming the apps lets the between-test cleanup use
+    # TRUNCATE ... CASCADE, which empties those tables too instead of failing on the link.
+    available_apps = ["django.contrib.auth", "django.contrib.contenttypes", "django.contrib.postgres", "core", "kwd"]
+
     def setUp(self):
         with transaction.atomic():
             # this kind of test empties every table between tests, so the running numbers are put back
