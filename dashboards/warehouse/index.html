@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8B1E24">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Scrappy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Scrappy Warehouse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+:root{
+  --ox:#8B1E24;--ox7:#5E1318;--ink:#2A2426;--pearl:#F7F7F7;--paper:#EFEEEC;--stone:#6E6866;
+  --line:#D8D3CE;--green:#2F5523;--green-t:#E7F0E2;--blue:#2B5470;--blue-t:#E6EEF4;--amber-t:#FBF1DE;--amber-d:#6B4507;--ox-t:#FBEFEA;
+  --head:'Space Grotesk',Arial,sans-serif;--body:'DM Sans',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--pearl);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+a{color:var(--ox)}
+button{font:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+input,select,textarea{font:inherit}
+:focus-visible{outline:3px solid var(--ox);outline-offset:2px}
+.hidden{display:none!important}
+/* login */
+.login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;background:var(--ink)}
+.login form{background:#fff;width:100%;max-width:380px;padding:28px 24px;display:flex;flex-direction:column;gap:14px}
+.login-logo{width:190px;display:block}
+.login h1{font-size:26px;margin:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:700}
+.field input{padding:13px 12px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:16px}
+.err{color:var(--ox);font-size:14px;min-height:20px}
+.loading{padding:40px 18px;text-align:center;color:var(--stone)}
+/* shell */
+.shell{display:flex;min-height:100vh}
+aside{width:240px;flex-shrink:0;background:var(--ink);color:#fff;padding:26px 22px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh}
+.logo{width:150px;display:block}
+.brand{display:flex;flex-direction:column;align-items:center;gap:10px}
+.brand-title{font-family:var(--head);font-weight:700;font-size:17px;letter-spacing:-.02em;text-align:center;line-height:1.2}
+nav a .count:empty{display:none}
+.who small{display:block;font-size:10px;letter-spacing:.14em;font-weight:700;color:#D3BEC0}
+.fr-card{border:1px solid #ffffff33;padding:10px 12px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.fr-card small{font-size:10px;letter-spacing:.14em;font-weight:700;color:#D3BEC0}
+.fr-card b{font-family:var(--head);font-size:17px;letter-spacing:-.02em;line-height:1.2}
+.fr-card .frc{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;letter-spacing:.1em;background:var(--ox);padding:2px 10px}
+.who b{display:block;font-size:16px}
+.who span{font-size:12px;color:#D3D1C7}
+nav{display:flex;flex-direction:column}
+nav a,nav button.navbtn{color:#DDD7D8;text-decoration:none;font-size:14px;padding:11px 12px;border:0;border-bottom:1px solid #ffffff1a;display:flex;justify-content:space-between;gap:8px;background:none;text-align:left;width:100%}
+nav a.on{background:var(--ox);color:#fff;font-weight:700;border-bottom-color:var(--ox)}
+nav a .count{font-size:12px;background:#ffffff26;padding:0 7px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;font-size:12px;color:#D3D1C7}
+.logout-btn{background:none;border:1px solid #ffffff55;color:#fff;font-size:14px;padding:11px 12px;text-align:left;width:100%;min-height:44px}
+.logout-btn:hover{background:#ffffff1a}
+.mob-only{display:none!important}
+.servicebar{display:flex;height:6px}
+.servicebar i{flex:1}
+main{flex:1;min-width:0;padding:30px 36px 56px;display:flex;flex-direction:column;gap:22px}
+.eyebrow{font-size:11px;letter-spacing:.17em;font-weight:700;color:var(--ox);text-transform:uppercase}
+h1{margin:4px 0;font-family:var(--head);font-size:34px;letter-spacing:-.04em;line-height:1.08}
+h2{margin:0;font-family:var(--head);font-size:20px;letter-spacing:-.03em;line-height:1.15}
+h3{margin:0;font-family:var(--head);font-size:17px;letter-spacing:-.02em}
+.muted{color:var(--stone)}
+.small{font-size:12px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.btn{border:0;background:var(--ox);color:#fff;font-weight:700;font-size:15px;padding:13px 20px;text-decoration:none;display:inline-block;text-align:center;min-height:46px}
+.btn:hover{background:var(--ox7)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--ink)}
+.btn.ghost:hover{background:var(--paper)}
+.btn.green{background:#1F7A3A}
+.btn.green:hover{background:#17602d}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:7px 12px;font-size:13px}
+.btn.busy{opacity:.6;pointer-events:none}
+.maplink{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;vertical-align:middle;text-decoration:none;background:#fff;color:var(--ox);border:1px solid var(--ox);border-radius:50%;flex:none}
+.maplink:hover{background:var(--ox);color:#fff}
+.maplink svg{width:20px;height:20px;fill:currentColor}
+.rowend{display:inline-flex;align-items:center;justify-content:flex-end;gap:10px}
+.linkbtn{background:none;border:0;color:var(--ox);font-weight:700;text-decoration:underline;padding:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{background:#fff;border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:3px;color:var(--ink);text-align:left}
+button.kpi{cursor:pointer}
+.kpi.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.kpi .l{font-size:12px;font-weight:500;color:var(--stone)}
+.kpi.dark .l,.kpi.dark .s{color:#D3D1C7}
+.kpi .v{font-family:var(--head);font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.kpi .s{font-size:12px;color:var(--stone)}
+.cols{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.grow{flex:999 1 480px;min-width:0}
+.side{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border:1px solid var(--line)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--line)}
+.pad{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:500;padding:8px 13px;min-height:38px}
+.tab.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11px;letter-spacing:.08em;color:var(--stone);font-weight:700;text-align:left;padding:11px 8px;white-space:nowrap}
+td{padding:11px 8px;border-top:1px solid var(--paper);vertical-align:middle}
+th:first-child,td:first-child{padding-left:18px}
+th:last-child,td:last-child{padding-right:18px}
+.r{text-align:right}
+.b{font-weight:700}
+.badge{font-size:12px;font-weight:700;padding:4px 9px;white-space:nowrap;display:inline-block}
+.b-prog{background:var(--ox-t);color:var(--ox)}
+.b-sched{background:var(--paper);color:var(--ink)}
+.b-ok{background:var(--green-t);color:var(--green)}
+.b-cash{background:var(--amber-t);color:var(--amber-d)}
+.b-flag{background:var(--ox-t);color:var(--ox)}
+.b-blue{background:var(--blue-t);color:var(--blue)}
+.row-split{display:flex;justify-content:space-between;gap:10px}
+.bar{height:8px;background:var(--paper)}
+.bar i{display:block;height:8px;background:var(--ox)}
+.empty{padding:36px 18px;text-align:center;color:var(--stone)}
+.notice{background:var(--amber-t);color:var(--amber-d);padding:12px 14px;font-size:13px}
+.notice.info{background:var(--blue-t);color:var(--blue)}
+.notice.ok{background:var(--green-t);color:var(--green)}
+.notice.bad{background:var(--ox-t);color:var(--ox)}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#fff;border:1px solid var(--line);padding:12px 14px}
+.filters .f{display:flex;flex-direction:column;gap:4px}
+.filters label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--stone)}
+.filters input,.filters select{padding:9px 10px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:14px;min-height:38px}
+.filters .sp{flex:1}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.06em;background:#fff;border:1px solid var(--line);padding:7px 12px}
+.live i{width:9px;height:9px;border-radius:50%;background:#1F7A3A;animation:blink 1.4s infinite}
+.live.off i{background:var(--stone);animation:none}
+@keyframes blink{50%{opacity:.25}}
+.loadrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--paper);width:100%;background:#fff;border-left:0;border-right:0;border-top:0;text-align:left;color:var(--ink)}
+.loadrow:hover{background:var(--pearl)}
+.loadrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
+.loadrow .t{display:flex;flex-direction:column}
+.wi{width:104px;padding:9px 10px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);text-align:right;font-weight:700;font-size:15px}
+.wi.bad{border-color:var(--ox);background:var(--ox-t)}
+.wi.good{border-color:#4F7F3B;background:var(--green-t)}
+.var-ok{color:var(--green);font-weight:700}
+.var-bad{color:var(--ox);font-weight:700}
+textarea{width:100%;border:1px solid var(--line);background:var(--pearl);padding:10px;min-height:68px;resize:vertical}
+.feed{display:flex;flex-direction:column}
+.ev{padding:11px 16px;border-bottom:1px solid var(--paper);display:flex;gap:10px;font-size:14px}
+.ev .dot{flex:0 0 auto;width:10px;height:10px;margin-top:6px;background:var(--ox)}
+.ev .dot.g{background:#4F7F3B}.ev .dot.b{background:#3D6F90}.ev .dot.a{background:#DE9827}
+.ev small{color:var(--stone);display:block;font-size:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:14px 18px;font-weight:500;max-width:min(420px,calc(100vw - 32px));opacity:0;transition:all .22s;pointer-events:none;z-index:10}
+.toast.show{transform:translate(-50%,0);opacity:1}
+.toast.bad{background:var(--ox)}
+tr.pickrow{cursor:pointer}tr.pickrow:hover{background:var(--pearl)}
+tr.pickrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
+.mini{display:flex;flex-direction:column;gap:2px;padding:14px 16px;background:#fff;border:1px solid var(--line);flex:1 1 220px}
+.mini b.v{font-family:var(--head);font-size:22px;letter-spacing:-.03em}
+.inl{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--stone)}
+.fld input,.fld select{padding:10px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:15px;min-height:42px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:860px){
+  .shell{flex-direction:column}
+  aside{width:auto;height:auto;position:sticky;top:0;z-index:5;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 12px;gap:10px}
+  .logo{width:110px}.brand-title,.who,.side-foot,.fr-card{display:none}.brand{flex-direction:row}
+  nav{flex-direction:row;flex:1;justify-content:flex-end;gap:2px;flex-wrap:wrap}
+  nav a,nav button.navbtn{border-bottom:0;padding:9px 9px;font-size:13px;width:auto}
+  .mob-only{display:flex!important}
+  nav a .count{display:none}
+  main{padding:18px 14px 48px;gap:18px}
+  h1{font-size:26px}
+}
+
+/* =========================================================
+   Look and feel layer: softer shapes, motion, icons.
+   Sits after the base styles, so it overrides them.
+   ========================================================= */
+:root{--line:#E5E0DB;--r:16px;--sh:0 1px 2px rgba(42,36,38,.07),0 5px 12px -8px rgba(42,36,38,.28);--ease:cubic-bezier(.22,1,.36,1)}
+*{-webkit-tap-highlight-color:transparent}
+body{background:#F6F4F2}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes load{0%{width:0}60%{width:70%}100%{width:90%}}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}
+@keyframes barin{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+#app.enter>*{animation:rise .5s var(--ease) both}
+#app.enter>*:nth-child(2){animation-delay:.06s}
+#app.enter>*:nth-child(3){animation-delay:.12s}
+#app.enter>*:nth-child(4){animation-delay:.18s}
+#app.enter>*:nth-child(5){animation-delay:.24s}
+#app.enter>*:nth-child(n+6){animation-delay:.3s}
+#app.enter .kpi,#app.enter .mini{animation:rise .5s var(--ease) both}
+#app.enter .kpi:nth-child(2),#app.enter .mini:nth-child(2){animation-delay:.07s}
+#app.enter .kpi:nth-child(3),#app.enter .mini:nth-child(3){animation-delay:.14s}
+#app.enter .kpi:nth-child(4),#app.enter .mini:nth-child(4){animation-delay:.21s}
+#app.enter .kpi:nth-child(n+5),#app.enter .mini:nth-child(n+5){animation-delay:.28s}
+#app.enter .bar i{transform-origin:left;animation:barin .9s var(--ease) both;animation-delay:.25s}
+#topbar{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--ox),#E8A1A5);z-index:100;opacity:0;transition:opacity .25s}
+#topbar.on{opacity:1;animation:load 1.8s var(--ease) forwards}
+
+/* login */
+.login{background:radial-gradient(900px 500px at 50% -10%,#8B1E24 0%,#3a1a1d 45%,#2A2426 100%)}
+.login form{border-radius:22px;box-shadow:0 30px 60px -20px rgba(0,0,0,.55);animation:rise .7s var(--ease) both;padding:30px 26px;max-width:390px}
+.login form.shake{animation:shake .5s}
+.field input{border:1.5px solid var(--line);border-radius:12px;padding:14px;transition:border-color .2s,box-shadow .2s,background .2s;width:100%}
+.field input:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.pw{position:relative}.pw input{padding-right:64px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ox);font-weight:700;font-size:13px;padding:10px}
+
+/* sidebar */
+aside{background:linear-gradient(180deg,#2e2729 0%,#201b1d 100%);padding:26px 18px}
+.fr-card,.fr-pick select{border-radius:12px}
+.fr-card{background:#ffffff0d;border-color:#ffffff2b}
+.fr-card .frc{border-radius:6px}
+.fr-pick select{background:#ffffff14;transition:background .2s,border-color .2s}
+.fr-pick select:hover{background:#ffffff22}
+nav{gap:3px}
+nav a,nav button.navbtn{border:0;border-radius:12px;padding:11px 14px;justify-content:flex-start;align-items:center;gap:12px;position:relative;transition:background .2s,color .2s,transform .2s var(--ease)}
+nav a svg{width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav a:hover{background:#ffffff14;transform:translateX(3px)}
+nav a.on{background:var(--ox);box-shadow:0 8px 18px -8px rgba(139,30,36,.9)}
+nav a .count{margin-left:auto;border-radius:99px;padding:1px 8px;font-weight:700}
+.logout-btn{border-radius:12px;transition:background .2s}
+.servicebar{border-radius:6px;overflow:hidden}
+main{padding:32px 40px 60px;max-width:1500px}
+
+/* buttons */
+.btn{border-radius:14px;background:linear-gradient(180deg,#9a2329,var(--ox));box-shadow:0 8px 18px -10px rgba(139,30,36,.9);display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .2s var(--ease),box-shadow .2s,background .2s}
+.btn:hover{transform:translateY(-2px);background:linear-gradient(180deg,#9a2329,var(--ox));box-shadow:0 12px 22px -10px rgba(139,30,36,.95)}
+.btn:active{transform:scale(.97);box-shadow:none}
+.btn.ghost{background:#fff;box-shadow:none;border:1.5px solid var(--ink)}
+.btn.ghost:hover{background:var(--paper);box-shadow:none}
+.btn.green{background:linear-gradient(180deg,#25903f,#1F7A3A);box-shadow:0 8px 18px -10px rgba(31,122,58,.9)}
+.btn.sm{border-radius:10px}
+.btn.busy{opacity:.75;pointer-events:none}
+.btn.busy::after{content:"";width:15px;height:15px;border:2.5px solid #ffffff80;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.btn.ghost.busy::after{border-color:#2a242666;border-top-color:var(--ink)}
+.btn:disabled{box-shadow:none;transform:none;filter:grayscale(.4)}
+.maplink{transition:transform .2s var(--ease),background .2s,color .2s}
+.maplink:hover{transform:scale(1.08)}
+
+/* cards, tables, forms */
+.card,.kpi,.mini,.filters{border-radius:var(--r);box-shadow:var(--sh);border-color:var(--line)}
+.card{overflow:hidden}
+.kpi{transition:transform .25s var(--ease),box-shadow .25s}
+button.kpi:hover,a.kpi:hover{transform:translateY(-3px)}
+.kpi.dark{background:linear-gradient(135deg,#3a3033,#2A2426)}
+.tab{border-radius:99px;border-width:1.5px;padding:8px 16px;transition:background .2s,color .2s,border-color .2s,transform .2s var(--ease)}
+.tab:hover{border-color:var(--ink)}.tab:active{transform:scale(.95)}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:#FBFAF9}
+td{padding-top:12px;padding-bottom:12px}
+.badge{border-radius:99px;display:inline-flex;align-items:center;gap:6px;padding:4px 11px}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.notice{border-radius:12px}
+.bar,.bar i{border-radius:9px}
+.bar i{background:linear-gradient(90deg,var(--ox),#C4474E)}
+.filters input,.filters select,.fld input,.fld select,textarea{border-radius:10px;border-width:1.5px;transition:border-color .2s,box-shadow .2s,background .2s}
+.filters input:focus,.filters select:focus,.fld input:focus,.fld select:focus,textarea:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.wi{border-radius:10px;border-width:1.5px;transition:border-color .2s,box-shadow .2s,background .2s}
+.wi:focus{outline:0;border-color:var(--ox);box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.loadrow{transition:background .2s,box-shadow .2s}
+tr.pickrow{transition:background .15s,box-shadow .2s}
+.live{border-radius:99px}
+.ev{transition:background .2s}.ev:hover{background:#FBFAF9}
+.ev .dot{border-radius:50%}
+.empty{padding:40px 18px}
+
+/* toast and loading */
+.toast{border-radius:14px;display:flex;align-items:center;gap:12px;padding:13px 18px 13px 14px;transition:all .35s var(--ease);z-index:60;box-shadow:0 18px 40px -16px rgba(0,0,0,.6);transform:translate(-50%,24px) scale(.96)}
+.toast.show{transform:translate(-50%,0) scale(1)}
+.toast .ic{flex:none;width:24px;height:24px;border-radius:50%;background:#2e9b4c;display:grid;place-items:center;font-size:14px;font-weight:700}
+.toast.bad .ic{background:#E5484D}
+.loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px 18px}
+.loading::before{content:"";width:34px;height:34px;border:3.5px solid var(--paper);border-top-color:var(--ox);border-radius:50%;animation:spin .8s linear infinite}
+
+.chk{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1.5px solid var(--line);border-radius:99px;background:#fff;cursor:pointer;font-size:14px}
+.chk input{width:18px;height:18px;accent-color:var(--ox)}
+td input[type=checkbox],th input[type=checkbox]{width:18px;height:18px;accent-color:var(--ox);cursor:pointer}
+@media (min-width:861px){aside{overflow-y:auto;overscroll-behavior:contain;height:100vh;height:100dvh;scrollbar-width:thin;scrollbar-color:#ffffff40 transparent}aside>*{flex-shrink:0}}
+@media (min-width:861px) and (max-height:560px){
+  aside{padding:12px 14px;gap:10px}
+  .logo{width:92px}.brand{gap:4px}.brand-title{font-size:14px}
+  .fr-card{padding:8px}.fr-card b{font-size:14px}.who b{font-size:14px}
+  nav a,nav button.navbtn{padding:8px 12px;font-size:13px}
+  .side-foot{margin-top:6px;gap:8px}.side-foot>span{display:none}
+}
+@media (max-width:860px) and (max-height:480px){aside{position:static;border-radius:0}}
+@media (hover:none){.btn:hover,a.kpi:hover,button.kpi:hover,.maplink:hover,nav a:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* phones: header plus a swipeable row of tabs */
+@media (max-width:860px){
+  aside{padding:10px 12px;gap:8px;border-radius:0 0 18px 18px;box-shadow:0 10px 24px -14px rgba(0,0,0,.6);z-index:30}
+  nav{flex:1 1 100%;order:9;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:2px 0 4px;justify-content:flex-start;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  nav a,nav button.navbtn{flex:none;width:auto;padding:9px 14px;font-size:13px;border-radius:99px;background:#ffffff14;white-space:nowrap}
+  nav a:hover{transform:none}
+  nav a svg{width:18px;height:18px}
+  nav a.on{box-shadow:none}
+  nav a .count{display:inline-block;margin-left:2px}
+  nav a .count:empty{display:none}
+  main{padding:18px 14px 40px;gap:18px}
+  .toast{bottom:16px}
+}
+</style>
+<link rel="stylesheet" href="../brand.css">
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <img class="login-logo" src="../logo.webp" alt="Scrappy">
+  <form id="login-form" novalidate>
+    <h1 style="font-family:var(--head);letter-spacing:-.03em">Warehouse login</h1>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" data-pw aria-label="Show password">Show</button></div></div>
+    <div class="err" id="login-err" role="alert"></div>
+    <button class="btn block" type="submit" id="login-btn">Log in</button>
+    <span class="muted small">For warehouse staff, supervisors and HQ. Accounts are created by Scrappy HQ.</span>
+  </form>
+</div>
+
+<div id="shell" class="shell hidden">
+  <aside>
+    <div class="brand"><img class="logo" src="../logo.webp" alt="Scrappy"><div class="brand-title">Warehouse Dashboard</div></div>
+    <div class="fr-card" id="fr-card"><small>FRANCHISE</small><b id="fr-name">&nbsp;</b><span class="frc" id="fr-code"></span></div>
+    <div class="who"><b id="who-name"></b><span class="role" id="who-role"></span><span id="who-meta"></span></div>
+    <nav aria-label="Main">
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#leads" data-view="leads">Leads <span class="count" id="nav-leads"></span></a>
+      <a href="#reconcile" data-view="reconcile">Reconcile loads <span class="count" id="nav-wait"></span></a>
+      <a href="#inventory" data-view="inventory">Inventory</a>
+      <a href="#requirements" data-view="requirements">HQ requirements <span class="count" id="nav-req"></span></a>
+      <a href="#finance" data-view="finance">Finance <span class="count" id="nav-fin"></span></a>
+      <button class="navbtn mob-only" data-act="logout" type="button">Log out</button>
+    </nav>
+    <div class="side-foot">
+      <span>HQ is the only buyer. Stock is released to HQ against its requirements. Weighing tolerance ±<b id="tolShow">2</b>%.</span>
+      <button class="logout-btn" data-act="logout" type="button">Log out</button>
+      <div class="servicebar" aria-hidden="true"><i style="background:#8B1E24"></i><i style="background:#4F7F3B"></i><i style="background:#3D6F90"></i><i style="background:#29908F"></i><i style="background:#DE9827"></i></div>
+    </div>
+  </aside>
+  <main id="app" aria-live="polite"></main>
+</div>
+<div id="topbar" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =========================================================
+   Scrappy Warehouse dashboard
+   Plain HTTPS to Supabase, no library. The publishable key is safe in a page.
+   All rules (who can weigh, release, count, verify) are enforced by the database.
+   ========================================================= */
+const SUPABASE_URL = 'https://suluhhbomiuwwocrfpxg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_45-7fJZdo_jovQfhN0dhtw_FNmo1Fw1';
+const SESSION_KEY = 'scrappy_wh_session';
+const STAFF = ['warehouse', 'supervisor'];
+const ROLE_LABEL = { warehouse: 'WAREHOUSE STAFF', supervisor: 'SUPERVISOR', hq: 'HQ' };
+const ROLE_TITLE = { warehouse: 'Warehouse manager', supervisor: 'Supervisor', hq: 'HQ' };
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => Number(v || 0);
+const kg = n => (Math.round(num(n) * 10) / 10).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const rs = n => (num(n) < 0 ? '−₹' : '₹') + Math.abs(Math.round(num(n))).toLocaleString('en-IN');
+const IST = 'Asia/Kolkata';
+const dayOf = t => t ? new Date(t).toLocaleDateString('en-CA', { timeZone: IST }) : '';
+const todayIST = () => dayOf(Date.now());
+const dlabel = d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'UTC', day: '2-digit', month: 'short' }) : '';
+const tlabel = t => t ? new Date(t).toLocaleTimeString('en-IN', { timeZone: IST, hour: 'numeric', minute: '2-digit' }).toUpperCase() : '—';
+const addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+function toast(m, bad) { const t = $('#toast'); t.innerHTML = '<span class="ic">' + (bad ? '!' : '✓') + '</span><span></span>'; t.lastChild.textContent = m; t.classList.toggle('bad', !!bad); t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), bad ? 5000 : 3000); }
+function store(k, v) { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+
+/* ---------- Supabase connection ---------- */
+let session = load(SESSION_KEY);
+async function authCall(grant, body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grant}`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || data.message || 'Login failed');
+  session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in || 3600) * 1000, user_id: (data.user && data.user.id) || (session && session.user_id) };
+  store(SESSION_KEY, session);
+  rtToken();
+  return session;
+}
+async function ensureFresh() {
+  if (session && session.expires_at - Date.now() < 300000) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); }
+    catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+  }
+}
+async function api(path, { method = 'GET', body, retry = true } = {}) {
+  await ensureFresh();
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method,
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session ? session.access_token : SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (res.status === 401 && retry && session) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); } catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+    return api(path, { method, body, retry: false });
+  }
+  const text = await res.text();
+  let data = null; try { data = text ? JSON.parse(text) : null; } catch (e) {}
+  if (!res.ok) throw new Error((data && (data.message || data.msg)) || `Request failed (${res.status})`);
+  return data;
+}
+const rest = q => api('/rest/v1/' + q);
+const rpc = (fn, args = {}) => api('/rest/v1/rpc/' + fn, { method: 'POST', body: args });
+
+/* ---------- state ---------- */
+const FAR_PAST = '2026-01-01';
+const S = {
+  profile: null, role: '', tol: 2, items: [], profiles: [], loads: [], totals: {}, paid: {}, wmap: {}, reqs: [], rels: [],
+  stock: [], moves: [], routes: [], txns: [], cash: [], pk: {},
+  from: addDays(todayIST(), -6), to: todayIST(), preset: '7', status: 'submitted', sel: null, draft: {}, notes: {},
+  rs: 'all', rel: null, cancel: null, fd: 'all', ft: 'all', rsel: null, feed: [], snap: null, wsOpen: false, lastOk: 0,
+  lv: null, lc: { unassigned: 0, failed_recent: 0, open_today: 0 }, lf: { tab: 'assign', driver: '', q: '' }, lsel: [], lsplit: false, lsplitDrv: [], ldrv: ''
+};
+const canWeigh = () => S.role === 'warehouse' || S.role === 'hq';
+const canRelease = () => S.role === 'supervisor' || S.role === 'hq'; /* only the supervisor (or HQ) releases stock to HQ */
+const canVerify = () => S.role === 'supervisor' || S.role === 'hq';
+const canAssign = () => S.role === 'supervisor' || S.role === 'hq';
+const isHQ = () => S.role === 'hq';
+const inRange = d => d >= S.from && d <= S.to;
+const itemById = id => S.items.find(i => i.id === id);
+const driverName = id => { const p = S.profiles.find(x => x.id === id); return p ? p.full_name : 'Driver'; };
+const personName = id => { const p = S.profiles.find(x => x.id === id); return p ? p.full_name : '—'; };
+const billedOf = (loadId, name) => num(((S.totals[loadId] || {})[name] || {}).kg);
+const billedTotal = l => S.items.reduce((a, i) => a + billedOf(l.id, i.name), 0);
+const weighedOf = (loadId, itemId) => { const w = (S.wmap[loadId] || {})[itemId]; return w ? num(w.warehouse_kg) : null; };
+const weighedTotal = l => S.items.reduce((a, i) => a + num(weighedOf(l.id, i.id)), 0);
+const pickupCount = id => S.paid[id] || 0;
+const varPct = (b, w) => b > 0 ? (w - b) / b * 100 : 0;
+const within = (b, w) => b > 0 ? Math.abs(w - b) / b <= S.tol / 100 : w === 0;
+const STATUS = {
+  open: ['On route', 'b-sched'], submitted: ['Waiting for weighing', 'b-cash'],
+  reconciled: ['✓ Reconciled', 'b-ok'], flagged: ['! Flagged', 'b-flag']
+};
+const badge = s => `<span class="badge ${(STATUS[s] || ['', 'b-sched'])[1]}">${esc((STATUS[s] || [s])[0])}</span>`;
+const SST = {
+  on_route: ['On route', 'b-sched'], awaiting_count: ['Cash count pending', 'b-cash'], counted: ['Awaiting supervisor', 'b-blue'],
+  verified: ['✓ Verified', 'b-ok'], disputed: ['! Disputed', 'b-flag'],
+  driver_out: ['Driver still out', 'b-sched'], with_last: ['Counted with last route', 'b-sched'], included: ['Included in last count', 'b-ok']
+};
+const sbadge = s => `<span class="badge ${(SST[s] || ['', 'b-sched'])[1]}">${esc((SST[s] || [s])[0])}</span>`;
+const TYPEL = { float_issued: 'Float issued', cash_payout: 'Cash paid to customer', upi_payout: 'UPI paid to customer', handover: 'Cash handed over' };
+const loadsInRange = () => S.loads.filter(l => inRange(dayOf(l.started_at)));
+const stockNow = itemId => { const r = S.stock.find(x => x.item_id === itemId); return r ? num(r.stock_now_kg) : 0; };
+const needsFin = () => S.routes.filter(r => r.route_status === 'awaiting_count' || r.route_status === 'counted').length;
+const waitingLoads = () => S.loads.filter(l => l.status === 'submitted');
+
+/* ---------- data ---------- */
+async function refresh() {
+  const to = S.to < todayIST() ? todayIST() : S.to;
+  const [items, profiles, loads, totals, paid, wts, reqs, rels, stock, moves, routes, txns, cash, lcnt] = await Promise.all([
+    rest('scrap_items?select=id,name&active=eq.true&order=id'),
+    rest('profiles?select=id,full_name,role,vehicle_no,territory,active'),
+    rest('loads?select=id,code,driver_id,vehicle_no,status,started_at,submitted_at,warehouse_kg,weighed_at,weighing_note,resolved_at,resolved_by,resolution_note&order=id.desc&limit=1000'),
+    rest('load_item_totals?select=load_id,item_name,total_kg,total_value'),
+    rest('bills?select=id,load_id&status=eq.paid&limit=5000'),
+    rest('load_weighings?select=load_id,item_id,billed_kg,warehouse_kg,within_tolerance,weighed_by,weighed_at&superseded_at=is.null&limit=5000'),
+    rest('hq_requirement_progress?select=*&order=id.desc&limit=500'),
+    rest('hq_releases?select=id,code,requirement_id,item_id,kg,vehicle_no,note,released_by,released_at&order=released_at.desc&limit=500'),
+    rpc('wh_stock_report', { p_from: S.from, p_to: S.to }),
+    rest('wh_stock_movements?select=day,kind,item_id,item_name,kg,ref,happened_at&order=happened_at.desc&limit=3000'),
+    rpc('wh_route_cash', { p_from: addDays(todayIST(), -90), p_to: to }),
+    rpc('wh_transactions', { p_from: S.from, p_to: S.to, p_driver: S.fd === 'all' ? null : S.fd, p_limit: 300 }),
+    rest('driver_cash_in_hand?select=*'),
+    rpc('wh_lead_counts')
+  ]);
+  S.items = items; S.profiles = profiles; S.loads = loads; S.reqs = reqs; S.rels = rels; S.stock = stock; S.moves = moves;
+  S.routes = routes; S.txns = txns; S.cash = cash; if (lcnt && lcnt[0]) S.lc = lcnt[0];
+  S.totals = {}; totals.forEach(t => { (S.totals[t.load_id] = S.totals[t.load_id] || {})[t.item_name] = { kg: num(t.total_kg), value: num(t.total_value) }; });
+  S.paid = {}; paid.forEach(b => { S.paid[b.load_id] = (S.paid[b.load_id] || 0) + 1; });
+  S.wmap = {}; wts.forEach(w => { (S.wmap[w.load_id] = S.wmap[w.load_id] || {})[w.item_id] = w; });
+  S.lastOk = Date.now();
+  diffFeed();
+  if (curView() === 'leads') { try { await loadLeads(); } catch (e) {} }
+}
+async function loadLeads() {
+  const [rows, work] = await Promise.all([rpc('wh_leads', { p_from: S.from, p_to: S.to, p_limit: 1000 }), rpc('wh_driver_workload', { p_date: todayIST() })]);
+  S.lv = { rows: rows || [], work: work || [], at: Date.now() };
+}
+async function loadTol() { try { S.tol = num(await rpc('wh_tolerance_pct')) || 2; } catch (e) {} $('#tolShow').textContent = S.tol; }
+
+/* ---------- live feed: what changed since the last refresh ---------- */
+function snapshot() {
+  const o = { loads: {}, paid: { ...S.paid }, reqs: {}, rels: {}, routes: {} };
+  S.loads.forEach(l => { o.loads[l.id] = l.status; });
+  S.reqs.forEach(r => { o.reqs[r.id] = r.status; });
+  S.rels.forEach(r => { o.rels[r.id] = 1; });
+  S.routes.forEach(r => { o.routes[r.load_id] = r.route_status; });
+  return o;
+}
+function diffFeed() {
+  const cur = snapshot(), old = S.snap; S.snap = cur;
+  if (!old) return;
+  const ev = (c, t) => S.feed.unshift({ c, t, when: new Date().toLocaleTimeString('en-IN', { timeZone: IST, hour: 'numeric', minute: '2-digit', second: '2-digit' }).toUpperCase() });
+  S.loads.forEach(l => {
+    const was = old.loads[l.id];
+    if (was === undefined) ev('b', `<b>${esc(driverName(l.driver_id))}</b> started route <b>${esc(l.code)}</b>.`);
+    else if (was !== l.status) {
+      if (l.status === 'submitted') ev('a', `<b>${esc(driverName(l.driver_id))}</b> ended route. <b>${esc(l.code)}</b> is at the warehouse, ${kg(billedTotal(l))} kg billed.`);
+      else if (l.status === 'reconciled') ev('g', `<b>${esc(l.code)}</b> reconciled (${kg(weighedTotal(l))} kg weighed).`);
+      else if (l.status === 'flagged') ev('a', `<b>${esc(l.code)}</b> flagged for HQ review.`);
+    }
+    const p = cur.paid[l.id] || 0, op = old.paid[l.id] || 0;
+    if (p > op) ev('g', `<b>${esc(driverName(l.driver_id))}</b> closed ${p - op} pickup${p - op > 1 ? 's' : ''}. <b>${esc(l.code)}</b> now ${kg(billedTotal(l))} kg billed.`);
+  });
+  S.reqs.forEach(r => { if (old.reqs[r.id] === undefined) ev('b', `<b>HQ</b> raised <b>${esc(r.code)}</b>: ${kg(r.required_kg)} kg ${esc(r.item_name)}.`); });
+  S.rels.forEach(r => { if (old.rels[r.id] === undefined) ev('g', `<b>${kg(r.kg)} kg ${esc((itemById(r.item_id) || {}).name || '')}</b> released to HQ (${esc(r.code)}).`); });
+  S.routes.forEach(r => {
+    const was = old.routes[r.load_id];
+    if (was !== undefined && was !== r.route_status && ['counted', 'verified', 'disputed'].includes(r.route_status))
+      ev(r.route_status === 'verified' ? 'g' : r.route_status === 'disputed' ? 'a' : 'b', `Cash for <b>${esc(r.load_code)}</b> (${esc(r.driver_name)}): ${esc((SST[r.route_status] || [r.route_status])[0])}.`);
+  });
+  S.feed = S.feed.slice(0, 15);
+}
+const feedHtml = () => S.feed.length ? S.feed.map(e => `<div class="ev"><span class="dot ${e.c}"></span><div>${e.t}<small>${esc(e.when)}</small></div></div>`).join('') : '<div class="empty">Waiting for driver activity…</div>';
+
+/* ---------- shared bits ---------- */
+function filterBar(extra = '') {
+  const P = [['today', 'Today'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['all', 'All']];
+  return `<div class="filters">
+    <div class="f"><label for="from">FROM</label><input type="date" id="from" value="${S.from}" data-act="range"></div>
+    <div class="f"><label for="to">TO</label><input type="date" id="to" value="${S.to}" data-act="range"></div>
+    <div class="tabs">${P.map(p => `<button class="tab ${S.preset === p[0] ? 'on' : ''}" data-act="preset" data-p="${p[0]}">${p[1]}</button>`).join('')}</div>
+    ${extra}<span class="sp"></span>
+    <span class="live ${S.wsOpen ? '' : 'off'}" title="${S.wsOpen ? 'Live: changes appear within a second' : 'Refreshes every 20 seconds'}"><i></i>${S.wsOpen ? 'LIVE' : 'AUTO-REFRESH'}</span>
+  </div>`;
+}
+const selectOptions = (list, val) => list.map(o => `<option value="${esc(o[0])}" ${String(val) === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
+
+/* ---------- overview ---------- */
+function vOverview() {
+  const L = loadsInRange(), waiting = waitingLoads(), flagged = S.loads.filter(l => l.status === 'flagged'), route = S.loads.filter(l => l.status === 'open');
+  const rec = L.filter(l => l.status === 'reconciled' || l.status === 'flagged');
+  const stockKg = S.stock.reduce((a, r) => a + num(r.stock_now_kg), 0);
+  const openReqs = S.reqs.filter(r => r.status === 'open' || r.status === 'partial');
+  const needKg = openReqs.reduce((a, r) => a + num(r.remaining_kg), 0);
+  const lc = S.lc || { unassigned: 0, failed_recent: 0 };
+  return `
+  <div class="head"><div><div class="eyebrow">Warehouse · ${dlabel(S.from)} – ${dlabel(S.to)}</div><h1>Today at the yard.</h1>
+    <div class="muted">Loads, weighing, HQ requirements and cash update live as drivers work.</div></div></div>
+  ${filterBar()}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Stock in yard now</span><span class="v">${kg(stockKg)} kg</span><span class="s">Weighed in, minus released to HQ</span></div>
+    <button class="kpi" data-act="goto" data-v="reconcile" data-s="submitted"><span class="l">Waiting for weighing</span><span class="v">${waiting.length} load${waiting.length === 1 ? '' : 's'}</span><span class="s">${kg(waiting.reduce((a, l) => a + billedTotal(l), 0))} kg billed</span></button>
+    <button class="kpi" data-act="goto" data-v="reconcile" data-s="flagged"><span class="l">Flagged for HQ</span><span class="v" style="color:${flagged.length ? 'var(--ox)' : 'inherit'}">${flagged.length}</span><span class="s">Outside ±${S.tol}% on a material</span></button>
+    <div class="kpi"><span class="l">On the road now</span><span class="v">${route.length} load${route.length === 1 ? '' : 's'}</span><span class="s">${kg(route.reduce((a, l) => a + billedTotal(l), 0))} kg billed so far</span></div>
+    <button class="kpi" data-act="goto" data-v="requirements"><span class="l">HQ still needs</span><span class="v">${kg(needKg)} kg</span><span class="s">${openReqs.length} open requirement${openReqs.length === 1 ? '' : 's'}</span></button>
+    <button class="kpi" data-act="goto" data-v="finance"><span class="l">Cash to count or verify</span><span class="v">${needsFin()}</span><span class="s">Route settlements waiting</span></button>
+    <button class="kpi" data-act="goto" data-v="leads" data-lt="assign"><span class="l">Leads to assign</span><span class="v" style="color:${num(lc.unassigned) ? 'var(--ox)' : 'inherit'}">${num(lc.unassigned)}</span><span class="s">Uploaded by HQ, no driver yet</span></button>
+    <button class="kpi" data-act="goto" data-v="leads" data-lt="failed"><span class="l">Pickups not completed</span><span class="v" style="color:${num(lc.failed_recent) ? 'var(--ox)' : 'inherit'}">${num(lc.failed_recent)}</span><span class="s">Last 3 days · see the reasons</span></button>
+  </div>
+  <div class="cols">
+    <section class="card grow">
+      <div class="card-h"><h2>Loads in range</h2><span class="muted small">${L.length} loads · ${kg(rec.reduce((a, l) => a + weighedTotal(l), 0))} kg received</span></div>
+      <div class="scroll"><table style="min-width:600px"><thead><tr><th>LOAD</th><th>DATE</th><th>DRIVER</th><th class="r">PICKUPS</th><th class="r">BILLED KG</th><th class="r">WEIGHED KG</th><th>STATUS</th></tr></thead>
+      <tbody>${L.map(l => `<tr><td class="b">${esc(l.code)}</td><td>${dlabel(dayOf(l.started_at))}</td><td>${esc(driverName(l.driver_id))}</td><td class="r">${pickupCount(l.id)}</td>
+        <td class="r">${kg(billedTotal(l))}</td><td class="r">${l.status === 'reconciled' || l.status === 'flagged' ? kg(weighedTotal(l)) : '—'}</td>
+        <td>${badge(l.status)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No loads in this date range.</td></tr>'}</tbody></table></div>
+    </section>
+    <section class="card side">
+      <div class="card-h"><h2>Live updates</h2></div>
+      <div class="feed">${feedHtml()}</div>
+    </section>
+  </div>`;
+}
+
+/* ---------- reconcile ---------- */
+function reconcileList() {
+  return S.loads.filter(l => (S.status === 'all' ? inRange(dayOf(l.started_at)) : l.status === S.status));
+}
+function vReconcile() {
+  const list = reconcileList();
+  let L = S.loads.find(l => l.id === S.sel);
+  if (!L || !list.includes(L)) L = list[0] || null;
+  S.sel = L ? L.id : null;
+  const extra = `<div class="f"><label for="st">STATUS</label><select id="st" data-act="status">
+    ${selectOptions([['submitted', 'Waiting for weighing'], ['flagged', 'Flagged'], ['reconciled', 'Reconciled'], ['open', 'On route'], ['all', 'All in date range']], S.status)}</select></div>`;
+  return `
+  <div><div class="eyebrow">Check and reconcile</div><h1>Weigh every material.</h1>
+    <div class="muted">${canWeigh() ? `Enter the warehouse weight for each material. Anything beyond ±${S.tol}% is flagged for HQ.` : 'View only. Weighing is done by warehouse staff.'}</div></div>
+  ${filterBar(extra)}
+  <div class="cols">
+    <section class="card side" style="flex:1 1 290px;max-width:380px">
+      <div class="card-h"><h2>Loads</h2><span class="muted small">${list.length}</span></div>
+      ${list.length ? list.map(l => `<button class="loadrow ${L && l.id === L.id ? 'on' : ''}" data-act="pick" data-id="${l.id}">
+        <span class="t"><b>${esc(l.code)}</b><span class="muted small">${dlabel(dayOf(l.started_at))} · ${esc(driverName(l.driver_id))} · ${pickupCount(l.id)} pickups</span></span>
+        <span style="text-align:right">${badge(l.status)}<br><span class="muted small">${kg(billedTotal(l))} kg</span></span></button>`).join('') : '<div class="empty">No loads match.</div>'}
+    </section>
+    <section class="grow" id="detail" style="display:flex;flex-direction:column;gap:14px">${L ? detail(L) : '<div class="card empty">Choose a load.</div>'}</section>
+  </div>`;
+}
+const editable = L => L.status === 'submitted' && canWeigh();
+function detail(L) {
+  const can = editable(L), d = S.draft[L.id] || (S.draft[L.id] = {});
+  const show = S.items.filter(i => billedOf(L.id, i.name) > 0 || weighedOf(L.id, i.id) != null || can);
+  const done = L.status === 'reconciled' || L.status === 'flagged';
+  return `
+  <div class="card">
+    <div class="card-h"><div><h2>${esc(L.code)} · ${esc(driverName(L.driver_id))}</h2><span class="muted small">${dlabel(dayOf(L.started_at))} · ${esc(L.vehicle_no || '')} · ${pickupCount(L.id)} paid pickups</span></div>${badge(L.status)}</div>
+    <div class="scroll"><table style="min-width:620px">
+      <thead><tr><th>MATERIAL</th><th class="r">BILLED KG</th><th class="r">WEIGHED KG</th><th class="r">DIFF KG</th><th class="r">DIFF %</th><th>CHECK</th></tr></thead>
+      <tbody>${show.map(i => `<tr>
+        <td class="b">${esc(i.name)}</td><td class="r">${kg(billedOf(L.id, i.name))}</td>
+        <td class="r">${can ? `<input class="wi" type="number" inputmode="decimal" step="0.1" min="0" data-act="w" data-item="${i.id}" value="${esc(d[i.id] ?? '')}" placeholder="0.0" aria-label="Weighed kg of ${esc(i.name)}">` : (weighedOf(L.id, i.id) != null ? kg(weighedOf(L.id, i.id)) : '—')}</td>
+        <td class="r" id="dk-${i.id}"></td><td class="r" id="dp-${i.id}"></td><td id="ch-${i.id}"></td></tr>`).join('')}
+        <tr style="border-top:2px solid var(--ink)"><td class="b">Total</td><td class="r b">${kg(billedTotal(L))}</td><td class="r b" id="tw"></td><td class="r b" id="tdk"></td><td class="r b" id="tdp"></td><td></td></tr>
+      </tbody></table></div>
+  </div>
+  ${L.status === 'open' ? '<div class="notice">This load is still on the road. Billed kg grows as the driver closes pickups. Weighing opens after End route.</div>' : ''}
+  ${L.status === 'submitted' && !canWeigh() ? '<div class="notice info">Waiting for warehouse staff to weigh this load.</div>' : ''}
+  ${can ? `<div class="card pad"><h3>Warehouse note</h3><textarea id="note" placeholder="e.g. Wet paper, moisture loss. Photo taken.">${esc(S.notes[L.id] || '')}</textarea>
+    <button class="btn green block" data-act="weigh" id="bt-ok">Save weighing</button>
+    <span class="muted small" id="hint"></span></div>` : ''}
+  ${done && L.weighing_note ? `<div class="notice"><b>Warehouse note:</b> ${esc(L.weighing_note)}</div>` : ''}
+  ${L.status === 'flagged' ? flaggedPanel(L) : ''}
+  ${L.resolution_note ? `<div class="notice info"><b>HQ decision${L.resolved_by ? ' by ' + esc(personName(L.resolved_by)) : ''}:</b> ${esc(L.resolution_note)}</div>` : ''}
+  <div class="card"><div class="card-h"><h3>Paid pickups on this load</h3></div><div id="pk">${pickupsHtml(L.id)}</div></div>`;
+}
+function flaggedPanel(L) {
+  if (!isHQ()) return '<div class="notice bad"><b>Flagged.</b> HQ must review the difference before this load can be closed or re-weighed.</div>';
+  return `<div class="card pad" style="border:2px solid var(--ox)"><h3>HQ decision on this flagged load</h3>
+    <span class="muted">Accept the difference, or send the load back so it can be weighed again.</span>
+    <textarea id="resnote" placeholder="Why? (required)"></textarea>
+    <div class="row-split" style="flex-wrap:wrap"><button class="btn green" style="flex:1 1 200px" data-act="resolve" data-a="accept">Accept the difference</button>
+    <button class="btn ghost" style="flex:1 1 200px" data-act="resolve" data-a="reweigh">Send back to re-weigh</button></div></div>`;
+}
+function mapLink(l) {
+  const la = Number(l.latitude), lo = Number(l.longitude);
+  if (l.latitude == null || l.longitude == null || !isFinite(la) || !isFinite(lo)) return '';
+  return `<a class="maplink" href="https://www.google.com/maps/dir/?api=1&destination=${la},${lo}&travelmode=driving" target="_blank" rel="noopener" title="Open in Google Maps" aria-label="Open ${esc(l.customer_name)} in Google Maps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></a>`;
+}
+function callLink(l) {
+  const d = String(l.phone || '').replace(/\D/g, '').slice(-10);
+  if (d.length !== 10) return '';
+  return `<a class="maplink" href="tel:+91${d}" title="Call ${d}" aria-label="Call ${esc(l.customer_name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg></a>`;
+}
+function pickupsHtml(id) {
+  const p = S.pk[id];
+  if (p === undefined) return '<div class="empty">Loading…</div>';
+  if (!p.length) return '<div class="empty">No paid pickups yet.</div>';
+  return `<div class="scroll"><table style="min-width:900px"><thead><tr><th>BILL</th><th>LEAD</th><th>CUSTOMER</th><th>PHONE</th><th>AREA</th><th>PAID</th><th class="r">KG</th><th class="r">AMOUNT</th><th>BY</th><th></th></tr></thead><tbody>${p.map(x => `<tr><td class="b">${esc(x.bill_no)}</td><td>${esc(x.lead_code)}</td><td>${esc(x.customer_name || '—')}</td><td>${esc(x.phone || '—')}</td><td>${esc(x.area || '—')}</td><td>${tlabel(x.paid_at)}</td><td class="r">${kg(x.total_kg)}</td><td class="r b">${rs(x.total_amount)}</td><td>${esc(x.payment_method === 'cash' ? 'Cash' : 'UPI')}</td><td class="r"><span class="rowend">${mapLink(x)}${callLink(x)}</span></td></tr>`).join('')}</tbody></table></div>`;
+}
+async function loadPickups(id) {
+  try { S.pk[id] = await rpc('wh_pickups', { p_from: FAR_PAST, p_to: addDays(todayIST(), 1), p_load_id: id }); }
+  catch (e) { S.pk[id] = []; }
+  if (curView() === 'reconcile' && S.sel === id && $('#pk')) $('#pk').innerHTML = pickupsHtml(id);
+}
+function updateRows(L) {
+  const can = editable(L), d = S.draft[L.id] || {};
+  let tw = 0, anyBad = false, anyBlankNeeded = false, tb = 0, any = false;
+  S.items.forEach(i => {
+    if (!$('#dk-' + i.id)) return;
+    const b = billedOf(L.id, i.name); tb += b;
+    const raw = can ? d[i.id] : weighedOf(L.id, i.id), blank = raw === '' || raw == null, inp = document.querySelector(`input[data-item="${i.id}"]`);
+    if (blank) {
+      if (b > 0) anyBlankNeeded = true;
+      $('#dk-' + i.id).textContent = '—'; $('#dp-' + i.id).textContent = '—';
+      $('#ch-' + i.id).innerHTML = can ? (b > 0 ? '<span class="muted small">Enter weight</span>' : '<span class="muted small">Not billed</span>') : '';
+      if (inp) inp.className = 'wi'; return;
+    }
+    const w = num(raw); tw += w; any = true;
+    const diff = w - b, p = varPct(b, w), ok = within(b, w);
+    if (!ok) anyBad = true;
+    $('#dk-' + i.id).innerHTML = `<span class="${ok ? 'var-ok' : 'var-bad'}">${diff > 0 ? '+' : ''}${kg(diff)}</span>`;
+    $('#dp-' + i.id).innerHTML = b > 0 ? `<span class="${ok ? 'var-ok' : 'var-bad'}">${p > 0 ? '+' : ''}${p.toFixed(1)}%</span>` : '—';
+    $('#ch-' + i.id).innerHTML = ok ? `<span class="badge b-ok">✓ Within ±${S.tol}%</span>` : `<span class="badge b-flag">! ${diff < 0 ? 'Short' : 'Excess'}</span>`;
+    if (inp) inp.className = 'wi ' + (ok ? 'good' : 'bad');
+  });
+  if ($('#tw')) {
+    $('#tw').textContent = any ? kg(tw) : '—';
+    const td = tw - tb;
+    $('#tdk').textContent = any ? (td > 0 ? '+' : '') + kg(td) : '—';
+    $('#tdp').textContent = any && tb > 0 ? (td > 0 ? '+' : '') + varPct(tb, tw).toFixed(1) + '%' : '—';
+  }
+  const hint = $('#hint'), ok = $('#bt-ok');
+  if (hint && ok) {
+    hint.textContent = anyBlankNeeded ? 'Enter the weight of every billed material to continue.' : anyBad ? `At least one material is outside ±${S.tol}%. The load will be flagged for HQ.` : any ? 'All entered materials are within tolerance.' : '';
+    ok.disabled = anyBlankNeeded || !any; ok.textContent = anyBad && !anyBlankNeeded ? 'Save weighing (will be flagged)' : 'Save weighing';
+  }
+}
+
+/* ---------- inventory ---------- */
+function vInventory() {
+  const R = S.stock, sum = f => R.reduce((a, r) => a + num(r[f]), 0), max = Math.max(1, ...R.map(r => num(r.closing_kg)));
+  const rece = S.moves.filter(m => m.kind === 'received' && inRange(m.day));
+  const days = [...new Set(rece.map(m => m.day))].sort().reverse();
+  const rels = S.rels.filter(x => inRange(dayOf(x.released_at)));
+  return `
+  <div class="head"><div><div class="eyebrow">Inventory</div><h1>What is in the yard.</h1>
+    <div class="muted">Opening stock + weighed kg received − kg released to HQ = closing stock. Pick any dates.</div></div>
+    <button class="btn ghost" data-act="csv">Download CSV</button></div>
+  ${filterBar()}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Closing stock on ${dlabel(S.to)}</span><span class="v">${kg(sum('closing_kg'))} kg</span><span class="s">Opening ${kg(sum('opening_kg'))} kg</span></div>
+    <div class="kpi"><span class="l">Stock value at HQ rates</span><span class="v">${rs(sum('closing_value'))}</span><span class="s">Indicative</span></div>
+    <div class="kpi"><span class="l">Received (weighed)</span><span class="v">${kg(sum('received_kg'))} kg</span><span class="s">In the selected dates</span></div>
+    <div class="kpi"><span class="l">Released to HQ</span><span class="v">${kg(sum('released_kg'))} kg</span><span class="s">${rels.length} release${rels.length === 1 ? '' : 's'}</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Stock by material</h2><span class="muted small">HQ need and cover use stock today</span></div>
+    <div class="scroll"><table style="min-width:820px"><thead><tr><th>MATERIAL</th><th class="r">OPENING KG</th><th class="r">RECEIVED KG</th><th class="r">RELEASED TO HQ</th><th class="r">CLOSING KG</th><th class="r">VALUE</th><th class="r">HQ STILL NEEDS</th><th>COVER</th><th style="width:12%">SHARE</th></tr></thead>
+    <tbody>${R.map(r => { const need = num(r.hq_open_need_kg), gap = need - num(r.stock_now_kg);
+      return `<tr><td class="b">${esc(r.item_name)}</td><td class="r muted">${kg(r.opening_kg)}</td><td class="r">${kg(r.received_kg)}</td><td class="r">${num(r.released_kg) ? '− ' + kg(r.released_kg) : '—'}</td><td class="r b">${kg(r.closing_kg)}</td><td class="r">${rs(r.closing_value)}</td>
+      <td class="r">${need ? kg(need) : '—'}</td><td>${need ? (gap > 0 ? `<span class="badge b-flag">Short ${kg(gap)}</span>` : '<span class="badge b-ok">✓ In stock</span>') : '<span class="muted small">No request</span>'}</td>
+      <td><div class="bar"><i style="width:${Math.max(2, Math.max(0, num(r.closing_kg)) / max * 100).toFixed(1)}%"></i></div></td></tr>`; }).join('')}
+      <tr style="border-top:2px solid var(--ox7)"><td class="b">Total</td><td class="r b">${kg(sum('opening_kg'))}</td><td class="r b">${kg(sum('received_kg'))}</td><td class="r b">− ${kg(sum('released_kg'))}</td><td class="r b">${kg(sum('closing_kg'))}</td><td class="r b">${rs(sum('closing_value'))}</td><td class="r b">${kg(sum('hq_open_need_kg'))}</td><td colspan="2"></td></tr></tbody></table></div></section>
+  <div class="cols">
+    <section class="card grow"><div class="card-h"><h2>Received by day</h2><span class="muted small">Weighed kg of reconciled and flagged loads</span></div>
+      <div class="scroll"><table style="min-width:640px"><thead><tr><th>DATE</th>${S.items.map(i => `<th class="r">${esc(i.name.toUpperCase())}</th>`).join('')}<th class="r">TOTAL</th></tr></thead>
+      <tbody>${days.map(dd => { let t = 0;
+        return `<tr><td class="b">${dlabel(dd)}</td>${S.items.map(i => { const v = rece.filter(m => m.day === dd && m.item_id === i.id).reduce((a, m) => a + num(m.kg), 0); t += v; return `<td class="r">${v ? kg(v) : '—'}</td>`; }).join('')}<td class="r b">${kg(t)}</td></tr>`; }).join('') || `<tr><td colspan="${S.items.length + 2}" class="empty">Nothing received in this range.</td></tr>`}</tbody></table></div></section>
+    <section class="card side"><div class="card-h"><h2>Released to HQ</h2><span class="muted small">${rels.length}</span></div>
+      ${relLog(rels)}
+    </section>
+  </div>`;
+}
+function relLog(rels) {
+  return rels.length ? rels.map(x => `<div class="row-split" style="padding:11px 16px;border-bottom:1px solid var(--paper)"><span><b>${esc((itemById(x.item_id) || {}).name || '')}</b> · ${esc(x.code)}<br><span class="muted small">${dlabel(dayOf(x.released_at))} · for ${esc(reqCode(x.requirement_id))} · ${esc(x.vehicle_no)}</span></span><b>− ${kg(x.kg)} kg</b></div>`).join('') : '<div class="empty">No releases in this range.</div>';
+}
+const reqCode = id => { const r = S.reqs.find(x => x.id === id); return r ? r.code : '—'; };
+
+/* ---------- leads: the supervisor splits the franchise's leads among drivers ---------- */
+const LSTAT = { unassigned: ['Not assigned', 'b-cash'], scheduled: ['Assigned', 'b-sched'], in_progress: ['In progress', 'b-prog'], closed: ['✓ Done', 'b-ok'], failed: ['Not completed', 'b-flag'], cancelled: ['Cancelled', 'b-flag'] };
+const lbadge = s => `<span class="badge ${(LSTAT[s] || ['', 'b-sched'])[1]}">${esc((LSTAT[s] || [s])[0])}</span>`;
+const leadRowsAll = () => (S.lv && S.lv.rows) || [];
+function leadRowsShown() {
+  const f = S.lf, q = f.q.trim().toLowerCase();
+  const inTab = r => f.tab === 'assign' ? (r.status === 'unassigned' || r.status === 'failed') : f.tab === 'assigned' ? (r.status === 'scheduled' || r.status === 'in_progress')
+    : f.tab === 'done' ? r.status === 'closed' : f.tab === 'failed' ? r.status === 'failed' : true;
+  return leadRowsAll().filter(r => inTab(r) && (!f.driver || r.driver_id === f.driver) && (!q || [r.customer_name, r.phone, r.area, r.code, r.address].some(x => String(x || '').toLowerCase().includes(q))));
+}
+const selectableRows = () => canAssign() ? leadRowsShown().filter(r => ['unassigned', 'scheduled', 'failed'].includes(r.status)) : [];
+function vLeads() {
+  const all = leadRowsAll(), loading = !S.lv, work = (S.lv && S.lv.work) || [];
+  const cnt = { assign: all.filter(r => r.status === 'unassigned' || r.status === 'failed').length, assigned: all.filter(r => r.status === 'scheduled' || r.status === 'in_progress').length,
+    done: all.filter(r => r.status === 'closed').length, failed: all.filter(r => r.status === 'failed').length, all: all.length };
+  const rows = leadRowsShown(), sel = selectableRows();
+  S.lsel = S.lsel.filter(id => sel.some(r => r.lead_id === id));
+  const tabs = [['assign', 'To assign'], ['assigned', 'Assigned'], ['done', 'Done'], ['failed', 'Not completed'], ['all', 'All']];
+  const extra = `<div class="f"><label for="lfd">DRIVER</label><select id="lfd" data-act="ldriverf"><option value="">All drivers</option>${selectOptions(work.map(d => [d.driver_id, d.full_name]), S.lf.driver)}</select></div>
+    <div class="f"><label for="lfq">SEARCH</label><input id="lfq" data-act="lq" value="${esc(S.lf.q)}" placeholder="Name, phone, area, lead"></div>`;
+  const toolbar = canAssign() ? `<section class="card pad">
+    <div class="row-split" style="flex-wrap:wrap;align-items:center"><h3>Give leads to drivers</h3><span class="muted small">${S.lsel.length} selected</span></div>
+    <div class="inl">
+      <div class="fld"><label for="ldrv">ASSIGN SELECTED TO</label><select id="ldrv" data-act="ldrv"><option value="">Choose a driver</option>${work.map(d => `<option value="${d.driver_id}" ${S.ldrv === d.driver_id ? 'selected' : ''}>${esc(d.full_name)} · ${d.leads_day} today</option>`).join('')}</select></div>
+      <button class="btn" data-act="lassign" ${S.lsel.length ? '' : 'disabled'}>Assign ${S.lsel.length || ''} selected</button>
+      <button class="btn ghost" data-act="lsplit-toggle" ${S.lsel.length ? '' : 'disabled'}>${S.lsplit ? 'Close split' : 'Split evenly…'}</button>
+      <button class="linkbtn" data-act="lselall">Select all (${sel.length})</button><button class="linkbtn" data-act="lselnone">Clear</button>
+      ${S.lsel.some(id => (all.find(r => r.lead_id === id) || {}).status === 'scheduled') ? '<button class="linkbtn" data-act="lunassign">Take back from drivers</button>' : ''}
+    </div>
+    ${S.lsplit && S.lsel.length ? `<div class="notice info">Tick the drivers who will share the ${S.lsel.length} selected leads. They are sorted by area and handed out in blocks, so each driver gets nearby pickups and everyone gets about the same number.</div>
+      <div class="inl">${work.map(d => `<label class="chk"><input type="checkbox" data-act="lsd" data-id="${d.driver_id}" ${S.lsplitDrv.includes(d.driver_id) ? 'checked' : ''}> ${esc(d.full_name)} <span class="muted small">(${d.leads_day} today)</span></label>`).join('')}
+      <button class="btn green" data-act="lsplit-go" ${S.lsplitDrv.length ? '' : 'disabled'}>Split ${S.lsel.length} among ${S.lsplitDrv.length || ''} driver${S.lsplitDrv.length === 1 ? '' : 's'}</button></div>` : ''}
+  </section>` : '<div class="notice info">Only the supervisor can give leads to drivers. You can see who has which lead and why a pickup could not be completed.</div>';
+  return `
+  <div class="head"><div><div class="eyebrow">Leads · ${dlabel(S.from)} – ${dlabel(S.to)}</div><h1>Give out today's pickups.</h1>
+    <div class="muted">HQ uploads the leads for this franchise. The supervisor splits them among the drivers. A pickup a driver could not complete comes back here with the reason.</div></div></div>
+  ${filterBar(extra)}
+  ${toolbar}
+  <div style="display:flex;gap:12px;flex-wrap:wrap">${work.map(w => `<div class="mini"><b>${esc(w.full_name)}</b><span class="muted small">${esc(w.vehicle_no || '')}${w.territory ? ' · ' + esc(w.territory) : ''}</span><b class="v">${w.leads_day} <span class="muted small" style="font-weight:400">leads today</span></b></div>`).join('')}</div>
+  <section class="card"><div class="card-h"><h2>Leads</h2><div class="tabs">${tabs.map(x => `<button class="tab ${S.lf.tab === x[0] ? 'on' : ''}" data-act="ltab" data-t="${x[0]}">${x[1]} (${cnt[x[0]]})</button>`).join('')}</div></div>
+    <div class="scroll"><table style="min-width:900px"><thead><tr>${canAssign() ? `<th style="width:42px"><input type="checkbox" data-act="lall" aria-label="Select all" ${sel.length && S.lsel.length === sel.length ? 'checked' : ''}></th>` : ''}<th>PICKUP</th><th>CUSTOMER</th><th>AREA AND ADDRESS</th><th>ITEMS SAID</th><th>DRIVER</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${rows.map(r => { const can = canAssign() && ['unassigned', 'scheduled', 'failed'].includes(r.status); return `<tr>${canAssign() ? `<td>${can ? `<input type="checkbox" data-act="lchk" data-id="${r.lead_id}" ${S.lsel.includes(r.lead_id) ? 'checked' : ''} aria-label="Select ${esc(r.code)}">` : ''}</td>` : ''}
+      <td><b>${tlabel(r.slot)}</b><br><span class="muted small">${dlabel(dayOf(r.slot))}</span></td>
+      <td><b>${esc(r.customer_name)}</b><br><span class="muted small">${esc(r.code)} · ${esc(r.phone || '')}</span></td>
+      <td>${esc(r.area || '—')}<br><span class="muted small">${esc(r.address || '')}</span></td>
+      <td>${esc(r.items_said || '—')}</td>
+      <td>${r.driver_name ? esc(r.driver_name) : '<span class="muted">Not assigned</span>'}</td>
+      <td>${lbadge(r.status)}${r.status === 'failed' ? `<div class="small" style="color:var(--ox);margin-top:4px"><b>${esc(r.fail_reason)}</b>${r.fail_note ? '<br>' + esc(r.fail_note) : ''}<br><span class="muted">${dlabel(dayOf(r.failed_at))} ${tlabel(r.failed_at)}</span></div>` : ''}</td>
+      <td class="r"><span class="rowend">${mapLink(r)}${callLink(r)}</span></td></tr>`; }).join('') || `<tr><td colspan="8" class="empty">${loading ? 'Loading…' : 'No leads here.'}</td></tr>`}</tbody></table></div></section>`;
+}
+
+/* ---------- HQ requirements ---------- */
+const RST = { completed: ['✓ Completed', 'b-ok'], partial: ['Partly released', 'b-cash'], open: ['Not started', 'b-sched'], cancelled: ['Cancelled', 'b-flag'] };
+function vRequirements() {
+  const all = S.reqs.filter(r => inRange(r.raised_on) || r.status === 'open' || r.status === 'partial');
+  const rows = all.filter(r => S.rs === 'all' ? r.status !== 'cancelled' : r.status === S.rs);
+  const live = S.reqs.filter(r => r.status === 'open' || r.status === 'partial'), overdue = live.filter(r => r.is_overdue);
+  const counted = all.filter(r => r.status !== 'cancelled');
+  const reqKg = counted.reduce((a, r) => a + num(r.required_kg), 0), relKg = counted.reduce((a, r) => a + Math.min(num(r.required_kg), num(r.released_kg)), 0);
+  const rels = S.rels.filter(x => inRange(dayOf(x.released_at)));
+  const extra = `<div class="f"><label for="rsf">STATUS</label><select id="rsf" data-act="rstatus">${selectOptions([['all', 'All active'], ['open', 'Not started'], ['partial', 'Partly released'], ['completed', 'Completed'], ['cancelled', 'Cancelled']], S.rs)}</select></div>`;
+  const R = S.rel && S.reqs.find(r => r.id === S.rel), C = S.cancel && S.reqs.find(r => r.id === S.cancel);
+  return `
+  <div><div class="eyebrow">HQ requirements</div><h1>What HQ has asked for.</h1>
+    <div class="muted">HQ is the only buyer. Release stock against each request and track it until it is complete.</div></div>
+  ${isHQ() ? `<section class="card pad"><h3>Raise a new requirement</h3><div class="inl">
+    <div class="fld"><label for="rq-i">MATERIAL</label><select id="rq-i">${S.items.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="rq-k">KG NEEDED</label><input id="rq-k" type="number" min="0" step="0.1" style="width:130px"></div>
+    <div class="fld"><label for="rq-d">DUE DATE</label><input id="rq-d" type="date" value="${addDays(todayIST(), 7)}"></div>
+    <div class="fld" style="flex:1 1 200px"><label for="rq-n">NOTE (OPTIONAL)</label><input id="rq-n"></div>
+    <button class="btn" data-act="raise">Raise requirement</button></div></section>` : ''}
+  ${filterBar(extra)}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Open requirements</span><span class="v">${live.length}</span><span class="s">${kg(live.reduce((a, r) => a + num(r.remaining_kg), 0))} kg still to release</span></div>
+    <div class="kpi"><span class="l">Fulfilled</span><span class="v">${reqKg ? Math.round(relKg / reqKg * 100) : 0}%</span><span class="s">${kg(relKg)} of ${kg(reqKg)} kg</span></div>
+    <div class="kpi"><span class="l">Overdue</span><span class="v" style="color:${overdue.length ? 'var(--ox)' : 'inherit'}">${overdue.length}</span><span class="s">Past the due date</span></div>
+    <div class="kpi"><span class="l">Released in range</span><span class="v">${kg(rels.reduce((a, x) => a + num(x.kg), 0))} kg</span><span class="s">${rels.length} release${rels.length === 1 ? '' : 's'}</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Requirements and completion</h2></div>
+    <div class="scroll"><table style="min-width:920px"><thead><tr><th>REQUEST</th><th>RAISED</th><th>DUE</th><th>MATERIAL</th><th class="r">REQUIRED</th><th class="r">RELEASED</th><th class="r">LEFT</th><th style="width:14%">PROGRESS</th><th class="r">IN YARD</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${rows.map(r => { const pct = Math.min(100, num(r.released_kg) / num(r.required_kg) * 100), yard = stockNow(r.item_id), act = r.status === 'open' || r.status === 'partial';
+      return `<tr><td class="b">${esc(r.code)}${r.note ? `<br><span class="muted small">${esc(r.note)}</span>` : ''}</td><td>${dlabel(r.raised_on)}</td><td ${r.is_overdue ? 'style="color:var(--ox);font-weight:700"' : ''}>${r.due_date ? dlabel(r.due_date) : '—'}${r.is_overdue ? ' · overdue' : ''}</td><td class="b">${esc(r.item_name)}</td>
+      <td class="r">${kg(r.required_kg)}</td><td class="r">${kg(r.released_kg)}</td><td class="r b">${kg(r.remaining_kg)}</td>
+      <td><div class="bar"><i style="width:${Math.max(2, pct).toFixed(0)}%;${r.status === 'completed' ? 'background:#4F7F3B' : ''}"></i></div></td>
+      <td class="r ${act && yard < num(r.remaining_kg) ? 'var-bad' : ''}">${kg(yard)}</td>
+      <td><span class="badge ${RST[r.status][1]}">${RST[r.status][0]}</span></td>
+      <td class="r" style="white-space:nowrap">${act && canRelease() ? `<button class="btn sm" data-act="rel-open" data-id="${r.id}">Release</button> ` : ''}${act && isHQ() ? `<button class="btn ghost sm" data-act="cancel-open" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No requirements match.</td></tr>'}</tbody></table></div></section>
+  ${R ? relPanel(R) : ''}${C ? cancelPanel(C) : ''}
+  <section class="card"><div class="card-h"><h2>Released stock</h2><span class="muted small">${rels.length} in range</span></div>
+    ${rels.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>RELEASE</th><th>DATE</th><th>FOR</th><th>MATERIAL</th><th class="r">KG</th><th>VEHICLE</th><th>RELEASED BY</th></tr></thead>
+    <tbody>${rels.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${dlabel(dayOf(x.released_at))}</td><td>${esc(reqCode(x.requirement_id))}</td><td>${esc((itemById(x.item_id) || {}).name || '')}</td><td class="r b">${kg(x.kg)}</td><td>${esc(x.vehicle_no)}</td><td>${esc(personName(x.released_by))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No releases in this range.</div>'}
+  </section>`;
+}
+function relPanel(R) {
+  const left = num(R.remaining_kg), yard = stockNow(R.item_id), max = Math.max(0, Math.min(left, Math.floor(yard * 10) / 10));
+  return `<section class="card pad" style="border:2px solid var(--ox)">
+    <div class="row-split" style="flex-wrap:wrap"><h2>Release stock for ${esc(R.code)} · ${esc(R.item_name)}</h2><button class="linkbtn" data-act="rel-close">Close</button></div>
+    <div class="muted">HQ needs <b>${kg(left)} kg</b> more. In the yard now: <b>${kg(yard)} kg</b>.</div>
+    ${yard < left ? `<div class="notice">Not enough ${esc(R.item_name)} in stock to complete this request. You can release a partial amount of up to ${kg(max)} kg.</div>` : ''}
+    <div class="inl">
+      <div class="fld"><label for="rkg">KG TO RELEASE</label><input id="rkg" type="number" step="0.1" min="0" max="${max}" value="${max}" style="width:140px"></div>
+      <div class="fld"><label for="rveh">VEHICLE / DISPATCH NO.</label><input id="rveh" style="width:200px" placeholder="e.g. KL-07-HQ-5566"></div>
+      <div class="fld" style="flex:1 1 180px"><label for="rnote">NOTE (OPTIONAL)</label><input id="rnote"></div>
+      <button class="btn green" data-act="rel-confirm" data-id="${R.id}" ${max <= 0 ? 'disabled' : ''}>Confirm release to HQ</button>
+    </div></section>`;
+}
+function cancelPanel(C) {
+  return `<section class="card pad" style="border:2px solid var(--ox)">
+    <div class="row-split" style="flex-wrap:wrap"><h2>Cancel ${esc(C.code)} · ${esc(C.item_name)}</h2><button class="linkbtn" data-act="cancel-close">Keep it</button></div>
+    <div class="fld"><label for="cnote">REASON (REQUIRED)</label><input id="cnote"></div>
+    <button class="btn" data-act="cancel-confirm" data-id="${C.id}">Cancel this requirement</button></section>`;
+}
+
+/* ---------- finance ---------- */
+const routesInRange = () => S.routes.filter(r => inRange(r.route_date) && (S.fd === 'all' || r.driver_id === S.fd));
+function vFinance() {
+  const RR = routesInRange();
+  if (!RR.find(r => r.load_id === S.rsel)) { const f = RR.find(r => r.route_status === 'counted' || r.route_status === 'awaiting_count') || RR[0]; S.rsel = f ? f.load_id : null; }
+  const sel = RR.find(r => r.load_id === S.rsel);
+  const sum = f => RR.filter(r => r.route_status !== 'included' && r.route_status !== 'with_last').reduce((a, r) => a + num(r[f]), 0);
+  const toVerify = RR.filter(r => r.route_status === 'counted'), toCount = RR.filter(r => r.route_status === 'awaiting_count');
+  const shortage = RR.reduce((a, r) => a + (r.difference != null && num(r.difference) < 0 ? num(r.difference) : 0), 0);
+  const drivers = S.profiles.filter(p => p.role === 'driver' && p.active);
+  const drvSel = `<div class="f"><label for="fd">DRIVER</label><select id="fd" data-act="fdriver"><option value="all">All drivers</option>${selectOptions(drivers.map(d => [d.id, d.full_name]), S.fd)}</select></div>`;
+  const T = S.txns.filter(t => S.ft === 'all' || t.kind === S.ft);
+  return `
+  <div class="head"><div><div class="eyebrow">Finance</div><h1>Every rupee, accounted for.</h1>
+    <div class="muted">Cash given to drivers, what they paid out, the balance at the end of each route, and supervisor verification.</div></div>
+    ${canWeigh() ? `<div class="inl"><div class="fld"><label for="fl-d">ISSUE FLOAT TO</label><select id="fl-d">${drivers.map(d => `<option value="${d.id}">${esc(d.full_name)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="fl-a">AMOUNT ₹</label><input id="fl-a" type="number" min="1" step="100" value="5000" style="width:120px"></div>
+      <button class="btn" data-act="issue-float">Issue float</button></div>` : ''}</div>
+  ${filterBar(drvSel)}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Cash paid to customers</span><span class="v">${rs(sum('cash_paid'))}</span><span class="s">UPI paid separately: ${rs(sum('upi_paid'))}</span></div>
+    <div class="kpi"><span class="l">Expected back from routes</span><span class="v">${rs(sum('expected_cash'))}</span><span class="s">Float − cash payouts</span></div>
+    <div class="kpi"><span class="l">Cash counted</span><span class="v">${rs(sum('counted_cash'))}</span><span class="s">${toCount.length} count${toCount.length === 1 ? '' : 's'} pending</span></div>
+    <div class="kpi"><span class="l">Awaiting supervisor</span><span class="v" style="color:${toVerify.length ? 'var(--ox)' : 'inherit'}">${toVerify.length}</span><span class="s">${rs(toVerify.reduce((a, r) => a + num(r.counted_cash), 0))} counted, not verified</span></div>
+    <div class="kpi"><span class="l">Shortages</span><span class="v" style="color:${shortage ? 'var(--ox)' : 'inherit'}">${rs(shortage)}</span><span class="s">Counted less than expected</span></div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">${S.cash.filter(c => S.fd === 'all' || c.driver_id === S.fd).map(c => `<div class="mini"><b>${esc(c.full_name)}</b><span class="muted small">Cash in hand now</span><b class="v">${rs(c.cash_in_hand)}</b></div>`).join('')}</div>
+  <div class="cols">
+    <section class="card grow"><div class="card-h"><h2>Route settlements</h2><span class="muted small">Click a row to open</span></div>
+      <div class="scroll"><table style="min-width:760px"><thead><tr><th>DATE</th><th>ROUTE</th><th>DRIVER</th><th class="r">CASH PAID</th><th class="r">UPI PAID</th><th class="r">EXPECTED</th><th class="r">COUNTED</th><th class="r">DIFF</th><th>STATUS</th></tr></thead>
+      <tbody>${RR.map(r => `<tr class="pickrow ${r.load_id === S.rsel ? 'on' : ''}" data-act="pick-s" data-id="${r.load_id}"><td class="b">${dlabel(r.route_date)}</td><td>${esc(r.load_code)}</td><td>${esc(r.driver_name)}</td><td class="r">${rs(r.cash_paid)}</td><td class="r muted">${rs(r.upi_paid)}</td><td class="r b">${r.expected_cash == null ? '—' : rs(r.expected_cash)}</td>
+        <td class="r">${r.counted_cash == null ? '—' : rs(r.counted_cash)}</td><td class="r ${num(r.difference) ? 'var-bad' : ''}">${r.difference == null ? '—' : num(r.difference) === 0 ? '✓' : rs(r.difference)}</td><td>${sbadge(r.route_status)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No routes in this range.</td></tr>'}</tbody></table></div></section>
+    <section class="side" style="flex:1 1 340px">${sel ? settleDetail(sel) : '<div class="card empty">Choose a route.</div>'}</section>
+  </div>
+  <section class="card"><div class="card-h"><h2>Transaction updates</h2>
+    <div class="inl"><div class="fld"><label for="ft">TYPE</label><select id="ft" data-act="ftype" style="padding:8px">${selectOptions([['all', 'All'], ...Object.keys(TYPEL).map(k => [k, TYPEL[k]])], S.ft)}</select></div></div></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>WHEN</th><th>DRIVER</th><th>TRANSACTION</th><th>DETAIL</th><th class="r">CASH IN HAND</th></tr></thead>
+    <tbody>${T.map(t => { const nocash = t.kind === 'upi_payout', e = num(t.cash_effect);
+      return `<tr><td class="muted">${dlabel(dayOf(t.txn_at))} ${tlabel(t.txn_at)}</td><td class="b">${esc(t.driver_name)}</td><td>${esc(TYPEL[t.kind] || t.kind)}${t.bill_no ? ` <span class="muted small">· ${esc(t.bill_no)}${t.area ? ' · ' + esc(t.area) : ''}</span>` : ''}</td><td class="muted">${esc(t.ref || '')}</td>
+      <td class="r ${nocash ? 'muted' : 'b'}" style="color:${nocash ? '' : e > 0 ? 'var(--green)' : 'var(--ink)'}">${nocash ? 'no cash · ' + rs(t.amount) : (e > 0 ? '+ ' : '− ') + rs(Math.abs(e))}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">No transactions.</td></tr>'}</tbody></table></div>
+    <div class="muted small" style="padding:10px 18px">Showing up to the latest ${S.txns.length}. UPI payments do not touch the driver's cash in hand.</div>
+  </section>`;
+}
+function settleDetail(r) {
+  const row = (a, b, st = '') => `<div class="row-split" style="padding:9px 0;border-top:1px solid var(--paper);${st}"><span>${a}</span><b>${b}</b></div>`;
+  const exp = num(r.expected_cash), diff = r.difference;
+  let act = '';
+  if (r.route_status === 'on_route') act = `<div class="notice">Route in progress. The cash count opens when the driver ends the route.</div>`;
+  const covers = S.routes.filter(x => x.driver_id === r.driver_id && x.route_status === 'with_last').map(x => x.load_code);
+  if (r.route_status === 'driver_out') act = '<div class="notice">This driver still has a route on the road. The cash is counted once, when the driver is back.</div>';
+  if (r.route_status === 'with_last') act = '<div class="notice info">The cash is counted once for all of this driver’s routes, from the driver’s latest route.</div>';
+  if (r.route_status === 'included') { const by = S.routes.find(x => x.settlement_id === r.settlement_id && x.route_status !== 'included'); act = `<div class="notice ok">Counted together with <b>${esc(by ? by.load_code : 'the driver’s last route')}</b>. Open that route to see the count and its verification.</div>`; }
+  if (r.route_status === 'awaiting_count') act = canWeigh() ? `<div class="card pad"><h3>Count the cash</h3><span class="muted">Driver should hand back all the cash in hand: <b>${rs(exp)}</b>.${covers.length ? ' This one count covers ' + esc(r.load_code) + ' and ' + esc(covers.join(', ')) + '.' : ''} Count it in front of the driver and enter the amount.</span>
+    <div class="inl"><div class="fld"><label for="cnt">CASH RECEIVED ₹</label><input id="cnt" type="number" min="0" step="1" data-act="cnt" value="${exp}" style="width:160px"></div></div>
+    <div class="fld"><label for="cn">NOTE <span id="cn-req"></span></label><input id="cn" placeholder="Required if the amount differs"></div>
+    <button class="btn green" data-act="count" data-id="${r.load_id}">Save count</button>
+    <span id="cntd" class="small muted">Matches the expected balance.</span></div>` : '<div class="notice info">Waiting for warehouse staff to count the cash.</div>';
+  if (r.route_status === 'counted') act = canVerify() ? `<div class="card pad"><h3>Verify the count</h3>
+    <span class="muted">Counted by ${esc(r.counted_by_name)}: <b>${rs(r.counted_cash)}</b>. ${num(diff) ? `<b class="var-bad">Difference ${rs(diff)}.</b> A note is required.` : 'Matches the expected balance.'} A different person must verify.</span>
+    <div class="fld"><label for="vn">NOTE ${num(diff) ? '(required)' : '(optional)'}</label><input id="vn" placeholder="e.g. Counted twice, matches the ledger"></div>
+    <div class="row-split" style="flex-wrap:wrap"><button class="btn green" style="flex:1 1 150px" data-act="verify" data-id="${r.settlement_id}" data-d="verify">Verify</button><button class="btn ghost" style="flex:1 1 150px" data-act="verify" data-id="${r.settlement_id}" data-d="dispute">Dispute · send to HQ</button></div></div>`
+    : `<div class="notice info">Counted by ${esc(r.counted_by_name)}. Waiting for a supervisor to verify.</div>`;
+  if (r.route_status === 'verified') act = `<div class="notice ok"><b>✓ Verified by ${esc(r.verified_by_name)}</b> · ${dlabel(dayOf(r.verified_at))} ${tlabel(r.verified_at)}${r.verify_note ? '<br>' + esc(r.verify_note) : ''}</div>`;
+  if (r.route_status === 'disputed') act = `<div class="notice bad"><b>! Disputed</b> by ${esc(r.verified_by_name)} · ${dlabel(dayOf(r.verified_at))}<br>${esc(r.verify_note || '')}</div>`;
+  return `<div class="card pad"><div class="row-split" style="flex-wrap:wrap"><div><h2>${esc(r.driver_name)} · ${esc(r.load_code)}</h2><span class="muted small">${dlabel(r.route_date)} · route settlement</span></div>${sbadge(r.route_status)}</div>
+    <div>${row('Float issued to the driver that day', rs(r.float_issued))}${row(r.route_status === 'awaiting_count' || r.counted_cash != null ? 'Cash paid to customers (all routes in this count)' : 'Cash paid to customers (this route)', rs(r.cash_paid))}${r.expected_cash == null ? '' : row('Expected back from the driver', rs(exp), 'border-top:2px solid var(--ink);')}
+    ${row('Cash counted', r.counted_cash == null ? 'Not yet' : rs(r.counted_cash))}${row('Difference', diff == null ? '—' : num(diff) === 0 ? '✓ None' : rs(diff), num(diff) ? 'color:var(--ox)' : '')}
+    ${row('UPI paid (no cash)', rs(r.upi_paid), 'color:var(--stone)')}</div>
+    ${r.counted_by_name ? `<span class="muted small">Counted by ${esc(r.counted_by_name)} · ${dlabel(dayOf(r.counted_at))} ${tlabel(r.counted_at)}${r.count_note ? ' · ' + esc(r.count_note) : ''}</span>` : ''}</div>
+  ${act}`;
+}
+
+/* ---------- routing and render ---------- */
+const VIEWS = { overview: vOverview, leads: vLeads, reconcile: vReconcile, inventory: vInventory, requirements: vRequirements, finance: vFinance };
+const curView = () => VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
+function navCounts() {
+  const w = waitingLoads().length, r = S.reqs.filter(x => x.status === 'open' || x.status === 'partial').length, f = needsFin();
+  $('#nav-wait').textContent = w || ''; $('#nav-req').textContent = r || ''; $('#nav-fin').textContent = f || '';
+  { const lc = S.lc || {}; $('#nav-leads').textContent = (num(lc.unassigned) + num(lc.failed_recent)) || ''; }
+}
+function render() {
+  const v = curView();
+  const key = v + ':' + (typeof S.fr !== 'undefined' ? (S.fr || '') : ''), app = $('#app'), changed = key !== window.__viewKey;
+  if (!changed) app.classList.remove('enter');
+  app.innerHTML = VIEWS[v]();
+  if (changed) { window.__viewKey = key; app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter'); }
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.view === v));
+  navCounts();
+  if (v === 'leads' && (!S.lv || Date.now() - S.lv.at > 8000)) { loadLeads().then(() => { if (curView() === 'leads') rerenderIfIdle(); }).catch(e => toast(e.message, true)); }
+  if (v === 'reconcile') { const L = S.loads.find(l => l.id === S.sel); if (L) { updateRows(L); if (S.pk[L.id] === undefined) loadPickups(L.id); } }
+}
+function rerenderIfIdle() {
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && $('#app').contains(a)) { navCounts(); return; }
+  render();
+}
+window.addEventListener('hashchange', () => { render(); scrollTo(0, 0); });
+
+/* run an action, show a message, reload the data */
+async function act(btn, fn, okMsg) {
+  if (btn) btn.classList.add('busy'); busyBar(true);
+  try {
+    const out = await fn();
+    S.pk = {};
+    await refresh();
+    toast(typeof okMsg === 'function' ? okMsg(out) : okMsg);
+    return true;
+  } catch (e) { toast(e.message, true); try { await refresh(); } catch (_) {} return false; }
+  finally { if (btn) btn.classList.remove('busy'); busyBar(false); render(); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.act === 'w') { const L = S.loads.find(l => l.id === S.sel); (S.draft[L.id] || (S.draft[L.id] = {}))[t.dataset.item] = t.value; updateRows(L); }
+  if (t.id === 'note' && S.sel) S.notes[S.sel] = t.value;
+  if (t.dataset.act === 'cnt') {
+    const r = S.routes.find(x => x.load_id === S.rsel), d = num(t.value) - num(r.expected_cash), el = $('#cntd');
+    el.className = 'small ' + (d ? 'var-bad' : 'muted'); el.textContent = d ? `Difference ${rs(d)} from the expected balance. A note is required.` : 'Matches the expected balance.';
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target, a = t.dataset.act;
+  if (a === 'range') { S.from = $('#from').value || S.from; S.to = $('#to').value || S.to; if (S.from > S.to) [S.from, S.to] = [S.to, S.from]; S.preset = ''; refresh().then(render).catch(err => toast(err.message, true)); }
+  if (a === 'status') { S.status = t.value; render(); }
+  if (a === 'rstatus') { S.rs = t.value; render(); }
+  if (a === 'fdriver') { S.fd = t.value; refresh().then(render).catch(err => toast(err.message, true)); }
+  if (a === 'ftype') { S.ft = t.value; render(); }
+  if (a === 'lchk') { const id = +t.dataset.id; S.lsel = t.checked ? [...new Set([...S.lsel, id])] : S.lsel.filter(x => x !== id); render(); }
+  if (a === 'lall') { S.lsel = t.checked ? selectableRows().map(r => r.lead_id) : []; render(); }
+  if (a === 'ldriverf') { S.lf.driver = t.value; render(); }
+  if (a === 'lq') { S.lf.q = t.value; render(); }
+  if (a === 'ldrv') { S.ldrv = t.value; }
+  if (a === 'lsd') { const id = t.dataset.id; S.lsplitDrv = t.checked ? [...new Set([...S.lsplitDrv, id])] : S.lsplitDrv.filter(x => x !== id); render(); }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
+  const a = b.dataset.act, L = S.loads.find(l => l.id === S.sel), val = id => ($(id) || {}).value || '';
+  if (a === 'logout') logout();
+  if (a === 'preset') { const p = b.dataset.p; S.preset = p; S.to = todayIST(); S.from = p === 'today' ? S.to : p === '7' ? addDays(S.to, -6) : p === '30' ? addDays(S.to, -29) : FAR_PAST; try { await refresh(); } catch (err) { toast(err.message, true); } render(); }
+  if (a === 'goto') { if (b.dataset.s) S.status = b.dataset.s; if (b.dataset.lt) { S.lf.tab = b.dataset.lt; S.lsel = []; } location.hash = b.dataset.v; render(); }
+  if (a === 'pick') { S.sel = +b.dataset.id; render(); }
+  if (a === 'pick-s') { S.rsel = +b.dataset.id; render(); }
+  if (a === 'ltab') { S.lf.tab = b.dataset.t; S.lsel = []; S.lsplit = false; render(); }
+  if (a === 'lselall') { S.lsel = selectableRows().map(r => r.lead_id); render(); }
+  if (a === 'lselnone') { S.lsel = []; S.lsplit = false; render(); }
+  if (a === 'lsplit-toggle') { S.lsplit = !S.lsplit; render(); }
+  if (a === 'lassign') {
+    const d = val('#ldrv') || S.ldrv; if (!S.lsel.length) { toast('Select the leads first.', true); return; } if (!d) { toast('Choose a driver.', true); return; }
+    const nm = driverName(d), ids = [...S.lsel];
+    const ok = await act(b, () => rpc('wh_assign_leads', { p_lead_ids: ids, p_driver: d }), c => `${c} lead${c === 1 ? '' : 's'} given to ${nm}.`);
+    if (ok) { S.lsel = []; render(); }
+  }
+  if (a === 'lunassign') {
+    const ids = S.lsel.filter(id => (leadRowsAll().find(r => r.lead_id === id) || {}).status === 'scheduled'); if (!ids.length) return;
+    const ok = await act(b, () => rpc('wh_assign_leads', { p_lead_ids: ids, p_driver: null }), c => `${c} lead${c === 1 ? '' : 's'} taken back.`);
+    if (ok) { S.lsel = []; render(); }
+  }
+  if (a === 'lsplit-go') {
+    if (!S.lsel.length) { toast('Select the leads first.', true); return; } if (!S.lsplitDrv.length) { toast('Tick the drivers who will share the leads.', true); return; }
+    const ids = [...S.lsel], drv = [...S.lsplitDrv];
+    const ok = await act(b, () => rpc('wh_split_leads', { p_lead_ids: ids, p_driver_ids: drv }), r => 'Split done: ' + r.map(x => `${x.name} ${x.count}`).join(', ') + '.');
+    if (ok) { S.lsel = []; S.lsplit = false; S.lsplitDrv = []; render(); }
+  }
+  if (a === 'weigh' && L) {
+    const d = S.draft[L.id] || {}, weights = [];
+    for (const i of S.items) {
+      const v = d[i.id];
+      if (v === undefined || v === '') { if (billedOf(L.id, i.name) > 0) { toast(`Enter the weight of ${i.name}.`, true); return; } continue; }
+      if (!(num(v) >= 0)) { toast(`Check the weight of ${i.name}.`, true); return; }
+      weights.push({ item_id: i.id, kg: num(v) });
+    }
+    if (!weights.length) { toast('Enter at least one weight.', true); return; }
+    const ok = await act(b, () => rpc('record_load_weighing', { p_load_id: L.id, p_weights: weights, p_note: val('#note').trim() || null }),
+      r => r.status === 'reconciled' ? `${L.code} reconciled. Stock updated.` : `${L.code} flagged for HQ review.`);
+    if (ok) { delete S.draft[L.id]; delete S.notes[L.id]; render(); }
+  }
+  if (a === 'resolve' && L) {
+    const note = val('#resnote').trim(); if (!note) { toast('Add a note explaining the decision.', true); return; }
+    await act(b, () => rpc('resolve_flagged_load', { p_load_id: L.id, p_action: b.dataset.a, p_note: note }), r => r === 'reconciled' ? `${L.code} accepted and reconciled.` : `${L.code} sent back for re-weighing.`);
+  }
+  if (a === 'raise') {
+    const k = num(val('#rq-k')); if (!(k > 0)) { toast('Enter the kg HQ needs.', true); return; }
+    await act(b, () => rpc('raise_requirement', { p_item_id: +val('#rq-i'), p_required_kg: k, p_due_date: val('#rq-d') || null, p_note: val('#rq-n').trim() || null }), c => `Requirement ${c} raised.`);
+  }
+  if (a === 'rel-open') { S.rel = +b.dataset.id; S.cancel = null; render(); setTimeout(() => $('#rkg') && $('#rkg').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'rel-close') { S.rel = null; render(); }
+  if (a === 'cancel-open') { S.cancel = +b.dataset.id; S.rel = null; render(); setTimeout(() => $('#cnote') && $('#cnote').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'cancel-close') { S.cancel = null; render(); }
+  if (a === 'cancel-confirm') {
+    const n = val('#cnote').trim(); if (!n) { toast('Add a reason for cancelling.', true); return; }
+    const ok = await act(b, () => rpc('cancel_requirement', { p_requirement_id: +b.dataset.id, p_note: n }), 'Requirement cancelled.'); if (ok) { S.cancel = null; render(); }
+  }
+  if (a === 'rel-confirm') {
+    const v = Math.round(num(val('#rkg')) * 10) / 10, veh = val('#rveh').trim();
+    if (!(v > 0)) { toast('Enter the kg to release.', true); return; }
+    if (!veh) { toast('Enter the vehicle or dispatch number.', true); return; }
+    const ok = await act(b, () => rpc('release_to_hq', { p_requirement_id: +b.dataset.id, p_kg: v, p_vehicle_no: veh, p_note: val('#rnote').trim() || null }), c => `${kg(v)} kg released to HQ (${c}).`);
+    if (ok) { S.rel = null; render(); }
+  }
+  if (a === 'issue-float') {
+    const amt = Math.round(num(val('#fl-a'))), dr = val('#fl-d');
+    if (!dr) { toast('Choose a driver.', true); return; }
+    if (!(amt > 0)) { toast('Enter an amount.', true); return; }
+    await act(b, () => rpc('issue_float', { p_driver_id: dr, p_amount: amt, p_note: null }), bal => `${rs(amt)} float issued. Driver now holds ${rs(bal)}.`);
+  }
+  if (a === 'count') {
+    const v = val('#cnt'); if (v === '' || num(v) < 0) { toast('Enter the cash amount you counted.', true); return; }
+    await act(b, () => rpc('count_route_cash', { p_load_id: +b.dataset.id, p_counted: num(v), p_note: val('#cn').trim() || null }), 'Count saved. Now a supervisor must verify.');
+  }
+  if (a === 'verify') {
+    await act(b, () => rpc('verify_settlement', { p_settlement_id: +b.dataset.id, p_decision: b.dataset.d, p_note: val('#vn').trim() || null }), r => r === 'verified' ? 'Settlement verified.' : 'Sent to HQ as disputed.');
+  }
+  if (a === 'csv') {
+    const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const rows = [['Material', 'Opening kg', 'Received kg', 'Released to HQ kg', 'Closing kg', 'Value INR', 'HQ still needs kg']].concat(S.stock.map(r => [r.item_name, num(r.opening_kg).toFixed(1), num(r.received_kg).toFixed(1), num(r.released_kg).toFixed(1), num(r.closing_kg).toFixed(1), Math.round(num(r.closing_value)), num(r.hq_open_need_kg).toFixed(1)]));
+    const url = URL.createObjectURL(new Blob([rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv' }));
+    const x = document.createElement('a'); x.href = url; x.download = `scrappy-inventory-${S.from}_to_${S.to}.csv`; x.click(); URL.revokeObjectURL(url);
+  }
+});
+
+/* ---------- live updates: Supabase Realtime over a plain websocket, plus a 20 s refresh as a safety net ---------- */
+let ws = null, wsBeat = null, wsRetry = null, wsRef = 0, refreshTimer = null;
+const RT_TABLES = ['leads', 'loads', 'bills', 'cash_ledger', 'load_weighings', 'hq_requirements', 'hq_releases', 'cash_settlements'];
+let lastRefreshAt = 0;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  const wait = Math.max(700, 10000 - (Date.now() - lastRefreshAt));
+  refreshTimer = setTimeout(async () => { lastRefreshAt = Date.now(); try { await refresh(); rerenderIfIdle(); } catch (e) {} }, wait);
+}
+function rtSend(topic, event, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ topic, event, payload, ref: String(++wsRef) })); }
+function rtToken() { if (ws && ws.readyState === 1 && session) rtSend('realtime:wh', 'access_token', { access_token: session.access_token }); }
+function rtConnect() {
+  if (!session || ws) return;
+  try { ws = new WebSocket(`${SUPABASE_URL.replace('https', 'wss')}/realtime/v1/websocket?apikey=${SUPABASE_KEY}&vsn=1.0.0`); } catch (e) { ws = null; return; }
+  ws.onopen = () => {
+    rtSend('realtime:wh', 'phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '' }, postgres_changes: RT_TABLES.map(t => ({ event: '*', schema: 'public', table: t })) }, access_token: session.access_token });
+    clearInterval(wsBeat); wsBeat = setInterval(() => rtSend('phoenix', 'heartbeat', {}), 25000);
+  };
+  ws.onmessage = m => {
+    let d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    if (d.event === 'phx_reply' && d.topic === 'realtime:wh') { const ok = d.payload && d.payload.status === 'ok'; if (ok !== S.wsOpen) { S.wsOpen = ok; rerenderIfIdle(); } }
+    if (d.event === 'postgres_changes') scheduleRefresh();
+  };
+  ws.onclose = () => { clearInterval(wsBeat); ws = null; if (S.wsOpen) { S.wsOpen = false; rerenderIfIdle(); } if (session) { clearTimeout(wsRetry); wsRetry = setTimeout(rtConnect, 5000); } };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+function rtStop() { clearInterval(wsBeat); clearTimeout(wsRetry); const w = ws; ws = null; S.wsOpen = false; if (w) { w.onclose = null; try { w.close(); } catch (e) {} } }
+setInterval(async () => { if (session && S.profile && document.visibilityState === 'visible' && Date.now() - lastRefreshAt > 15000) { lastRefreshAt = Date.now(); try { await refresh(); rerenderIfIdle(); } catch (e) {} } }, 20000);
+
+/* ---------- login ---------- */
+$('#login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('#email').value.trim(), pw = $('#password').value, err = $('#login-err'), btn = $('#login-btn');
+  err.textContent = '';
+  if (!email || !pw) { err.textContent = 'Enter your email and password.'; return; }
+  btn.classList.add('busy'); btn.textContent = 'Logging in…';
+  try { await authCall('password', { email, password: pw }); await start(); }
+  catch (e2) { shake(); err.textContent = /invalid/i.test(e2.message) ? 'Wrong email or password.' : e2.message; }
+  finally { btn.classList.remove('busy'); btn.textContent = 'Log in'; }
+});
+function logoutLocal(msg) {
+  window.__viewKey = null;
+  rtStop();
+  if (session) fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
+  session = null; store(SESSION_KEY, undefined); S.profile = null; S.snap = null; S.feed = [];
+  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
+  $('#login-err').textContent = typeof msg === 'string' ? msg : '';
+  $('#password').value = '';
+}
+async function start() {
+  $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
+  $('#app').innerHTML = '<div class="loading"><svg class="hop" viewBox="-4 -26 392 134" role="img" aria-label="Loading"><g class="h h0"><path d="M99.10 0.00L12.50 0.00A12.50 12.50 0 0 0 1.67 18.75L44.98 93.75A12.50 12.50 0 0 0 66.63 93.75L109.93 18.75A12.50 12.50 0 0 0 99.10 0.00Z"/></g><g transform="translate(141.6 0)"><g class="h h1"><circle cx="50" cy="50" r="50"/></g></g><g transform="translate(271.6 0)"><g class="h h2"><path d="M12.50 100.00L99.10 100.00A12.50 12.50 0 0 0 109.93 81.25L66.63 6.25A12.50 12.50 0 0 0 44.98 6.25L1.67 81.25A12.50 12.50 0 0 0 12.50 100.00Z"/></g></g></svg>Loading the yard…</div>';
+  try {
+    const p = await rest(`profiles?id=eq.${encodeURIComponent(session.user_id)}&select=id,full_name,role,territory,vehicle_no,active,franchise_id`);
+    const me = p && p[0];
+    if (me && me.active && me.role === 'hq') { logout('HQ uses the HQ dashboard, not this one.'); return; }
+    if (!me || !me.active || !STAFF.includes(me.role) || !me.franchise_id) { logout('This login is not set up for a franchise warehouse. Ask HQ.'); return; }
+    S.profile = me; S.role = me.role;
+    try {
+      const fr = (await rest('franchises?select=code,name&id=eq.' + me.franchise_id))[0];
+      $('#fr-name').textContent = fr ? fr.name : '—'; $('#fr-code').textContent = fr ? fr.code : ''; S.franchise = fr || null;
+      document.title = 'Scrappy Warehouse' + (fr ? ' · ' + fr.name + ' (' + fr.code + ')' : '');
+    } catch (e) { /* the label is optional; everything else is still limited by the database */ }
+    $('#who-name').textContent = me.full_name; $('#who-role').textContent = ROLE_TITLE[me.role] || ''; $('#who-meta').textContent = '';
+    api('/auth/v1/user').then(u => { if (u && u.email) $('#who-meta').textContent = u.email; }).catch(() => {});
+    if (me.role === 'supervisor') S.status = 'all';
+    if (!location.hash && me.role === 'supervisor') location.hash = 'finance';
+    await loadTol(); await refresh(); render(); rtConnect();
+  } catch (e) { $('#app').innerHTML = `<div class="card pad"><b>Could not load the dashboard.</b><span class="muted">${esc(e.message)}</span><button class="btn" onclick="location.reload()">Try again</button></div>`; }
+}
+
+/* ---------- look and feel: icons, screen-change animation, busy bar ---------- */
+const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>"};
+document.querySelectorAll('nav a[data-view]').forEach(a => { const d = NAV_ICONS[a.dataset.view]; if (d) a.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'); });
+function busyBar(on) { const b = document.getElementById('topbar'); if (!b) return; b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } }
+function shake() { const f = document.getElementById('login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
+document.addEventListener('click', e => {
+  if (e.target.closest('.btn,.tab') && navigator.vibrate) { try { navigator.vibrate(8); } catch (_) {} }
+  const pw = e.target.closest('[data-pw]');
+  if (pw) { const i = document.getElementById('password'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; pw.textContent = show ? 'Hide' : 'Show'; pw.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); }
+});
+/* one login per person: the newest login wins; an older device is signed out within about 20 seconds */
+let sessChecking = false;
+async function checkSession() {
+  if (!session || sessChecking || document.visibilityState !== 'visible') return;
+  sessChecking = true;
+  try { const ok = await rpc('session_valid'); if (ok === false) logout('You were logged out because this account was opened on another device.'); }
+  catch (e) { /* offline or a short error: try again next time */ }
+  finally { sessChecking = false; }
+}
+setInterval(checkSession, 20000);
+document.addEventListener('visibilitychange', checkSession);
+/* lets the phone install this page as an app (full screen, no address bar) */
+if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
+function logout(msg) { logoutLocal(msg); location.replace('../' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+session && session.access_token ? start() : logout();
+</script>
+</body>
+</html>

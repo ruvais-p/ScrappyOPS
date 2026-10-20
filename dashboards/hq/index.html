@@ -1,0 +1,1368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8B1E24">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Scrappy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Scrappy HQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+:root{
+  --ox:#8B1E24;--ox7:#5E1318;--ink:#2A2426;--pearl:#F7F7F7;--paper:#EFEEEC;--stone:#6E6866;
+  --line:#D8D3CE;--green:#2F5523;--green-t:#E7F0E2;--blue:#2B5470;--blue-t:#E6EEF4;--amber-t:#FBF1DE;--amber-d:#6B4507;--ox-t:#FBEFEA;
+  --head:'Space Grotesk',Arial,sans-serif;--body:'DM Sans',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--pearl);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+a{color:var(--ox)}
+button{font:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+input,select,textarea{font:inherit}
+:focus-visible{outline:3px solid var(--ox);outline-offset:2px}
+.hidden{display:none!important}
+.login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;background:var(--ink)}
+.login form{background:#fff;width:100%;max-width:380px;padding:28px 24px;display:flex;flex-direction:column;gap:14px}
+.login-logo{width:190px;display:block}
+.login h1{font-size:26px;margin:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:700}
+.field input{padding:13px 12px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:16px}
+.err{color:var(--ox);font-size:14px;min-height:20px}
+.loading{padding:40px 18px;text-align:center;color:var(--stone)}
+.shell{display:flex;min-height:100vh}
+aside{width:240px;flex-shrink:0;background:var(--ink);color:#fff;padding:26px 22px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{width:150px;display:block}
+.brand{display:flex;flex-direction:column;align-items:center;gap:10px}
+.brand-title{font-family:var(--head);font-weight:700;font-size:17px;letter-spacing:-.02em;text-align:center;line-height:1.2}
+.who b{display:block;font-size:16px}
+.who span{font-size:12px;color:#D3D1C7;word-break:break-all}
+nav{display:flex;flex-direction:column}
+nav a,nav button.navbtn{color:#DDD7D8;text-decoration:none;font-size:14px;padding:10px 12px;border:0;border-bottom:1px solid #ffffff1a;display:flex;justify-content:space-between;gap:8px;background:none;text-align:left;width:100%}
+nav a.on{background:var(--ox);color:#fff;font-weight:700;border-bottom-color:var(--ox)}
+nav a .count{font-size:12px;background:#ffffff26;padding:0 7px}
+nav a .count:empty{display:none}
+nav a .count.hot{background:#DE9827;color:#2A2426;font-weight:700}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;font-size:12px;color:#D3D1C7}
+.logout-btn{background:none;border:1px solid #ffffff55;color:#fff;font-size:14px;padding:11px 12px;text-align:left;width:100%;min-height:44px}
+.logout-btn:hover{background:#ffffff1a}
+.mob-only{display:none!important}
+.servicebar{display:flex;height:6px}
+.servicebar i{flex:1}
+main{flex:1;min-width:0;padding:30px 36px 56px;display:flex;flex-direction:column;gap:22px}
+.eyebrow{font-size:11px;letter-spacing:.17em;font-weight:700;color:var(--ox);text-transform:uppercase}
+h1{margin:4px 0;font-family:var(--head);font-size:34px;letter-spacing:-.04em;line-height:1.08}
+h2{margin:0;font-family:var(--head);font-size:20px;letter-spacing:-.03em;line-height:1.15}
+h3{margin:0;font-family:var(--head);font-size:17px;letter-spacing:-.02em}
+.muted{color:var(--stone)}
+.small{font-size:12px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.btn{border:0;background:var(--ox);color:#fff;font-weight:700;font-size:15px;padding:13px 20px;text-decoration:none;display:inline-block;text-align:center;min-height:46px}
+.btn:hover{background:var(--ox7)}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--ink)}
+.btn.ghost:hover{background:var(--paper)}
+.btn.green{background:#1F7A3A}
+.btn.green:hover{background:#17602d}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:7px 12px;font-size:13px}
+.btn.busy{opacity:.6;pointer-events:none}
+.linkbtn{background:none;border:0;color:var(--ox);font-weight:700;text-decoration:underline;padding:4px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{background:#fff;border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:3px;color:var(--ink);text-align:left}
+button.kpi{cursor:pointer}
+.kpi.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.kpi .l{font-size:12px;font-weight:500;color:var(--stone)}
+.kpi.dark .l,.kpi.dark .s{color:#D3D1C7}
+.kpi .v{font-family:var(--head);font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.kpi .s{font-size:12px;color:var(--stone)}
+.cols{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.grow{flex:999 1 480px;min-width:0}
+.side{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border:1px solid var(--line)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--line)}
+.pad{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:500;padding:8px 13px;min-height:38px}
+.tab.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11px;letter-spacing:.08em;color:var(--stone);font-weight:700;text-align:left;padding:11px 8px;white-space:nowrap}
+td{padding:11px 8px;border-top:1px solid var(--paper);vertical-align:middle}
+th:first-child,td:first-child{padding-left:18px}
+th:last-child,td:last-child{padding-right:18px}
+.r{text-align:right}
+.b{font-weight:700}
+.badge{font-size:12px;font-weight:700;padding:4px 9px;white-space:nowrap;display:inline-block}
+.b-sched{background:var(--paper);color:var(--ink)}
+.b-ok{background:var(--green-t);color:var(--green)}
+.b-cash{background:var(--amber-t);color:var(--amber-d)}
+.b-flag{background:var(--ox-t);color:var(--ox)}
+.b-blue{background:var(--blue-t);color:var(--blue)}
+.row-split{display:flex;justify-content:space-between;gap:10px}
+.bar{height:8px;background:var(--paper)}
+.bar i{display:block;height:8px;background:var(--ox)}
+.empty{padding:36px 18px;text-align:center;color:var(--stone)}
+.notice{background:var(--amber-t);color:var(--amber-d);padding:12px 14px;font-size:13px}
+.notice.info{background:var(--blue-t);color:var(--blue)}
+.notice.ok{background:var(--green-t);color:var(--green)}
+.notice.bad{background:var(--ox-t);color:var(--ox)}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:#fff;border:1px solid var(--line);padding:12px 14px}
+.filters .f{display:flex;flex-direction:column;gap:4px}
+.filters label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--stone)}
+.filters input,.filters select{padding:9px 10px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:14px;min-height:38px}
+.filters .sp{flex:1}
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.06em;background:#fff;border:1px solid var(--line);padding:7px 12px}
+.live i{width:9px;height:9px;border-radius:50%;background:#1F7A3A;animation:blink 1.4s infinite}
+.live.off i{background:var(--stone);animation:none}
+@keyframes blink{50%{opacity:.25}}
+.loadrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--paper);width:100%;background:#fff;border-left:0;border-right:0;border-top:0;text-align:left;color:var(--ink)}
+.loadrow:hover{background:var(--pearl)}
+.loadrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
+textarea{width:100%;border:1px solid var(--line);background:var(--pearl);padding:10px;min-height:68px;resize:vertical}
+.feed{display:flex;flex-direction:column}
+.ev{padding:11px 16px;border-bottom:1px solid var(--paper);display:flex;gap:10px;font-size:14px}
+.ev .dot{flex:0 0 auto;width:10px;height:10px;margin-top:6px;background:var(--ox)}
+.ev .dot.g{background:#4F7F3B}.ev .dot.b{background:#3D6F90}.ev .dot.a{background:#DE9827}
+.ev small{color:var(--stone);display:block;font-size:12px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:14px 18px;font-weight:500;max-width:min(420px,calc(100vw - 32px));opacity:0;transition:all .22s;pointer-events:none;z-index:10}
+.toast.show{transform:translate(-50%,0);opacity:1}
+.toast.bad{background:var(--ox)}
+tr.pickrow{cursor:pointer}tr.pickrow:hover{background:var(--pearl)}
+tr.pickrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
+.mini{display:flex;flex-direction:column;gap:2px;padding:14px 16px;background:#fff;border:1px solid var(--line);flex:1 1 220px}
+.mini b.v{font-family:var(--head);font-size:22px;letter-spacing:-.03em}
+.inl{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.fld{display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--stone)}
+.fld input,.fld select{padding:10px;border:1px solid var(--line);background:var(--pearl);color:var(--ink);font-size:15px;min-height:42px}
+.alert{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--paper)}
+.alert .n{font-family:var(--head);font-weight:700;font-size:22px;min-width:34px}
+.alert.hot .n{color:var(--ox)}
+.chart{width:100%;height:auto;display:block}
+.chart text{font-family:var(--body);font-size:11px;fill:var(--stone)}
+.dz{border:2px dashed var(--line);background:var(--pearl);padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.row-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--paper)}
+.fr-pick{display:flex;flex-direction:column;gap:5px}
+.fr-pick label{font-size:10px;letter-spacing:.14em;font-weight:700;color:#D3BEC0}
+.fr-pick select{padding:10px;border:1px solid #ffffff55;background:#ffffff14;color:#fff;font-size:14px;min-height:42px;width:100%}
+.fr-pick select option{color:#2A2426;background:#fff}
+.scope{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:var(--blue-t);color:var(--blue);padding:7px 12px;border:1px solid #c5d6e3}
+.frcode{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;background:var(--blue-t);color:var(--blue);padding:1px 7px;margin-left:6px;vertical-align:middle}
+@media print{body *{visibility:hidden}#cred,#cred *{visibility:visible}#cred{position:absolute;left:0;top:0;width:100%;border:0!important}.no-print{display:none!important}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:860px){
+  .shell{flex-direction:column}
+  aside{width:auto;height:auto;position:sticky;top:0;z-index:5;flex-direction:row;flex-wrap:wrap;align-items:center;padding:10px 12px;gap:10px;overflow:visible}
+  .logo{width:110px}.brand-title,.who,.side-foot{display:none}.brand{flex-direction:row}
+  nav{flex-direction:row;flex:1;justify-content:flex-end;gap:2px;flex-wrap:wrap}
+  nav a,nav button.navbtn{border-bottom:0;padding:8px 8px;font-size:13px;width:auto}
+  .mob-only{display:flex!important}
+  nav a .count{display:none}
+  .fr-pick{flex:1 1 100%;order:5}
+  main{padding:18px 14px 48px;gap:18px}
+  h1{font-size:26px}
+}
+
+/* =========================================================
+   Look and feel layer: softer shapes, motion, icons.
+   Sits after the base styles, so it overrides them.
+   ========================================================= */
+:root{--line:#E5E0DB;--r:16px;--sh:0 1px 2px rgba(42,36,38,.07),0 5px 12px -8px rgba(42,36,38,.28);--ease:cubic-bezier(.22,1,.36,1)}
+*{-webkit-tap-highlight-color:transparent}
+body{background:#F6F4F2}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:scale(.9)}70%{transform:scale(1.03)}100%{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes load{0%{width:0}60%{width:70%}100%{width:90%}}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}
+@keyframes barin{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+#app.enter>*{animation:rise .5s var(--ease) both}
+#app.enter>*:nth-child(2){animation-delay:.06s}
+#app.enter>*:nth-child(3){animation-delay:.12s}
+#app.enter>*:nth-child(4){animation-delay:.18s}
+#app.enter>*:nth-child(5){animation-delay:.24s}
+#app.enter>*:nth-child(n+6){animation-delay:.3s}
+#app.enter .kpi,#app.enter .mini{animation:rise .5s var(--ease) both}
+#app.enter .kpi:nth-child(2),#app.enter .mini:nth-child(2){animation-delay:.07s}
+#app.enter .kpi:nth-child(3),#app.enter .mini:nth-child(3){animation-delay:.14s}
+#app.enter .kpi:nth-child(4),#app.enter .mini:nth-child(4){animation-delay:.21s}
+#app.enter .kpi:nth-child(n+5),#app.enter .mini:nth-child(n+5){animation-delay:.28s}
+#app.enter .bar i{transform-origin:left;animation:barin .9s var(--ease) both;animation-delay:.25s}
+#topbar{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--ox),#E8A1A5);z-index:100;opacity:0;transition:opacity .25s}
+#topbar.on{opacity:1;animation:load 1.8s var(--ease) forwards}
+
+/* login */
+.login{background:radial-gradient(900px 500px at 50% -10%,#8B1E24 0%,#3a1a1d 45%,#2A2426 100%)}
+.login form{border-radius:22px;box-shadow:0 30px 60px -20px rgba(0,0,0,.55);animation:rise .7s var(--ease) both;padding:30px 26px;max-width:390px}
+.login form.shake{animation:shake .5s}
+.field input{border:1.5px solid var(--line);border-radius:12px;padding:14px;transition:border-color .2s,box-shadow .2s,background .2s;width:100%}
+.field input:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.pw{position:relative}.pw input{padding-right:64px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ox);font-weight:700;font-size:13px;padding:10px}
+
+/* sidebar */
+aside{background:linear-gradient(180deg,#2e2729 0%,#201b1d 100%);padding:26px 18px}
+.fr-card,.fr-pick select{border-radius:12px}
+.fr-card{background:#ffffff0d;border-color:#ffffff2b}
+.fr-card .frc{border-radius:6px}
+.fr-pick select{background:#ffffff14;transition:background .2s,border-color .2s}
+.fr-pick select:hover{background:#ffffff22}
+nav{gap:3px}
+nav a,nav button.navbtn{border:0;border-radius:12px;padding:11px 14px;justify-content:flex-start;align-items:center;gap:12px;position:relative;transition:background .2s,color .2s,transform .2s var(--ease)}
+nav a svg{width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav a:hover{background:#ffffff14;transform:translateX(3px)}
+nav a.on{background:var(--ox);box-shadow:0 8px 18px -8px rgba(139,30,36,.9)}
+nav a .count{margin-left:auto;border-radius:99px;padding:1px 8px;font-weight:700}
+.logout-btn{border-radius:12px;transition:background .2s}
+.servicebar{border-radius:6px;overflow:hidden}
+main{padding:32px 40px 60px;max-width:1500px}
+
+/* buttons */
+.btn{border-radius:14px;background:linear-gradient(180deg,#9a2329,var(--ox));box-shadow:0 8px 18px -10px rgba(139,30,36,.9);display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .2s var(--ease),box-shadow .2s,background .2s}
+.btn:hover{transform:translateY(-2px);background:linear-gradient(180deg,#9a2329,var(--ox));box-shadow:0 12px 22px -10px rgba(139,30,36,.95)}
+.btn:active{transform:scale(.97);box-shadow:none}
+.btn.ghost{background:#fff;box-shadow:none;border:1.5px solid var(--ink)}
+.btn.ghost:hover{background:var(--paper);box-shadow:none}
+.btn.green{background:linear-gradient(180deg,#25903f,#1F7A3A);box-shadow:0 8px 18px -10px rgba(31,122,58,.9)}
+.btn.sm{border-radius:10px}
+.btn.busy{opacity:.75;pointer-events:none}
+.btn.busy::after{content:"";width:15px;height:15px;border:2.5px solid #ffffff80;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.btn.ghost.busy::after{border-color:#2a242666;border-top-color:var(--ink)}
+.btn:disabled{box-shadow:none;transform:none;filter:grayscale(.4)}
+.maplink{transition:transform .2s var(--ease),background .2s,color .2s}
+.maplink:hover{transform:scale(1.08)}
+
+/* cards, tables, forms */
+.card,.kpi,.mini,.filters{border-radius:var(--r);box-shadow:var(--sh);border-color:var(--line)}
+.card{overflow:hidden}
+.kpi{transition:transform .25s var(--ease),box-shadow .25s}
+button.kpi:hover,a.kpi:hover{transform:translateY(-3px)}
+.kpi.dark{background:linear-gradient(135deg,#3a3033,#2A2426)}
+.tab{border-radius:99px;border-width:1.5px;padding:8px 16px;transition:background .2s,color .2s,border-color .2s,transform .2s var(--ease)}
+.tab:hover{border-color:var(--ink)}.tab:active{transform:scale(.95)}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:#FBFAF9}
+td{padding-top:12px;padding-bottom:12px}
+.badge{border-radius:99px;display:inline-flex;align-items:center;gap:6px;padding:4px 11px}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.notice{border-radius:12px}
+.bar,.bar i{border-radius:9px}
+.bar i{background:linear-gradient(90deg,var(--ox),#C4474E)}
+.filters input,.filters select,.fld input,.fld select,textarea{border-radius:10px;border-width:1.5px;transition:border-color .2s,box-shadow .2s,background .2s}
+.filters input:focus,.filters select:focus,.fld input:focus,.fld select:focus,textarea:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.wi{border-radius:10px;border-width:1.5px;transition:border-color .2s,box-shadow .2s,background .2s}
+.wi:focus{outline:0;border-color:var(--ox);box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.loadrow{transition:background .2s,box-shadow .2s}
+tr.pickrow{transition:background .15s,box-shadow .2s}
+.live{border-radius:99px}
+.ev{transition:background .2s}.ev:hover{background:#FBFAF9}
+.ev .dot{border-radius:50%}
+.empty{padding:40px 18px}
+
+/* toast and loading */
+.toast{border-radius:14px;display:flex;align-items:center;gap:12px;padding:13px 18px 13px 14px;transition:all .35s var(--ease);z-index:60;box-shadow:0 18px 40px -16px rgba(0,0,0,.6);transform:translate(-50%,24px) scale(.96)}
+.toast.show{transform:translate(-50%,0) scale(1)}
+.toast .ic{flex:none;width:24px;height:24px;border-radius:50%;background:#2e9b4c;display:grid;place-items:center;font-size:14px;font-weight:700}
+.toast.bad .ic{background:#E5484D}
+.loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px 18px}
+.loading::before{content:"";width:34px;height:34px;border:3.5px solid var(--paper);border-top-color:var(--ox);border-radius:50%;animation:spin .8s linear infinite}
+
+@media (min-width:861px){aside{overflow-y:auto;overscroll-behavior:contain;height:100vh;height:100dvh;scrollbar-width:thin;scrollbar-color:#ffffff40 transparent}aside>*{flex-shrink:0}}
+@media (min-width:861px) and (max-height:560px){
+  aside{padding:12px 14px;gap:10px}
+  .logo{width:92px}.brand{gap:4px}.brand-title{font-size:14px}
+  .fr-card{padding:8px}.fr-card b{font-size:14px}.who b{font-size:14px}
+  nav a,nav button.navbtn{padding:8px 12px;font-size:13px}
+  .side-foot{margin-top:6px;gap:8px}.side-foot>span{display:none}
+}
+@media (max-width:860px) and (max-height:480px){aside{position:static;border-radius:0}}
+@media (hover:none){.btn:hover,a.kpi:hover,button.kpi:hover,.maplink:hover,nav a:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* phones: header plus a swipeable row of tabs */
+@media (max-width:860px){
+  aside{padding:10px 12px;gap:8px;border-radius:0 0 18px 18px;box-shadow:0 10px 24px -14px rgba(0,0,0,.6);z-index:30}
+  nav{flex:1 1 100%;order:9;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:2px 0 4px;justify-content:flex-start;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  nav::-webkit-scrollbar{display:none}
+  nav a,nav button.navbtn{flex:none;width:auto;padding:9px 14px;font-size:13px;border-radius:99px;background:#ffffff14;white-space:nowrap}
+  nav a:hover{transform:none}
+  nav a svg{width:18px;height:18px}
+  nav a.on{box-shadow:none}
+  nav a .count{display:inline-block;margin-left:2px}
+  nav a .count:empty{display:none}
+  main{padding:18px 14px 40px;gap:18px}
+  .toast{bottom:16px}
+}
+</style>
+<link rel="stylesheet" href="../brand.css">
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <img class="login-logo" src="../logo.webp" alt="Scrappy">
+  <form id="login-form" novalidate>
+    <h1 style="font-family:var(--head);letter-spacing:-.03em">HQ login</h1>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" data-pw aria-label="Show password">Show</button></div></div>
+    <div class="err" id="login-err" role="alert"></div>
+    <button class="btn block" type="submit" id="login-btn">Log in</button>
+    <span class="muted small">For Scrappy HQ only.</span>
+  </form>
+</div>
+
+<div id="shell" class="shell hidden">
+  <aside>
+    <div class="brand"><img class="logo" src="../logo.webp" alt="Scrappy"><div class="brand-title">HQ Dashboard</div></div>
+    <div class="fr-pick"><label for="frsel">FRANCHISE</label><select id="frsel" data-act="frsel" aria-label="Choose a franchise"></select></div>
+    <div class="who"><b id="who-name"></b><span class="role" id="who-role"></span><span id="who-meta"></span></div>
+    <nav aria-label="Main">
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#franchises" data-view="franchises">Franchises</a>
+      <a href="#leads" data-view="leads">Leads <span class="count" id="nav-leads"></span></a>
+      <a href="#pickups" data-view="pickups">Pickups and bills</a>
+      <a href="#loads" data-view="loads">Loads and weighing <span class="count" id="nav-loads"></span></a>
+      <a href="#stock" data-view="stock">Stock and requests</a>
+      <a href="#cash" data-view="cash">Cash <span class="count" id="nav-cash"></span></a>
+      <a href="#team" data-view="team">Team</a>
+      <a href="#rates" data-view="rates">Rates</a>
+      <a href="#activity" data-view="activity">Activity log</a>
+      <button class="navbtn mob-only" data-act="logout" type="button">Log out</button>
+    </nav>
+    <div class="side-foot">
+      <span>Rates and decisions made here are recorded in the activity log and cannot be edited.</span>
+      <button class="logout-btn" data-act="logout" type="button">Log out</button>
+      <div class="servicebar" aria-hidden="true"><i style="background:#8B1E24"></i><i style="background:#4F7F3B"></i><i style="background:#3D6F90"></i><i style="background:#29908F"></i><i style="background:#DE9827"></i></div>
+    </div>
+  </aside>
+  <main id="app" aria-live="polite"></main>
+</div>
+<div id="topbar" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =========================================================
+   Scrappy HQ dashboard
+   Plain HTTPS to Supabase. The publishable key is safe in a page.
+   Every HQ action goes through a database function that checks the caller is HQ.
+   ========================================================= */
+const SUPABASE_URL = 'https://suluhhbomiuwwocrfpxg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_45-7fJZdo_jovQfhN0dhtw_FNmo1Fw1';
+const SESSION_KEY = 'scrappy_hq_session';
+const COLLECTOR_URL = location.origin + '/';
+const WAREHOUSE_URL = location.origin + '/';
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => Number(v || 0);
+const kg = n => (Math.round(num(n) * 10) / 10).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const rs = n => (num(n) < 0 ? '−₹' : '₹') + Math.abs(Math.round(num(n))).toLocaleString('en-IN');
+const IST = 'Asia/Kolkata';
+const dayOf = t => t ? new Date(t).toLocaleDateString('en-CA', { timeZone: IST }) : '';
+const todayIST = () => dayOf(Date.now());
+const dlabel = d => d ? new Date(String(d).slice(0, 10) + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'UTC', day: '2-digit', month: 'short' }) : '';
+const tlabel = t => t ? new Date(t).toLocaleTimeString('en-IN', { timeZone: IST, hour: 'numeric', minute: '2-digit' }).toUpperCase() : '—';
+const dtlabel = t => t ? dlabel(dayOf(t)) + ' ' + tlabel(t) : '—';
+const addDays = (d, n) => { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const pct = n => (num(n) > 0 ? '+' : '') + num(n).toFixed(1) + '%';
+function toast(m, bad) { const t = $('#toast'); t.innerHTML = '<span class="ic">' + (bad ? '!' : '✓') + '</span><span></span>'; t.lastChild.textContent = m; t.classList.toggle('bad', !!bad); t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), bad ? 5500 : 3200); }
+function store(k, v) { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+const selectOptions = (list, val) => list.map(o => `<option value="${esc(o[0])}" ${String(val) === String(o[0]) ? 'selected' : ''}>${esc(o[1])}</option>`).join('');
+const val = id => ($(id) || {}).value || '';
+
+/* ---------- Supabase connection ---------- */
+let session = load(SESSION_KEY);
+async function authCall(grant, body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grant}`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || data.message || 'Login failed');
+  session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in || 3600) * 1000, user_id: (data.user && data.user.id) || (session && session.user_id) };
+  store(SESSION_KEY, session);
+  rtToken();
+  return session;
+}
+async function ensureFresh() {
+  if (session && session.expires_at - Date.now() < 300000) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); }
+    catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+  }
+}
+async function api(path, { method = 'GET', body, headers = {}, retry = true } = {}) {
+  await ensureFresh();
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method,
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session ? session.access_token : SUPABASE_KEY}`, 'Content-Type': 'application/json', ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (res.status === 401 && retry && session) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); } catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+    return api(path, { method, body, headers, retry: false });
+  }
+  const text = await res.text();
+  let data = null; try { data = text ? JSON.parse(text) : null; } catch (e) {}
+  if (!res.ok) throw new Error((data && (data.message || data.msg)) || `Request failed (${res.status})`);
+  return data;
+}
+const rest = q => api('/rest/v1/' + q);
+const rpc = (fn, args = {}) => api('/rest/v1/rpc/' + fn, { method: 'POST', body: args });
+
+/* creating logins and resetting passwords: done by a server-side function that checks the caller is HQ */
+async function loginsApi(body) {
+  await ensureFresh();
+  const call = () => fetch(`${SUPABASE_URL}/functions/v1/hq-logins`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  let res = await call();
+  if (res.status === 401) { try { await authCall('refresh_token', { refresh_token: session.refresh_token }); res = await call(); } catch (e) {} }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Could not reach the login service. Try again.');
+  return data;
+}
+
+/* PDF bill, made on the server from the database. HQ is allowed to open any bill. */
+async function makePdf(billId) {
+  await ensureFresh();
+  const call = () => fetch(`${SUPABASE_URL}/functions/v1/bill-pdf`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ bill_id: billId })
+  });
+  let res = await call();
+  if (res.status === 401) { try { await authCall('refresh_token', { refresh_token: session.refresh_token }); res = await call(); } catch (e) {} }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) throw new Error(data.error || 'Could not make the PDF bill.');
+  return data.url;
+}
+
+/* ---------- state ---------- */
+const FAR_PAST = '2026-01-01';
+const S = {
+  profile: null, from: addDays(todayIST(), -6), to: todayIST(), preset: '7',
+  ov: null, daily: [], isum: [], team: [], items: [], metric: 'kg',
+  lf: { status: '', driver: '', q: '' }, leads: [], leadTab: 'list', leadAct: null, imports: [], upload: null,
+  bf: { status: '', driver: '', q: '' }, bills: [], billSel: null, billItems: {},
+  loads: [], loadFilter: 'attention', loadSel: null, loadDetail: {}, score: [],
+  stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
+  routes: [], txns: [], cashSel: null, resolutions: [], disputes: [], fd: '', disputeAct: null,
+  rates: [], ratehist: [], editPerson: null, audit: [],
+  feed: [], prevOv: null, wsOpen: false,
+  allItems: [], addItem: false, removeItem: null, creds: null, resetAsk: null,
+  fr: load('scrappy_hq_fr') || null, franchises: [], fran: [], frQ: '', frSort: 'attention', frStatus: 'active', frEdit: null, frAdd: false, personAdd: false
+};
+const itemName = id => (S.items.find(i => i.id === id) || S.allItems.find(i => i.id === id) || {}).name || '';
+const personName = id => { const p = S.team.find(x => x.id === id); return p ? p.full_name : '—'; };
+const drivers = () => S.team.filter(p => p.role === 'driver' && (!S.fr || p.franchise_id === S.fr));
+const allDrivers = () => S.team.filter(p => p.role === 'driver');
+const rangeArgs = () => ({ p_from: S.from, p_to: S.to, p_franchise: S.fr || null });
+const frById = id => S.franchises.find(f => f.id === id);
+const frCode = id => (frById(id) || {}).code || '';
+const frName = id => (frById(id) || {}).name || '';
+const scopeLabel = () => S.fr ? frName(S.fr) + ' (' + frCode(S.fr) + ')' : 'All franchises';
+const frq = () => S.fr ? '&franchise_id=eq.' + S.fr : '';
+const frTag = code => code ? `<span class="frcode">${esc(code)}</span>` : '';
+const curView = () => VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
+
+/* ---------- data: the base is always loaded; each screen loads what it needs ---------- */
+async function loadBase() {
+  const [fr, team, items] = await Promise.all([rest('franchises?select=id,code,name,district,constituency,active&order=code'), rpc('hq_team', {}), rest('scrap_items?select=id,name,active&order=id')]);
+  S.franchises = fr; S.team = team; S.allItems = items; S.items = items.filter(i => i.active);
+  if (S.fr && !frById(S.fr)) { S.fr = null; store('scrappy_hq_fr', undefined); }
+  S.ov = await rpc('hq_overview', rangeArgs());
+}
+const LOAD = {
+  overview: async () => { [S.daily, S.isum, S.fran] = await Promise.all([rpc('hq_daily', rangeArgs()), rpc('hq_item_summary', rangeArgs()), S.fr ? Promise.resolve([]) : rpc('hq_franchises', { p_from: S.from, p_to: S.to })]); },
+  franchises: async () => { S.fran = await rpc('hq_franchises', { p_from: S.from, p_to: S.to }); },
+  leads: async () => {
+    S.leads = await rpc('hq_leads', { ...rangeArgs(), p_status: S.lf.status || null, p_driver: S.lf.driver || null, p_search: S.lf.q || null, p_limit: 300, p_franchise: S.fr || null });
+    if (S.leadTab === 'upload') S.imports = await rest('lead_import?select=id,customer_name,phone,driver_email,franchise_code,pickup_date,status,message,lead_code,imported_at&order=id.desc&limit=60');
+  },
+  pickups: async () => {
+    S.bills = await rpc('hq_bills', { ...rangeArgs(), p_status: S.bf.status || null, p_driver: S.bf.driver || null, p_search: S.bf.q || null, p_limit: 300, p_franchise: S.fr || null });
+  },
+  loads: async () => { [S.loads, S.score] = await Promise.all([rpc('hq_loads', rangeArgs()), rpc('hq_driver_scorecard', rangeArgs())]); },
+  stock: async () => {
+    [S.stock, S.reqs, S.rels] = await Promise.all([rpc('wh_stock_report', rangeArgs()), rest('hq_requirement_progress?select=*&order=id.desc&limit=300' + frq()),
+      rest('hq_releases?select=id,code,requirement_id,item_id,kg,vehicle_no,note,released_by,released_at,franchise_id&order=released_at.desc&limit=200' + frq())]);
+  },
+  cash: async () => {
+    const lim = addDays(todayIST(), -180);
+    [S.routes, S.txns, S.resolutions, S.disputes] = await Promise.all([rpc('wh_route_cash', { p_from: S.from < lim ? lim : S.from, p_to: S.to, p_driver: null, p_franchise: S.fr || null }),
+      rpc('wh_transactions', { ...rangeArgs(), p_driver: S.fd || null, p_limit: 300 }), rest('settlement_resolutions?select=settlement_id,decision,note,resolved_by,resolved_at&order=id.desc&limit=500'),
+      rpc('hq_open_disputes', { p_franchise: S.fr || null })]);
+  },
+  team: async () => { S.score = await rpc('hq_driver_scorecard', rangeArgs()); },
+  rates: async () => { [S.rates, S.ratehist] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100')]); },
+  activity: async () => { S.audit = await rest('hq_audit?select=id,at,by_id,action,ref,detail,franchise_id&order=id.desc&limit=200' + frq()); }
+};
+async function refresh() {
+  await Promise.all([loadBase(), LOAD[curView()]()]);
+  diffOv();
+}
+
+/* ---------- live feed: what changed since the last refresh ---------- */
+function diffOv() {
+  const o = S.ov, p = S.prevOv; S.prevOv = o; if (!p) return;
+  const ev = (c, t) => S.feed.unshift({ c, t, when: new Date().toLocaleTimeString('en-IN', { timeZone: IST, hour: 'numeric', minute: '2-digit', second: '2-digit' }).toUpperCase() });
+  if (o.paid_bills > p.paid_bills) ev('g', `${o.paid_bills - p.paid_bills} pickup${o.paid_bills - p.paid_bills > 1 ? 's' : ''} paid. Total now ${o.paid_bills}, ${kg(o.kg)} kg, ${rs(o.amount)}.`);
+  if (o.loads_open > p.loads_open) ev('b', `A driver started a route. ${o.loads_open} on the road.`);
+  if (o.loads_waiting > p.loads_waiting) ev('a', `A load reached the warehouse and is waiting for weighing.`);
+  if (o.loads_flagged > p.loads_flagged) ev('a', `<b>A load was flagged</b> at weighing. It needs your decision.`);
+  if (o.counts_unverified > p.counts_unverified) ev('b', `A cash count was saved and waits for a supervisor.`);
+  if (o.disputes_open > p.disputes_open) ev('a', `<b>A cash count was disputed.</b> It needs your decision.`);
+  if (o.leads_scheduled > p.leads_scheduled) ev('b', `${o.leads_scheduled - p.leads_scheduled} new lead${o.leads_scheduled - p.leads_scheduled > 1 ? 's' : ''} scheduled.`);
+  S.feed = S.feed.slice(0, 15);
+}
+const feedHtml = () => S.feed.length ? S.feed.map(e => `<div class="ev"><span class="dot ${e.c}"></span><div>${e.t}<small>${esc(e.when)}</small></div></div>`).join('') : '<div class="empty">Waiting for activity…</div>';
+
+/* ---------- shared bits ---------- */
+function filterBar(extra = '', range = true) {
+  const P = [['today', 'Today'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['all', 'All']];
+  return `<div class="filters">
+    <span class="scope" title="Change this in the left panel">${esc(scopeLabel())}</span>
+    ${range ? `<div class="f"><label for="from">FROM</label><input type="date" id="from" value="${S.from}" data-act="range"></div>
+    <div class="f"><label for="to">TO</label><input type="date" id="to" value="${S.to}" data-act="range"></div>
+    <div class="tabs">${P.map(p => `<button class="tab ${S.preset === p[0] ? 'on' : ''}" data-act="preset" data-p="${p[0]}">${p[1]}</button>`).join('')}</div>` : ''}
+    ${extra}<span class="sp"></span>
+    <span class="live ${S.wsOpen ? '' : 'off'}" title="${S.wsOpen ? 'Live: changes appear within a second' : 'Refreshes every 20 seconds'}"><i></i>${S.wsOpen ? 'LIVE' : 'AUTO-REFRESH'}</span>
+  </div>`;
+}
+const driverSelect = (id, act, v, label = 'DRIVER') => `<div class="f"><label for="${id}">${label}</label><select id="${id}" data-act="${act}"><option value="">All drivers</option>${selectOptions(drivers().map(d => [d.id, d.full_name]), v)}</select></div>`;
+const searchBox = (id, act, v) => `<div class="f"><label for="${id}">SEARCH</label><input id="${id}" data-act="${act}" value="${esc(v)}" placeholder="Name, phone, code, area" style="min-width:200px"></div>`;
+const LST = { unassigned: ['Not assigned', 'b-cash'], failed: ['Not completed', 'b-flag'], scheduled: ['Scheduled', 'b-sched'], in_progress: ['In progress', 'b-cash'], closed: ['✓ Closed', 'b-ok'], cancelled: ['Cancelled', 'b-flag'] };
+const BST = { draft: ['Draft', 'b-sched'], sent: ['Sent to customer', 'b-cash'], confirmed: ['Customer agreed', 'b-blue'], paid: ['✓ Paid', 'b-ok'] };
+const LDST = { open: ['On route', 'b-sched'], submitted: ['Waiting for weighing', 'b-cash'], reconciled: ['✓ Reconciled', 'b-ok'], flagged: ['! Flagged', 'b-flag'] };
+const SST = { on_route: ['On route', 'b-sched'], driver_out: ['Driver still out', 'b-sched'], with_last: ['Counted with last route', 'b-sched'], included: ['Included in last count', 'b-ok'], awaiting_count: ['Cash count pending', 'b-cash'], counted: ['Awaiting supervisor', 'b-blue'], verified: ['✓ Verified', 'b-ok'], disputed: ['! Disputed', 'b-flag'] };
+const chip = (map, k) => `<span class="badge ${(map[k] || ['', 'b-sched'])[1]}">${esc((map[k] || [k])[0])}</span>`;
+const kv = (a, b, st = '') => `<div class="row-kv" style="${st}"><span class="muted">${a}</span><b style="text-align:right">${b}</b></div>`;
+
+/* ---------- overview ---------- */
+function barChart(rows, metric) {
+  if (!rows.length) return '<div class="empty">No data in this range.</div>';
+  const W = 760, H = 190, pl = 8, pr = 8, pt = 14, pb = 26, n = rows.length, bw = Math.max(4, (W - pl - pr) / n - 4);
+  const vals = rows.map(r => num(r[metric])), max = Math.max(1, ...vals);
+  const bars = rows.map((r, i) => {
+    const h = Math.max(vals[i] > 0 ? 2 : 0, (H - pt - pb) * vals[i] / max), x = pl + i * ((W - pl - pr) / n) + 2, y = H - pb - h;
+    const label = metric === 'amount' ? rs(vals[i]) : metric === 'kg' ? kg(vals[i]) + ' kg' : vals[i] + ' pickups';
+    return `<g><title>${esc(dlabel(r.day))}: ${esc(label)}</title><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="#8B1E24"/></g>`;
+  }).join('');
+  const step = Math.ceil(n / 8), ticks = rows.map((r, i) => i % step === 0 ? `<text x="${(pl + i * ((W - pl - pr) / n) + 2 + bw / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(dlabel(r.day))}</text>` : '').join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily ${esc(metric)}"><line x1="${pl}" x2="${W - pr}" y1="${H - pb}" y2="${H - pb}" stroke="#D8D3CE"/><text x="${pl}" y="10">${esc(metric === 'amount' ? rs(max) : metric === 'kg' ? kg(max) + ' kg' : max)}</text>${bars}${ticks}</svg>`;
+}
+function vOverview() {
+  const o = S.ov; if (!o) return '<div class="loading"><svg class="hop" viewBox="-4 -26 392 134" role="img" aria-label="Loading"><g class="h h0"><path d="M99.10 0.00L12.50 0.00A12.50 12.50 0 0 0 1.67 18.75L44.98 93.75A12.50 12.50 0 0 0 66.63 93.75L109.93 18.75A12.50 12.50 0 0 0 99.10 0.00Z"/></g><g transform="translate(141.6 0)"><g class="h h1"><circle cx="50" cy="50" r="50"/></g></g><g transform="translate(271.6 0)"><g class="h h2"><path d="M12.50 100.00L99.10 100.00A12.50 12.50 0 0 0 109.93 81.25L66.63 6.25A12.50 12.50 0 0 0 44.98 6.25L1.67 81.25A12.50 12.50 0 0 0 12.50 100.00Z"/></g></g></svg>Loading…</div>';
+  const alerts = [
+    [o.loads_flagged, 'Flagged loads need your decision', 'loads', 'flagged', true],
+    [o.disputes_open, 'Disputed cash counts need a decision', 'cash', '', true],
+    [o.counts_waiting, 'Drivers are back and the cash is not counted yet', 'cash', '', false],
+    [o.counts_unverified, 'Cash counts wait for a supervisor', 'cash', '', false],
+    [o.loads_waiting, 'Loads wait for weighing at the warehouse', 'loads', 'waiting', false],
+    [o.leads_unassigned, 'Leads wait for a supervisor to give them to a driver', 'leads', 'unassigned', false],
+    [o.leads_failed, 'Pickups could not be completed in this period (reasons on the Leads page)', 'leads', 'failed', false],
+    [o.leads_late, 'Scheduled pickups are more than 3 hours late', 'leads', 'late', true],
+    [o.req_overdue, 'HQ requirements are overdue', 'stock', '', true]
+  ].filter(a => num(a[0]) > 0);
+  const variance = num(o.billed_kg_weighed) > 0 ? (num(o.weighed_kg) - num(o.billed_kg_weighed)) / num(o.billed_kg_weighed) * 100 : null;
+  const maxKg = Math.max(1, ...S.isum.map(i => num(i.kg)));
+  return `
+  <div class="head"><div><div class="eyebrow">${esc(scopeLabel())} · ${dlabel(S.from)} – ${dlabel(S.to)}</div><h1>${S.fr ? esc(frName(S.fr)) + ', live.' : 'The whole business, live.'}</h1>
+    <div class="muted">Leads, pickups, loads, stock and cash from every driver, the warehouse and the supervisor.</div></div></div>
+  ${filterBar()}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Paid out to customers</span><span class="v">${rs(o.amount)}</span><span class="s">${o.paid_bills} pickups · cash ${rs(o.cash_amount)} · UPI ${rs(o.upi_amount)}</span></div>
+    <div class="kpi"><span class="l">Scrap bought</span><span class="v">${kg(o.kg)} kg</span><span class="s">${num(o.kg) > 0 ? 'Average ₹' + (num(o.amount) / num(o.kg)).toFixed(1) + ' per kg' : 'Paid bills in range'}</span></div>
+    <button class="kpi" data-act="go" data-v="leads"><span class="l">Pickups today</span><span class="v">${o.leads_today}</span><span class="s">${o.leads_in_progress} in progress · ${o.leads_scheduled} scheduled in all</span></button>
+    <div class="kpi"><span class="l">On the road now</span><span class="v">${o.loads_open}</span><span class="s">${o.loads_waiting} at warehouse waiting</span></div>
+    <button class="kpi" data-act="go" data-v="stock"><span class="l">Stock in the yard</span><span class="v">${kg(o.stock_kg)} kg</span><span class="s">${rs(o.stock_value)} at HQ rates · HQ needs ${kg(o.req_remaining_kg)} kg</span></button>
+    <button class="kpi" data-act="go" data-v="cash"><span class="l">Cash held by drivers</span><span class="v">${rs(o.cash_in_field)}</span><span class="s">Shortages in range: ${rs(o.shortage_total)}</span></button>
+    ${!S.fr ? `<button class="kpi" data-act="go" data-v="franchises"><span class="l">Franchises</span><span class="v">${o.franchises_active}</span><span class="s">${o.drivers_active} active drivers</span></button>` : `<div class="kpi"><span class="l">Drivers</span><span class="v">${o.drivers_active}</span><span class="s">Active in this franchise</span></div>`}
+  </div>
+  ${!S.fr ? frAttentionCard() : ''}
+  <div class="cols">
+    <section class="card grow">
+      <div class="card-h"><h2>Needs your attention</h2><span class="muted small">${alerts.length ? alerts.length + ' item' + (alerts.length > 1 ? 's' : '') : 'All clear'}</span></div>
+      ${alerts.length ? alerts.map(a => `<div class="alert ${a[4] ? 'hot' : ''}"><span class="n">${a[0]}</span><span style="flex:1">${esc(a[1])}</span><button class="btn ghost sm" data-act="go" data-v="${a[2]}" data-f="${a[3]}">Open</button></div>`).join('') : '<div class="empty">Nothing is waiting for HQ.</div>'}
+    </section>
+    <section class="card side">
+      <div class="card-h"><h2>Live updates</h2></div>
+      <div class="feed">${feedHtml()}</div>
+    </section>
+  </div>
+  <section class="card">
+    <div class="card-h"><h2>Day by day</h2><div class="tabs">${[['kg', 'Kg bought'], ['amount', '₹ paid out'], ['pickups', 'Pickups']].map(m => `<button class="tab ${S.metric === m[0] ? 'on' : ''}" data-act="metric" data-m="${m[0]}">${m[1]}</button>`).join('')}</div></div>
+    <div class="pad">${barChart(S.daily, S.metric)}</div>
+  </section>
+  <div class="cols">
+    <section class="card grow"><div class="card-h"><h2>By material</h2><span class="muted small">Paid bills in range</span></div>
+      <div class="scroll"><table style="min-width:520px"><thead><tr><th>MATERIAL</th><th class="r">KG</th><th class="r">PAID OUT</th><th class="r">AVG ₹/KG</th><th class="r">PICKUPS</th><th style="width:20%">SHARE</th></tr></thead>
+      <tbody>${S.isum.map(i => `<tr><td class="b">${esc(i.item_name)}</td><td class="r">${kg(i.kg)}</td><td class="r">${rs(i.amount)}</td><td class="r">${num(i.avg_rate) ? '₹' + num(i.avg_rate).toFixed(1) : '—'}</td><td class="r">${i.pickups}</td><td><div class="bar"><i style="width:${Math.max(1, num(i.kg) / maxKg * 100).toFixed(1)}%"></i></div></td></tr>`).join('') || '<tr><td colspan="6" class="empty">No data.</td></tr>'}</tbody></table></div></section>
+    <section class="card side"><div class="card-h"><h2>Weighing check</h2></div>
+      <div class="pad">${variance == null ? '<span class="muted">No loads weighed in this range.</span>' : `
+        ${kv('Billed by drivers (weighed loads)', kg(o.billed_kg_weighed) + ' kg')}${kv('Weighed at the warehouse', kg(o.weighed_kg) + ' kg')}
+        ${kv('Difference', `<span class="${Math.abs(variance) > 2 ? 'var-bad' : ''}" style="color:${Math.abs(variance) > 2 ? 'var(--ox)' : 'var(--green)'}">${pct(variance)}</span>`)}
+        <span class="muted small">The warehouse allows ±2% per material. A steady gap in one direction is worth a look. See the driver table under Loads and weighing.</span>`}</div></section>
+  </div>`;
+}
+
+/* reset a password: type the new one, or leave it empty and one is made */
+const resetBox = id => `<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><input id="rp-pw" type="text" autocomplete="off" spellcheck="false" maxlength="72" placeholder="Type the new password (8+ characters)" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;min-width:230px;font-family:monospace;font-size:14px" aria-label="New password"><button class="btn sm" data-act="person-reset" data-id="${id}">Set password</button><button class="linkbtn" data-act="person-reset-cancel">Cancel</button><span class="muted small" style="flex:1 1 100%;text-align:right">Leave it empty and a random password is made for you. Any open login of this person is signed out.</span></span>`;
+/* ---------- logins just created: shown once, never stored ---------- */
+const ROLE_LOGIN = { driver: 'Collector', warehouse: 'Warehouse manager', supervisor: 'Supervisor' };
+const loginUrl = role => role === 'driver' ? COLLECTOR_URL : WAREHOUSE_URL;
+function credsSheet() {
+  const C = S.creds; if (!C) return '';
+  const ok = C.rows.filter(r => r.ok), bad = C.rows.filter(r => !r.ok);
+  return `<section class="card pad" id="cred" style="border:2px solid var(--green)">
+    <div class="row-split" style="flex-wrap:wrap"><h2>${esc(C.title)}</h2><button class="linkbtn no-print" data-act="creds-close">Close</button></div>
+    ${ok.length ? `<div class="notice"><b>Save these passwords now.</b> A password made for you is shown only once and is not stored anywhere. One you typed yourself is not shown again. If one is lost, use Reset password in Team.</div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>ROLE</th><th>NAME</th><th>LOGIN (EMAIL)</th><th>PASSWORD</th><th>LOG IN AT</th></tr></thead>
+    <tbody>${ok.map(r => `<tr><td class="b">${esc(ROLE_LOGIN[r.role] || r.role)}</td><td>${esc(r.full_name)}</td><td>${esc(r.email)}</td><td style="font-family:monospace;font-size:15px;font-weight:700">${r.password ? esc(r.password) : '<span class="muted" style="font-family:var(--body);font-weight:400">chosen by HQ</span>'}</td><td class="small">${esc(loginUrl(r.role))}</td></tr>`).join('')}</tbody></table></div>
+    <div class="inl no-print"><button class="btn green sm" data-act="creds-copy">Copy all</button><button class="btn ghost sm" data-act="creds-print">Print</button><button class="btn ghost sm" data-act="creds-csv">Download CSV</button></div>` : ''}
+    ${bad.map(r => `<div class="notice bad"><b>${esc(r.full_name || r.email || 'Person')}</b> (${esc(ROLE_LOGIN[r.role] || r.role)}): ${esc(r.error)}</div>`).join('')}
+    ${bad.length ? '<span class="muted small no-print">Anyone who failed can be added again from Team, Add a person.</span>' : ''}
+  </section>`;
+}
+const credsText = () => (S.creds ? S.creds.rows.filter(r => r.ok) : []).map(r => `${ROLE_LOGIN[r.role] || r.role}: ${r.full_name}\nLogin: ${r.email}\nPassword: ${r.password || '(chosen by HQ)'}\nLog in at: ${loginUrl(r.role)}`).join('\n\n');
+
+/* ---------- franchises ---------- */
+const quiet3 = f => f.active && num(f.drivers) > 0 && f.last_activity && (Date.now() - new Date(f.last_activity).getTime()) > 3 * 864e5;
+const frScore = f => num(f.loads_flagged) * 3 + num(f.disputes_open) * 3 + num(f.leads_late) * 2 + num(f.counts_unverified) + (quiet3(f) ? 1 : 0);
+const frReasons = f => [
+  num(f.loads_flagged) ? [f.loads_flagged + ' flagged load' + (f.loads_flagged > 1 ? 's' : ''), 'b-flag'] : null,
+  num(f.disputes_open) ? [f.disputes_open + ' cash dispute' + (f.disputes_open > 1 ? 's' : ''), 'b-flag'] : null,
+  num(f.leads_late) ? [f.leads_late + ' late pickup' + (f.leads_late > 1 ? 's' : ''), 'b-cash'] : null,
+  num(f.counts_unverified) ? [f.counts_unverified + ' count' + (f.counts_unverified > 1 ? 's' : '') + ' to verify', 'b-blue'] : null,
+  quiet3(f) ? ['quiet for 3+ days', 'b-sched'] : null
+].filter(Boolean);
+function frAttentionCard() {
+  const L = S.fran.filter(f => f.active && frScore(f) > 0).sort((a, b) => frScore(b) - frScore(a)).slice(0, 8);
+  return `<section class="card"><div class="card-h"><h2>Franchises needing attention</h2><button class="linkbtn" data-act="go" data-v="franchises">See all franchises</button></div>
+    ${L.length ? L.map(f => `<div class="alert"><span style="flex:1"><b>${esc(f.name)}</b>${frTag(f.code)}<br>${frReasons(f).map(r => `<span class="badge ${r[1]}" style="margin:3px 4px 0 0">${esc(r[0])}</span>`).join('')}</span><button class="btn ghost sm" data-act="fr-open" data-id="${f.franchise_id}">Open</button></div>`).join('') : '<div class="empty">No franchise needs attention.</div>'}</section>`;
+}
+function vFranchises() {
+  const q = S.frQ.toLowerCase();
+  let F = S.fran.filter(f => (S.frStatus === 'all' || (S.frStatus === 'active' ? f.active : !f.active)) && (!q || (f.code + ' ' + f.name + ' ' + (f.district || '') + ' ' + (f.constituency || '')).toLowerCase().includes(q)));
+  const sorters = { attention: (a, b) => frScore(b) - frScore(a) || a.code.localeCompare(b.code), pickups: (a, b) => num(b.pickups) - num(a.pickups), kg: (a, b) => num(b.kg) - num(a.kg), amount: (a, b) => num(b.amount) - num(a.amount),
+    stock: (a, b) => num(b.stock_kg) - num(a.stock_kg), cash: (a, b) => num(b.cash_in_hand) - num(a.cash_in_hand), quiet: (a, b) => (new Date(a.last_activity || 0)) - (new Date(b.last_activity || 0)), name: (a, b) => a.name.localeCompare(b.name) };
+  F = F.slice().sort(sorters[S.frSort] || sorters.attention);
+  const A = S.fran.filter(f => f.active), sum = k => A.reduce((a, f) => a + num(f[k]), 0);
+  const E = S.frEdit && S.fran.find(f => f.franchise_id === S.frEdit);
+  const extra = `<div class="f"><label for="frq">SEARCH</label><input id="frq" data-act="frsearch" value="${esc(S.frQ)}" placeholder="Name, code, district" style="min-width:190px"></div>
+    <div class="f"><label for="frs">SORT BY</label><select id="frs" data-act="frsort">${selectOptions([['attention', 'Needs attention'], ['pickups', 'Pickups'], ['kg', 'Kg bought'], ['amount', '₹ paid out'], ['stock', 'Stock'], ['cash', 'Cash held'], ['quiet', 'Quietest first'], ['name', 'Name']], S.frSort)}</select></div>
+    <div class="f"><label for="frst">SHOW</label><select id="frst" data-act="frstatus">${selectOptions([['active', 'Active'], ['off', 'Switched off'], ['all', 'All']], S.frStatus)}</select></div>`;
+  return `
+  ${credsSheet()}<div class="head"><div><div class="eyebrow">Franchises</div><h1>All franchises, side by side.</h1>
+    <div class="muted">One line per franchise. Click a row to open that franchise in every screen.</div></div><button class="btn" data-act="fr-add-toggle">${S.frAdd ? 'Close' : 'Add a franchise'}</button></div>
+  ${S.frAdd ? `<section class="card pad" style="border:2px solid var(--ox)"><h3>Add a franchise</h3><div class="inl">
+    <div class="fld"><label for="fa-c">CODE</label><input id="fa-c" style="width:120px;text-transform:uppercase" placeholder="e.g. TKR"></div><div class="fld"><label for="fa-n">NAME</label><input id="fa-n" placeholder="e.g. Thrikkakara"></div>
+    <div class="fld"><label for="fa-d">DISTRICT</label><input id="fa-d" placeholder="e.g. Ernakulam"></div><div class="fld"><label for="fa-k">ASSEMBLY CONSTITUENCY</label><input id="fa-k"></div></div>
+    <span class="muted small">The code is 2 to 12 letters, numbers or dashes and appears next to every record of the franchise.</span>
+    <h3 style="margin-top:6px">Logins for this franchise</h3>
+    <span class="muted">Fill in the people you have now. Leave a block empty to add that person later from Team. A password is generated for each login and shown once after you save, or type your own (8 or more characters).</span>
+    ${[['warehouse', 'Warehouse manager'], ['supervisor', 'Supervisor'], ['driver', 'Collector']].map(([role, label]) => `<div style="border:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:8px"><b>${label}</b><div class="inl"><div class="fld"><label for="fl-${role}-n">NAME</label><input id="fl-${role}-n"></div><div class="fld"><label for="fl-${role}-e">LOGIN EMAIL</label><input id="fl-${role}-e" type="email" style="min-width:230px"></div>${role === 'driver' ? '<div class="fld"><label for="fl-driver-v">VEHICLE NO.</label><input id="fl-driver-v" style="width:150px"></div>' : ''}<div class="fld"><label for="fl-${role}-p">PASSWORD (OPTIONAL)</label><input id="fl-${role}-p" type="password" autocomplete="new-password" placeholder="blank = generate" style="width:170px"></div></div></div>`).join('')}
+    <div><button class="btn green" data-act="fr-add-ok">Create franchise and logins</button></div>
+  </section>` : ''}
+  ${filterBar(extra)}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Active franchises</span><span class="v">${A.length}</span><span class="s">${sum('drivers')} drivers · ${sum('staff')} staff logins</span></div>
+    <div class="kpi"><span class="l">Paid out in range</span><span class="v">${rs(sum('amount'))}</span><span class="s">${sum('pickups')} pickups · ${kg(sum('kg'))} kg</span></div>
+    <div class="kpi"><span class="l">Stock in yards</span><span class="v">${kg(sum('stock_kg'))} kg</span><span class="s">All active franchises</span></div>
+    <div class="kpi"><span class="l">Cash held by drivers</span><span class="v">${rs(sum('cash_in_hand'))}</span><span class="s">All active franchises</span></div>
+    <div class="kpi"><span class="l">Needing a decision</span><span class="v" style="color:${sum('loads_flagged') + sum('disputes_open') ? 'var(--ox)' : 'inherit'}">${sum('loads_flagged') + sum('disputes_open')}</span><span class="s">${sum('loads_flagged')} flagged loads · ${sum('disputes_open')} disputes</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Franchises</h2><span class="muted small">${F.length} shown</span></div>
+    <div class="scroll"><table style="min-width:1100px"><thead><tr><th>FRANCHISE</th><th>DISTRICT</th><th class="r">DRIVERS</th><th class="r">PICKUPS TODAY</th><th class="r">PICKUPS</th><th class="r">KG</th><th class="r">PAID OUT</th><th class="r">STOCK KG</th><th class="r">CASH HELD</th><th class="r">WEIGH DIFF</th><th>ATTENTION</th><th>LAST ACTIVITY</th><th></th></tr></thead>
+    <tbody>${F.map(f => `<tr class="pickrow" data-act="fr-open" data-id="${f.franchise_id}" style="${f.active ? '' : 'opacity:.55'}"><td class="b">${esc(f.name)}${frTag(f.code)}${f.active ? '' : ' <span class="badge b-flag">off</span>'}</td><td>${esc(f.district || '—')}</td>
+      <td class="r">${f.drivers}</td><td class="r">${f.leads_today}</td><td class="r">${f.pickups}</td><td class="r">${kg(f.kg)}</td><td class="r b">${rs(f.amount)}</td><td class="r">${kg(f.stock_kg)}</td><td class="r">${rs(f.cash_in_hand)}</td>
+      <td class="r" style="color:${f.variance_pct != null && Math.abs(num(f.variance_pct)) > 2 ? 'var(--ox)' : 'inherit'};font-weight:700">${f.variance_pct == null ? '—' : pct(f.variance_pct)}</td>
+      <td>${frReasons(f).map(r => `<span class="badge ${r[1]}" style="margin:2px 4px 2px 0">${esc(r[0])}</span>`).join('') || '<span class="badge b-ok">✓ clear</span>'}</td><td class="muted">${f.last_activity ? dtlabel(f.last_activity) : 'no activity yet'}</td>
+      <td class="r"><button class="btn ghost sm" data-act="fr-edit" data-id="${f.franchise_id}">Edit</button></td></tr>`).join('') || '<tr><td colspan="13" class="empty">No franchises match.</td></tr>'}</tbody></table></div></section>
+  ${E ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Edit ${esc(E.name)}</h2><button class="linkbtn" data-act="fr-edit-close">Close</button></div>
+    <div class="inl"><div class="fld"><label for="fe-c">CODE</label><input id="fe-c" value="${esc(E.code)}" style="width:120px;text-transform:uppercase"></div><div class="fld"><label for="fe-n">NAME</label><input id="fe-n" value="${esc(E.name)}"></div>
+    <div class="fld"><label for="fe-d">DISTRICT</label><input id="fe-d" value="${esc(E.district || '')}"></div><div class="fld"><label for="fe-k">CONSTITUENCY</label><input id="fe-k" value="${esc(E.constituency || '')}"></div>
+    <div class="fld"><label for="fe-a">STATUS</label><select id="fe-a"><option value="1" ${E.active ? 'selected' : ''}>Active</option><option value="0" ${E.active ? '' : 'selected'}>Switched off</option></select></div>
+    <button class="btn green" data-act="fr-save" data-id="${E.franchise_id}">Save</button></div>
+    <span class="muted small">A franchise can only be switched off when no driver is on the road and it has no open leads.</span></section>` : ''}`;
+}
+
+/* ---------- leads ---------- */
+function vLeads() {
+  const tabs = `<div class="tabs"><button class="tab ${S.leadTab === 'list' ? 'on' : ''}" data-act="leadtab" data-t="list">All leads</button><button class="tab ${S.leadTab === 'upload' ? 'on' : ''}" data-act="leadtab" data-t="upload">Upload from Excel</button></div>`;
+  return `
+  <div class="head"><div><div class="eyebrow">Leads</div><h1>Plan the day's pickups.</h1>
+    <div class="muted">Upload leads from Excel, assign each to a driver, and move or cancel any that have not started.</div></div>${tabs}</div>
+  ${S.leadTab === 'upload' ? vUpload() : vLeadList()}`;
+}
+function vLeadList() {
+  const extra = `<div class="f"><label for="lst">STATUS</label><select id="lst" data-act="lstatus">${selectOptions([['', 'All'], ['unassigned', 'Not assigned'], ['scheduled', 'Scheduled'], ['in_progress', 'In progress'], ['closed', 'Closed'], ['failed', 'Not completed'], ['cancelled', 'Cancelled']], S.lf.status)}</select></div>
+    ${driverSelect('ldr', 'ldriver', S.lf.driver)}${searchBox('lq', 'lsearch', S.lf.q)}`;
+  const L = S.leads, cnt = s => L.filter(x => x.status === s).length;
+  return `${filterBar(extra)}
+  <div class="kpis">
+    <div class="kpi"><span class="l">Leads shown</span><span class="v">${L.length}</span><span class="s">By pickup date in range</span></div>
+    <div class="kpi"><span class="l">Not assigned</span><span class="v" style="color:${cnt('unassigned') ? 'var(--ox)' : 'inherit'}">${cnt('unassigned')}</span><span class="s">Waiting for the supervisor</span></div>
+    <div class="kpi"><span class="l">Scheduled</span><span class="v">${cnt('scheduled')}</span><span class="s">Not started yet</span></div>
+    <div class="kpi"><span class="l">Not completed</span><span class="v" style="color:${cnt('failed') ? 'var(--ox)' : 'inherit'}">${cnt('failed')}</span><span class="s">Driver gave a reason</span></div>
+    <div class="kpi"><span class="l">In progress</span><span class="v">${cnt('in_progress')}</span><span class="s">Driver is with the customer</span></div>
+    <div class="kpi"><span class="l">Closed</span><span class="v">${cnt('closed')}</span><span class="s">Paid and done</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Leads</h2><span class="muted small">Up to 300 shown. Narrow the dates or filters for more.</span></div>
+    <div class="scroll"><table style="min-width:980px"><thead><tr><th>LEAD</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>CUSTOMER</th><th>AREA</th><th>DRIVER</th><th>PICKUP</th><th>ITEMS SAID</th><th>STATUS</th><th>BILL</th><th></th></tr></thead>
+    <tbody>${L.map(l => `<tr><td class="b">${esc(l.code)}</td>${!S.fr ? `<td>${frTag(l.franchise_code)}</td>` : ''}<td>${esc(l.customer_name)}<br><span class="muted small">${esc(l.phone)}</span></td><td>${esc(l.area || '—')}</td><td>${l.driver_name ? esc(l.driver_name) : '<span class="muted">Not assigned yet</span>'}</td>
+      <td>${dlabel(dayOf(l.slot))}<br><span class="muted small">${tlabel(l.slot)}</span></td><td>${esc(l.items_said || '—')}</td><td>${chip(LST, l.status)}${l.status === 'failed' ? `<div class="small" style="color:var(--ox);margin-top:4px"><b>${esc(l.fail_reason)}</b>${l.fail_note ? '<br>' + esc(l.fail_note) : ''}<br><span class="muted">${dlabel(dayOf(l.failed_at))} ${tlabel(l.failed_at)}</span></div>` : ''}</td>
+      <td>${l.bill_no ? esc(l.bill_no) + '<br><span class="muted small">' + esc((BST[l.bill_status] || [l.bill_status])[0]) + '</span>' : '—'}</td>
+      <td class="r" style="white-space:nowrap">${['unassigned', 'scheduled', 'failed'].includes(l.status) ? `<button class="btn ghost sm" data-act="lead-move" data-id="${l.lead_id}">${l.status === 'scheduled' ? 'Reassign' : 'Assign'}</button> <button class="btn ghost sm" data-act="lead-cancel" data-id="${l.lead_id}">Cancel</button>` : ''}</td></tr>
+      ${S.leadAct && S.leadAct.id === l.lead_id ? `<tr><td colspan="10" style="background:var(--pearl)">${leadActPanel(l)}</td></tr>` : ''}`).join('') || '<tr><td colspan="10" class="empty">No leads match.</td></tr>'}</tbody></table></div></section>`;
+}
+function leadActPanel(l) {
+  if (S.leadAct.mode === 'move') return `<div class="inl"><div class="fld"><label for="mv-d">${l.status === 'scheduled' ? 'MOVE' : 'ASSIGN'} ${esc(l.code)} TO</label><select id="mv-d">${allDrivers().filter(d => d.active && d.id !== l.driver_id).sort((a, b) => (b.franchise_code === l.franchise_code) - (a.franchise_code === l.franchise_code) || String(a.full_name).localeCompare(String(b.full_name))).map(d => `<option value="${d.id}">${esc(d.full_name)} (${esc(d.franchise_code || '')})</option>`).join('')}</select></div>
+    <button class="btn green sm" data-act="lead-move-ok" data-id="${l.lead_id}">Reassign</button><button class="linkbtn" data-act="lead-close">Close</button></div>`;
+  return `<div class="inl"><div class="fld" style="flex:1 1 280px"><label for="cx-r">REASON FOR CANCELLING ${esc(l.code)} (REQUIRED)</label><input id="cx-r"></div>
+    <button class="btn sm" data-act="lead-cancel-ok" data-id="${l.lead_id}">Cancel this lead</button><button class="linkbtn" data-act="lead-close">Keep it</button></div>`;
+}
+function vUpload() {
+  const U = S.upload;
+  return `
+  <section class="card pad"><h3>Upload leads</h3>
+    <span class="muted">Use the Scrappy lead template (the <b>Leads</b> sheet). Columns: customer_name, phone, address, area, upi_id, franchise_code, driver_email, pickup_date, pickup_time, items, latitude, longitude. Give the <b>franchise_code</b> (for example KKD) and leave driver_email blank: the lead goes to that franchise's supervisor, who splits the leads among the drivers. If you do give a driver_email, the lead is assigned to that driver straight away. Latitude and longitude are optional (for example 10.0159 and 76.3419); when given, the collector gets an Open in Google Maps button on the lead. Dates as DD-MM-YYYY, today or later. A blank time means 9:00 AM. Excel (.xlsx) and CSV both work. One file can hold leads for many franchises.</span>
+    <div class="dz"><input type="file" id="lf" accept=".xlsx,.xls,.csv" data-act="lfile" aria-label="Choose the leads file"><button class="linkbtn" data-act="template">Download a blank template (CSV)</button></div>
+    ${U && U.error ? `<div class="notice bad">${esc(U.error)}</div>` : ''}
+    ${U && U.rows ? uploadPreview(U) : ''}
+  </section>
+  ${U && U.result ? uploadResult(U.result) : ''}
+  <section class="card"><div class="card-h"><h2>Recent uploads</h2><span class="muted small">Last 60 rows sent to the import inbox</span></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>WHEN</th><th>CUSTOMER</th><th>DRIVER / FRANCHISE</th><th>DATE</th><th>RESULT</th><th>LEAD</th><th>MESSAGE</th></tr></thead>
+    <tbody>${S.imports.map(i => `<tr><td class="muted">${dtlabel(i.imported_at)}</td><td>${esc(i.customer_name)}</td><td>${i.driver_email ? esc(i.driver_email) : (i.franchise_code ? frTag(String(i.franchise_code).toUpperCase()) + ' <span class="muted small">to assign</span>' : '')}</td><td>${esc(i.pickup_date)}</td><td>${impChip(i.status)}</td><td class="b">${esc(i.lead_code || '')}</td><td class="muted">${esc(i.message || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nothing uploaded yet.</td></tr>'}</tbody></table></div></section>`;
+}
+const impChip = s => `<span class="badge ${s === 'created' ? 'b-ok' : s === 'duplicate' ? 'b-cash' : s === 'error' ? 'b-flag' : 'b-sched'}">${esc(s)}</span>`;
+function checkRow(r) {
+  const w = [];
+  if (!r.customer_name) w.push('name missing'); if (!r.address) w.push('address missing');
+  if (String(r.phone).replace(/\D/g, '').length < 10) w.push('phone needs 10 digits');
+  const fc = String(r.franchise_code || '').trim().toUpperCase(), em = String(r.driver_email || '').trim();
+  if (!fc && !em) w.push('franchise code missing');
+  if (fc && !(S.franchises || []).some(f => String(f.code).toUpperCase() === fc)) w.push('no franchise with code ' + fc);
+  if (em) { const d = allDrivers().find(x => (x.email || '').toLowerCase() === em.toLowerCase()); if (!d) w.push('no driver with this email'); else if (!d.active) w.push('driver is switched off'); else if (fc && d.franchise_code && String(d.franchise_code).toUpperCase() !== fc) w.push('driver belongs to ' + d.franchise_code); }
+  if (!r.pickup_date) w.push('date missing');
+  const la = String(r.latitude).trim(), lo = String(r.longitude).trim();
+  if (la || lo) { if (!la || !lo) { if (!(la && /^-?\d+(\.\d+)?\s*[, ;]\s*-?\d+(\.\d+)?$/.test(la))) w.push('needs both latitude and longitude'); } else if (!(isFinite(la) && isFinite(lo))) w.push('location must be numbers'); else if (+la < 6 || +la > 38 || +lo < 67 || +lo > 98) w.push('location not in India (swapped?)'); }
+  return w;
+}
+function uploadPreview(U) {
+  const bad = U.rows.filter(r => checkRow(r).length).length;
+  return `<div class="notice ${bad ? '' : 'info'}"><b>${U.rows.length} row${U.rows.length === 1 ? '' : 's'}</b> read from <b>${esc(U.name)}</b>${bad ? ` · ${bad} look wrong and will be rejected by the database (see below)` : ' · all look fine'}.</div>
+    <div class="scroll"><table style="min-width:980px"><thead><tr><th>#</th><th>CUSTOMER</th><th>PHONE</th><th>AREA</th><th>FRANCHISE</th><th>DRIVER</th><th>DATE</th><th>TIME</th><th>ITEMS</th><th>MAP</th><th>CHECK</th></tr></thead>
+    <tbody>${U.rows.slice(0, 100).map((r, i) => { const w = checkRow(r); return `<tr><td class="muted">${i + 1}</td><td>${esc(r.customer_name)}</td><td>${esc(r.phone)}</td><td>${esc(r.area)}</td><td>${frTag(String(r.franchise_code || '').trim().toUpperCase() || ((allDrivers().find(x => (x.email || '').toLowerCase() === String(r.driver_email || '').toLowerCase())) || {}).franchise_code) || '—'}</td><td>${r.driver_email ? esc(r.driver_email) : '<span class="muted">Supervisor assigns</span>'}</td><td>${esc(r.pickup_date)}</td><td>${esc(r.pickup_time)}</td><td>${esc(r.items)}</td><td>${r.latitude && r.longitude ? '✓' : ''}</td><td>${w.length ? '<span class="badge b-flag">' + esc(w.join(', ')) + '</span>' : '<span class="badge b-ok">ok</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+    ${U.rows.length > 100 ? `<span class="muted small">Showing the first 100 of ${U.rows.length}.</span>` : ''}
+    <div class="inl"><button class="btn green" data-act="import" ${U.busy ? 'disabled' : ''}>Import ${U.rows.length} row${U.rows.length === 1 ? '' : 's'}</button><button class="linkbtn" data-act="upload-clear">Clear</button></div>`;
+}
+function uploadResult(R) {
+  const c = s => R.filter(x => x.status === s).length;
+  return `<section class="card"><div class="card-h"><h2>Import result</h2><span class="muted small">${c('created')} created · ${c('duplicate')} duplicate · ${c('error')} error</span>${c('error') ? '<button class="btn ghost sm" data-act="errors-csv">Download the rows with errors</button>' : ''}</div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>CUSTOMER</th><th>RESULT</th><th>LEAD</th><th>MESSAGE</th></tr></thead>
+    <tbody>${R.map(x => `<tr><td>${esc(x.customer_name)}</td><td>${impChip(x.status)}</td><td class="b">${esc(x.lead_code || '')}</td><td class="muted">${esc(x.message || '')}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+/* reading the file */
+async function loadXlsx() {
+  if (window.XLSX) return;
+  await new Promise((res, rej) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = res; s.onerror = () => rej(new Error('Could not load the spreadsheet reader. Check the internet connection and try again.')); document.head.appendChild(s); });
+}
+const COLS = ['customer_name', 'phone', 'address', 'area', 'upi_id', 'franchise_code', 'driver_email', 'pickup_date', 'pickup_time', 'items', 'latitude', 'longitude'];
+const pad2 = n => String(n).padStart(2, '0');
+function cellText(v, col) {
+  if (v == null) return '';
+  if (v instanceof Date) {
+    if (col === 'pickup_time') { const d = new Date(v.getTime() + 30000); const h = d.getHours(); return `${(h + 11) % 12 + 1}:${pad2(d.getMinutes())} ${h < 12 ? 'AM' : 'PM'}`; }
+    const d = new Date(v.getTime() + 60000); return `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
+  }
+  if (typeof v === 'number') {
+    if (col === 'pickup_date' && v > 20000) { const d = new Date(Math.round((v - 25569) * 86400000)); return `${pad2(d.getUTCDate())}-${pad2(d.getUTCMonth() + 1)}-${d.getUTCFullYear()}`; }
+    if (col === 'pickup_time' && v >= 0 && v < 1) { const m = Math.round(v * 1440), h = Math.floor(m / 60) % 24; return `${(h + 11) % 12 + 1}:${pad2(m % 60)} ${h < 12 ? 'AM' : 'PM'}`; }
+    return String(Math.round(v) === v ? v : v);
+  }
+  return String(v).trim();
+}
+async function readLeadFile(file) {
+  await loadXlsx();
+  let wb;
+  if (/\.csv$/i.test(file.name)) wb = XLSX.read(await file.text(), { type: 'string', raw: true });
+  else wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  const sheet = wb.SheetNames.find(n => n.toLowerCase() === 'leads') || wb.SheetNames[0];
+  const raw = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { raw: true, defval: '' });
+  const rows = raw.map(o => { const m = {}; Object.keys(o).forEach(k => { m[String(k).trim().toLowerCase().replace(/\s+/g, '_')] = o[k]; }); const r = {}; COLS.forEach(c => { r[c] = cellText(m[c], c); }); return r; })
+    .filter(r => COLS.some(c => r[c] !== ''));
+  if (!rows.length) throw new Error('No rows found. Check that the sheet is called Leads and row 1 has the template headings.');
+  if (rows.length > 500) throw new Error('Please upload at most 500 rows at a time.');
+  return { name: file.name, rows };
+}
+function downloadFile(name, text) {
+  const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' })), a = document.createElement('a');
+  a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
+const csvLine = a => a.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',');
+
+/* ---------- pickups and bills ---------- */
+function vPickups() {
+  const extra = `<div class="f"><label for="bst">STATUS</label><select id="bst" data-act="bstatus">${selectOptions([['', 'All'], ['draft', 'Draft'], ['sent', 'Sent to customer'], ['confirmed', 'Customer agreed'], ['paid', 'Paid']], S.bf.status)}</select></div>
+    ${driverSelect('bdr', 'bdriver', S.bf.driver)}${searchBox('bq', 'bsearch', S.bf.q)}`;
+  const B = S.bills, paid = B.filter(b => b.status === 'paid');
+  const sel = B.find(b => b.bill_id === S.billSel);
+  return `
+  <div><div class="eyebrow">Pickups and bills</div><h1>Every bill, searchable.</h1>
+    <div class="muted">Customer, driver, items, payment proof and the PDF bill for every pickup.</div></div>
+  ${filterBar(extra)}
+  <div class="kpis">
+    <div class="kpi"><span class="l">Bills shown</span><span class="v">${B.length}</span><span class="s">Created in range</span></div>
+    <div class="kpi"><span class="l">Paid</span><span class="v">${paid.length}</span><span class="s">${kg(paid.reduce((a, b) => a + num(b.total_kg), 0))} kg · ${rs(paid.reduce((a, b) => a + num(b.total_amount), 0))}</span></div>
+    <div class="kpi"><span class="l">Not finished</span><span class="v">${B.length - paid.length}</span><span class="s">Draft, sent or agreed</span></div>
+  </div>
+  <div class="cols">
+    <section class="card grow"><div class="card-h"><h2>Bills</h2><span class="muted small">Click a row</span></div>
+      <div class="scroll"><table style="min-width:760px"><thead><tr><th>BILL</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>CUSTOMER</th><th>DRIVER</th><th>LOAD</th><th class="r">KG</th><th class="r">AMOUNT</th><th>PAY</th><th>STATUS</th></tr></thead>
+      <tbody>${B.map(b => `<tr class="pickrow ${b.bill_id === S.billSel ? 'on' : ''}" data-act="pick-bill" data-id="${b.bill_id}"><td class="b">${esc(b.bill_no)}<br><span class="muted small">${esc(b.lead_code)}</span></td>${!S.fr ? `<td>${frTag(b.franchise_code)}</td>` : ''}<td>${esc(b.customer_name)}<br><span class="muted small">${esc(b.area || '')}</span></td><td>${esc(b.driver_name)}</td><td>${esc(b.load_code)}</td>
+        <td class="r">${kg(b.total_kg)}</td><td class="r b">${rs(b.total_amount)}</td><td>${b.payment_method ? (b.payment_method === 'cash' ? 'Cash' : 'UPI') : '—'}</td><td>${chip(BST, b.status)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No bills match.</td></tr>'}</tbody></table></div></section>
+    <section class="side" style="flex:1 1 340px">${sel ? billDetail(sel) : '<div class="card empty">Choose a bill.</div>'}</section>
+  </div>`;
+}
+function billDetail(b) {
+  const items = S.billItems[b.bill_id];
+  const hand = items ? items.filter(i => i.typed_by_hand).length : 0;
+  return `<div class="card pad"><div class="row-split" style="flex-wrap:wrap"><div><h2>${esc(b.bill_no)}</h2><span class="muted small">${esc(b.lead_code)} · ${esc(b.load_code)}</span></div>${chip(BST, b.status)}</div>
+    <div>${kv('Customer', esc(b.customer_name))}${kv('Phone', esc(b.phone))}${kv('Area', esc(b.area || '—'))}${kv('Driver', esc(b.driver_name))}</div>
+    <div><h3 style="margin:6px 0">Items</h3>${items === undefined ? '<span class="muted">Loading…</span>' : items.length ? `<table><tbody>${items.map(i => `<tr><td style="padding-left:0">${esc(itemName(i.item_id))}${i.typed_by_hand ? ' <span class="badge b-cash" title="Typed by the driver, no scale photo">typed</span>' : ''}</td><td class="r">${kg(i.qty_kg)} kg</td><td class="r">₹${num(i.rate_per_kg)}/kg</td><td class="r b" style="padding-right:0">${rs(i.amount)}</td></tr>`).join('')}<tr><td class="b" style="padding-left:0;border-top:2px solid var(--ink)">Total</td><td class="r b" style="border-top:2px solid var(--ink)">${kg(b.total_kg)} kg</td><td style="border-top:2px solid var(--ink)"></td><td class="r b" style="padding-right:0;border-top:2px solid var(--ink)">${rs(b.total_amount)}</td></tr></tbody></table>${hand ? `<span class="muted small">${hand} of ${items.length} items were typed by hand.</span>` : ''}` : '<span class="muted">No items.</span>'}</div>
+    <div><h3 style="margin:6px 0">Timeline</h3>${kv('Started', dtlabel(b.created_at))}${kv('Sent to customer', dtlabel(b.sent_at))}${kv('WhatsApp opened', dtlabel(b.whatsapp_opened_at))}${kv('Customer agreed', dtlabel(b.confirmed_at))}${kv('Paid', dtlabel(b.paid_at))}</div>
+    ${b.payment_method ? `<div>${kv('Paid by', b.payment_method === 'cash' ? 'Cash' : 'UPI')}${b.upi_ref ? kv('UPI reference (UTR)', esc(b.upi_ref)) : ''}</div>` : ''}
+    ${b.confirm_proof_url ? `<a class="btn ghost sm" href="${esc(b.confirm_proof_url)}" target="_blank" rel="noopener">Open the customer proof</a>` : ''}
+    ${b.status !== 'draft' ? `<button class="btn green" data-act="pdf" data-id="${b.bill_id}">Open the PDF bill</button>` : ''}</div>`;
+}
+
+/* ---------- loads and weighing ---------- */
+const ldAttention = l => l.status === 'flagged' || l.status === 'submitted';
+function vLoads() {
+  const flt = { attention: ['Needs attention', l => ldAttention(l)], flagged: ['Flagged', l => l.status === 'flagged'], waiting: ['Waiting for weighing', l => l.status === 'submitted'], all: ['All in range', () => true] };
+  const key = flt[S.loadFilter] ? S.loadFilter : 'attention';
+  const list = S.loads.filter(flt[key][1]);
+  let L = S.loads.find(l => l.load_id === S.loadSel); if (!L || !list.includes(L)) L = list[0] || null; S.loadSel = L ? L.load_id : null;
+  const extra = `<div class="f"><label for="ldf">SHOW</label><select id="ldf" data-act="loadfilter">${selectOptions(Object.keys(flt).map(k => [k, flt[k][0]]), key)}</select></div>`;
+  return `
+  <div><div class="eyebrow">Loads and weighing</div><h1>Billed against weighed.</h1>
+    <div class="muted">What each driver billed, what the warehouse weighed, and your decision on every flagged load.</div></div>
+  ${filterBar(extra)}
+  <div class="cols">
+    <section class="card side" style="flex:1 1 300px;max-width:400px"><div class="card-h"><h2>Loads</h2><span class="muted small">${list.length}</span></div>
+      ${list.length ? list.map(l => `<button class="loadrow ${L && l.load_id === L.load_id ? 'on' : ''}" data-act="pick-load" data-id="${l.load_id}"><span style="display:flex;flex-direction:column"><b>${esc(l.code)}${!S.fr ? frTag(l.franchise_code) : ''}</b><span class="muted small">${dlabel(dayOf(l.started_at))} · ${esc(l.driver_name)} · ${l.pickups} pickups</span></span><span style="text-align:right">${chip(LDST, l.status)}<br><span class="muted small">${kg(l.billed_kg)} kg${l.variance_pct != null ? ' · ' + pct(l.variance_pct) : ''}</span></span></button>`).join('') : '<div class="empty">No loads match.</div>'}</section>
+    <section class="grow" style="display:flex;flex-direction:column;gap:14px">${L ? loadDetail(L) : '<div class="card empty">Choose a load.</div>'}</section>
+  </div>
+  <section class="card"><div class="card-h"><h2>Driver comparison</h2><span class="muted small">Weighed loads in the date range</span></div>
+    <div class="scroll"><table style="min-width:700px"><thead><tr><th>DRIVER</th><th class="r">PICKUPS</th><th class="r">KG BOUGHT</th><th class="r">BILLED (WEIGHED)</th><th class="r">WEIGHED</th><th class="r">DIFFERENCE</th><th class="r">LOADS OFF TOLERANCE</th></tr></thead>
+    <tbody>${S.score.filter(s => s.active || num(s.pickups)).map(s => `<tr><td class="b">${esc(s.full_name)}</td><td class="r">${s.pickups}</td><td class="r">${kg(s.kg)}</td><td class="r">${kg(s.weighed_billed_kg)}</td><td class="r">${kg(s.weighed_kg)}</td><td class="r b" style="color:${s.variance_pct != null && Math.abs(num(s.variance_pct)) > 2 ? 'var(--ox)' : 'inherit'}">${s.variance_pct == null ? '—' : pct(s.variance_pct)}</td><td class="r ${num(s.loads_off_tolerance) ? 'var-bad' : ''}">${s.loads_off_tolerance}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">No drivers.</td></tr>'}</tbody></table></div></section>`;
+}
+function loadDetail(L) {
+  const D = S.loadDetail[L.load_id];
+  const rows = D ? S.items.map(i => ({ i, b: num(((D.totals || {})[i.name] || {}).kg), w: (D.w || {})[i.id] })).filter(x => x.b > 0 || x.w) : [];
+  return `<div class="card"><div class="card-h"><div><h2>${esc(L.code)} · ${esc(L.driver_name)}</h2><span class="muted small">${dlabel(dayOf(L.started_at))} · ${esc(L.vehicle_no || '')} · ${L.pickups} paid pickups · ${rs(L.billed_amount)}</span></div>${chip(LDST, L.status)}</div>
+    ${!D ? '<div class="empty">Loading…</div>' : `<div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL</th><th class="r">BILLED KG</th><th class="r">WEIGHED KG</th><th class="r">DIFF KG</th><th class="r">DIFF %</th><th>CHECK</th></tr></thead>
+    <tbody>${rows.map(x => { const w = x.w ? num(x.w.warehouse_kg) : null, d = w == null ? null : w - x.b, p = w != null && x.b > 0 ? d / x.b * 100 : null;
+      return `<tr><td class="b">${esc(x.i.name)}</td><td class="r">${kg(x.b)}</td><td class="r">${w == null ? '—' : kg(w)}</td><td class="r">${d == null ? '—' : (d > 0 ? '+' : '') + kg(d)}</td><td class="r">${p == null ? '—' : pct(p)}</td><td>${x.w ? (x.w.within_tolerance ? '<span class="badge b-ok">✓ Within ±2%</span>' : '<span class="badge b-flag">! Outside ±2%</span>') : '<span class="muted small">Not weighed</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="empty">No items.</td></tr>'}</tbody></table></div>`}
+  </div>
+  ${L.status === 'flagged' ? `<div class="card pad" style="border:2px solid var(--ox)"><h3>Your decision on this flagged load</h3><span class="muted">Accept the difference, or send the load back so the warehouse weighs it again.</span>
+    <textarea id="resnote" placeholder="Why? (required)"></textarea>
+    <div class="row-split" style="flex-wrap:wrap"><button class="btn green" style="flex:1 1 200px" data-act="resolve" data-a="accept" data-id="${L.load_id}">Accept the difference</button><button class="btn ghost" style="flex:1 1 200px" data-act="resolve" data-a="reweigh" data-id="${L.load_id}">Send back to re-weigh</button></div></div>` : ''}
+  ${D && D.note ? `<div class="notice"><b>Warehouse note:</b> ${esc(D.note)}</div>` : ''}
+  ${L.resolution_note ? `<div class="notice info"><b>HQ decision:</b> ${esc(L.resolution_note)}</div>` : ''}
+  <div class="card"><div class="card-h"><h3>Paid pickups on this load</h3></div>${D && D.pickups ? (D.pickups.length ? `<div class="scroll"><table style="min-width:480px"><thead><tr><th>BILL</th><th>LEAD</th><th>AREA</th><th>PAID</th><th class="r">KG</th><th class="r">AMOUNT</th><th>BY</th></tr></thead><tbody>${D.pickups.map(x => `<tr><td class="b">${esc(x.bill_no)}</td><td>${esc(x.lead_code)}</td><td>${esc(x.area || '—')}</td><td>${tlabel(x.paid_at)}</td><td class="r">${kg(x.total_kg)}</td><td class="r b">${rs(x.total_amount)}</td><td>${x.payment_method === 'cash' ? 'Cash' : 'UPI'}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No paid pickups.</div>') : '<div class="empty">Loading…</div>'}</div>`;
+}
+async function loadLoadDetail(id) {
+  try {
+    const [totals, wts, pk, ld] = await Promise.all([rest(`load_item_totals?select=item_name,total_kg&load_id=eq.${id}`), rest(`load_weighings?select=item_id,warehouse_kg,billed_kg,within_tolerance&load_id=eq.${id}&superseded_at=is.null`),
+      rpc('wh_pickups', { p_from: FAR_PAST, p_to: addDays(todayIST(), 1), p_load_id: id }), rest(`loads?select=weighing_note&id=eq.${id}`)]);
+    const t = {}; totals.forEach(x => { t[x.item_name] = { kg: num(x.total_kg) }; });
+    const w = {}; wts.forEach(x => { w[x.item_id] = x; });
+    S.loadDetail[id] = { totals: t, w, pickups: pk, note: (ld[0] || {}).weighing_note };
+  } catch (e) { S.loadDetail[id] = { totals: {}, w: {}, pickups: [], note: '' }; }
+  if (curView() === 'loads' && S.loadSel === id) rerenderIfIdle();
+}
+
+/* ---------- stock and requests ---------- */
+const RST = { completed: ['✓ Completed', 'b-ok'], partial: ['Partly released', 'b-cash'], open: ['Not started', 'b-sched'], cancelled: ['Cancelled', 'b-flag'] };
+function vStock() {
+  const R = S.stock, sum = f => R.reduce((a, r) => a + num(r[f]), 0), max = Math.max(1, ...R.map(r => num(r.closing_kg)));
+  const live = S.reqs.filter(r => r.status === 'open' || r.status === 'partial');
+  const rows = S.reqs.filter(r => S.reqFilter === 'active' ? (r.status === 'open' || r.status === 'partial') : S.reqFilter === 'all' ? true : r.status === S.reqFilter);
+  const C = S.cancelReq && S.reqs.find(r => r.id === S.cancelReq);
+  const extra = `<div class="f"><label for="rqf">REQUESTS</label><select id="rqf" data-act="reqfilter">${selectOptions([['active', 'Active'], ['completed', 'Completed'], ['cancelled', 'Cancelled'], ['all', 'All']], S.reqFilter)}</select></div>`;
+  return `
+  <div><div class="eyebrow">Stock and requests</div><h1>What you hold, what you need.</h1>
+    <div class="muted">HQ is the only buyer. Raise a request and the warehouse releases stock against it.</div></div>
+  <section class="card pad"><h3>Raise a new requirement</h3><div class="inl">
+    <div class="fld"><label for="rq-f">FRANCHISE</label><select id="rq-f">${S.fr ? '' : '<option value="">Choose…</option>'}${S.franchises.filter(f => f.active).map(f => `<option value="${f.id}" ${f.id === S.fr ? 'selected' : ''}>${esc(f.code)} · ${esc(f.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="rq-i">MATERIAL</label><select id="rq-i">${S.items.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></div>
+    <div class="fld"><label for="rq-k">KG NEEDED</label><input id="rq-k" type="number" min="0" step="0.1" style="width:130px"></div>
+    <div class="fld"><label for="rq-d">DUE DATE</label><input id="rq-d" type="date" value="${addDays(todayIST(), 7)}"></div>
+    <div class="fld" style="flex:1 1 200px"><label for="rq-n">NOTE (OPTIONAL)</label><input id="rq-n"></div>
+    <button class="btn" data-act="raise">Raise requirement</button></div></section>
+  ${filterBar(extra)}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Stock now</span><span class="v">${kg(sum('stock_now_kg'))} kg</span><span class="s">Closing on ${dlabel(S.to)}: ${kg(sum('closing_kg'))} kg</span></div>
+    <div class="kpi"><span class="l">Stock value</span><span class="v">${rs(sum('closing_value'))}</span><span class="s">At HQ rates</span></div>
+    <div class="kpi"><span class="l">Received in range</span><span class="v">${kg(sum('received_kg'))} kg</span><span class="s">Weighed at the warehouse</span></div>
+    <div class="kpi"><span class="l">Released to HQ</span><span class="v">${kg(sum('released_kg'))} kg</span><span class="s">In range</span></div>
+    <div class="kpi"><span class="l">HQ still needs</span><span class="v">${kg(live.reduce((a, r) => a + num(r.remaining_kg), 0))} kg</span><span class="s">${live.length} open · ${live.filter(r => r.is_overdue).length} overdue</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Stock by material</h2><button class="btn ghost sm" data-act="stock-csv">Download CSV</button></div>
+    <div class="scroll"><table style="min-width:760px"><thead><tr><th>MATERIAL</th><th class="r">OPENING</th><th class="r">RECEIVED</th><th class="r">RELEASED</th><th class="r">CLOSING</th><th class="r">VALUE</th><th class="r">HQ NEEDS</th><th>COVER</th><th style="width:12%">SHARE</th></tr></thead>
+    <tbody>${R.map(r => { const need = num(r.hq_open_need_kg), gap = need - num(r.stock_now_kg);
+      return `<tr><td class="b">${esc(r.item_name)}</td><td class="r muted">${kg(r.opening_kg)}</td><td class="r">${kg(r.received_kg)}</td><td class="r">${num(r.released_kg) ? '− ' + kg(r.released_kg) : '—'}</td><td class="r b">${kg(r.closing_kg)}</td><td class="r">${rs(r.closing_value)}</td><td class="r">${need ? kg(need) : '—'}</td><td>${need ? (gap > 0 ? `<span class="badge b-flag">Short ${kg(gap)}</span>` : '<span class="badge b-ok">✓ In stock</span>') : '<span class="muted small">No request</span>'}</td><td><div class="bar"><i style="width:${Math.max(2, Math.max(0, num(r.closing_kg)) / max * 100).toFixed(1)}%"></i></div></td></tr>`; }).join('')}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Requirements</h2></div>
+    <div class="scroll"><table style="min-width:860px"><thead><tr><th>REQUEST</th><th>RAISED</th><th>DUE</th><th>MATERIAL</th><th class="r">REQUIRED</th><th class="r">RELEASED</th><th class="r">LEFT</th><th style="width:14%">PROGRESS</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td class="b">${esc(r.code)}${!S.fr ? frTag(frCode(r.franchise_id)) : ''}${r.note ? `<br><span class="muted small">${esc(r.note)}</span>` : ''}</td><td>${dlabel(r.raised_on)}</td><td ${r.is_overdue ? 'style="color:var(--ox);font-weight:700"' : ''}>${r.due_date ? dlabel(r.due_date) : '—'}${r.is_overdue ? ' · overdue' : ''}</td><td class="b">${esc(r.item_name)}</td>
+      <td class="r">${kg(r.required_kg)}</td><td class="r">${kg(r.released_kg)}</td><td class="r b">${kg(r.remaining_kg)}</td><td><div class="bar"><i style="width:${Math.max(2, Math.min(100, num(r.released_kg) / num(r.required_kg) * 100)).toFixed(0)}%;${r.status === 'completed' ? 'background:#4F7F3B' : ''}"></i></div></td><td>${chip(RST, r.status)}</td>
+      <td class="r">${r.status === 'open' || r.status === 'partial' ? `<button class="btn ghost sm" data-act="req-cancel" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="empty">No requirements here.</td></tr>'}</tbody></table></div></section>
+  ${C ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Cancel ${esc(C.code)} · ${esc(C.item_name)}</h2><button class="linkbtn" data-act="req-cancel-close">Keep it</button></div>
+    <div class="fld"><label for="cnote">REASON (REQUIRED)</label><input id="cnote"></div><button class="btn" data-act="req-cancel-ok" data-id="${C.id}">Cancel this requirement</button></section>` : ''}
+  <section class="card"><div class="card-h"><h2>Released to HQ</h2><span class="muted small">Latest 200</span></div>
+    ${S.rels.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>RELEASE</th><th>DATE</th><th>FOR</th><th>MATERIAL</th><th class="r">KG</th><th>VEHICLE</th><th>RELEASED BY</th></tr></thead><tbody>${S.rels.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${dlabel(dayOf(x.released_at))}</td><td>${esc((S.reqs.find(r => r.id === x.requirement_id) || {}).code || '—')}</td><td>${esc(itemName(x.item_id))}</td><td class="r b">${kg(x.kg)}</td><td>${esc(x.vehicle_no)}</td><td>${esc(personName(x.released_by))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nothing released yet.</div>'}</section>`;
+}
+
+/* ---------- cash ---------- */
+function vCash() {
+  const o = S.ov, RR = S.routes.filter(r => (r.route_date >= S.from && r.route_date <= S.to) && (!S.fd || r.driver_id === S.fd));
+  const disputes = S.disputes;
+  const sel = S.routes.find(r => r.load_id === S.cashSel) || RR.find(r => r.route_status === 'counted') || RR[0];
+  if (sel) S.cashSel = sel.load_id;
+  const drvs = drivers().filter(d => d.active);
+  const T = S.txns;
+  return `
+  <div class="head"><div><div class="eyebrow">Cash</div><h1>Every rupee, accounted for.</h1>
+    <div class="muted">Float, payouts, cash counts and their verification. Cash is counted once per driver, when the driver is back.</div></div>
+    <div class="inl"><div class="fld"><label for="fl-d">ISSUE FLOAT TO</label><select id="fl-d">${drvs.map(d => `<option value="${d.id}">${esc(d.full_name)}${!S.fr ? ' (' + esc(d.franchise_code || '') + ')' : ''}</option>`).join('')}</select></div>
+      <div class="fld"><label for="fl-a">AMOUNT ₹</label><input id="fl-a" type="number" min="1" step="100" value="5000" style="width:120px"></div>
+      <button class="btn" data-act="issue-float">Issue float</button></div></div>
+  ${filterBar(driverSelect('fd', 'fdriver', S.fd))}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Cash held by drivers</span><span class="v">${rs(o.cash_in_field)}</span><span class="s">Right now, across all drivers</span></div>
+    <div class="kpi"><span class="l">Counts to do</span><span class="v">${o.counts_waiting}</span><span class="s">Driver back, cash not counted</span></div>
+    <div class="kpi"><span class="l">Waiting for a supervisor</span><span class="v">${o.counts_unverified}</span><span class="s">Counted, not verified</span></div>
+    <div class="kpi"><span class="l">Disputes to decide</span><span class="v" style="color:${o.disputes_open ? 'var(--ox)' : 'inherit'}">${o.disputes_open}</span><span class="s">Supervisor disputed the count</span></div>
+    <div class="kpi"><span class="l">Shortages in range</span><span class="v" style="color:${num(o.shortage_total) ? 'var(--ox)' : 'inherit'}">${rs(o.shortage_total)}</span><span class="s">Counted less than expected</span></div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">${drivers().filter(d => d.active || num(d.cash_in_hand)).map(d => `<div class="mini"><b>${esc(d.full_name)}${!S.fr ? frTag(d.franchise_code) : ''}</b><span class="muted small">Cash in hand now</span><b class="v">${rs(d.cash_in_hand)}</b></div>`).join('')}</div>
+  ${disputes.length ? `<section class="card" style="border:2px solid var(--ox)"><div class="card-h"><h2>Disputed counts: your decision</h2><span class="muted small">${disputes.length}</span></div>
+    ${disputes.map(r => `<div class="pad" style="border-bottom:1px solid var(--paper)"><div class="row-split" style="flex-wrap:wrap"><span><b>${esc(r.driver_name)}</b>${!S.fr ? frTag(r.franchise_code) : ''} · ${esc(r.load_code)} · expected ${rs(r.expected_cash)}, counted ${rs(r.counted_cash)} (<b style="color:var(--ox)">${rs(r.difference)}</b>)</span><button class="btn ghost sm" data-act="dispute-open" data-id="${r.settlement_id}">Decide</button></div>
+      <span class="muted small">Counted by ${esc(r.counted_by_name)} · disputed by ${esc(r.verified_by_name)}: ${esc(r.verify_note || '')}</span>
+      ${S.disputeAct === r.settlement_id ? `<div class="inl"><div class="fld"><label for="dd">DECISION</label><select id="dd"><option value="recover_from_driver">Recover from the driver</option><option value="write_off">Write off</option><option value="no_action">No action</option></select></div><div class="fld" style="flex:1 1 240px"><label for="dn">NOTE (REQUIRED)</label><input id="dn"></div><button class="btn green sm" data-act="dispute-ok" data-id="${r.settlement_id}">Record decision</button><button class="linkbtn" data-act="dispute-close">Close</button></div>` : ''}</div>`).join('')}</section>` : ''}
+  <div class="cols">
+    <section class="card grow"><div class="card-h"><h2>Route settlements</h2><span class="muted small">Click a row</span></div>
+      <div class="scroll"><table style="min-width:760px"><thead><tr><th>DATE</th><th>ROUTE</th><th>DRIVER</th><th class="r">CASH PAID</th><th class="r">UPI PAID</th><th class="r">EXPECTED</th><th class="r">COUNTED</th><th class="r">DIFF</th><th>STATUS</th></tr></thead>
+      <tbody>${RR.map(r => `<tr class="pickrow ${r.load_id === S.cashSel ? 'on' : ''}" data-act="pick-route" data-id="${r.load_id}"><td class="b">${dlabel(r.route_date)}</td><td>${esc(r.load_code)}${!S.fr ? frTag(r.franchise_code) : ''}</td><td>${esc(r.driver_name)}</td><td class="r">${rs(r.cash_paid)}</td><td class="r muted">${rs(r.upi_paid)}</td><td class="r b">${r.expected_cash == null ? '—' : rs(r.expected_cash)}</td><td class="r">${r.counted_cash == null ? '—' : rs(r.counted_cash)}</td><td class="r ${num(r.difference) ? 'var-bad' : ''}" style="${num(r.difference) ? 'color:var(--ox);font-weight:700' : ''}">${r.difference == null ? '—' : num(r.difference) === 0 ? '✓' : rs(r.difference)}</td><td>${chip(SST, r.route_status)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No routes in this range.</td></tr>'}</tbody></table></div></section>
+    <section class="side" style="flex:1 1 340px">${sel ? routeDetail(sel) : '<div class="card empty">Choose a route.</div>'}</section>
+  </div>
+  <section class="card"><div class="card-h"><h2>Transactions</h2><span class="muted small">Latest 300 in range</span></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>WHEN</th><th>DRIVER</th><th>TRANSACTION</th><th>DETAIL</th><th class="r">CASH IN HAND</th></tr></thead>
+    <tbody>${T.map(t => { const nocash = t.kind === 'upi_payout', e = num(t.cash_effect), L = { float_issued: 'Float issued', cash_payout: 'Cash paid to customer', upi_payout: 'UPI paid to customer', handover: 'Cash handed over' };
+      return `<tr><td class="muted">${dtlabel(t.txn_at)}</td><td class="b">${esc(t.driver_name)}</td><td>${esc(L[t.kind] || t.kind)}${t.bill_no ? ` <span class="muted small">· ${esc(t.bill_no)}${t.area ? ' · ' + esc(t.area) : ''}</span>` : ''}</td><td class="muted">${esc(t.ref || '')}</td>
+      <td class="r ${nocash ? 'muted' : 'b'}" style="${nocash ? '' : 'color:' + (e > 0 ? 'var(--green)' : 'var(--ink)')}">${nocash ? 'no cash · ' + rs(t.amount) : (e > 0 ? '+ ' : '− ') + rs(Math.abs(e))}</td></tr>`; }).join('') || '<tr><td colspan="5" class="empty">No transactions.</td></tr>'}</tbody></table></div></section>`;
+}
+function routeDetail(r) {
+  const res = S.resolutions.find(x => x.settlement_id === r.settlement_id && r.route_status === 'disputed');
+  let act = '';
+  if (r.route_status === 'counted') act = `<div class="notice info"><b>Counted by ${esc(r.counted_by_name)}: ${rs(r.counted_cash)}.</b> ${num(r.difference) ? `Difference ${rs(r.difference)}. ` : 'Matches the expected balance. '}Waiting for the supervisor to verify it.</div>`;
+  if (r.route_status === 'awaiting_count') act = '<div class="notice info">The driver is back. The warehouse staff counts the cash on their dashboard.</div>';
+  if (r.route_status === 'verified') act = `<div class="notice ok"><b>✓ Verified by ${esc(r.verified_by_name)}</b> · ${dtlabel(r.verified_at)}${r.verify_note ? '<br>' + esc(r.verify_note) : ''}</div>`;
+  if (r.route_status === 'disputed') act = `<div class="notice bad"><b>! Disputed</b> by ${esc(r.verified_by_name)} · ${dtlabel(r.verified_at)}<br>${esc(r.verify_note || '')}</div>${res ? `<div class="notice ok"><b>HQ decision:</b> ${esc(({ recover_from_driver: 'Recover from the driver', write_off: 'Write off', no_action: 'No action' })[res.decision])} · ${esc(res.note)}</div>` : ''}`;
+  if (r.route_status === 'included') act = '<div class="notice ok">Counted together with the driver’s last route.</div>';
+  if (r.route_status === 'on_route' || r.route_status === 'driver_out' || r.route_status === 'with_last') act = '<div class="notice">Cash is counted once, when the driver is back from the road.</div>';
+  return `<div class="card pad"><div class="row-split" style="flex-wrap:wrap"><div><h2>${esc(r.driver_name)} · ${esc(r.load_code)}</h2><span class="muted small">${dlabel(r.route_date)}</span></div>${chip(SST, r.route_status)}</div>
+    <div>${kv('Float issued that day', rs(r.float_issued))}${kv('Cash paid to customers', rs(r.cash_paid))}${r.expected_cash == null ? '' : kv('Expected back', rs(r.expected_cash), 'border-top:2px solid var(--ink)')}${kv('Cash counted', r.counted_cash == null ? 'Not yet' : rs(r.counted_cash))}${kv('Difference', r.difference == null ? '—' : num(r.difference) === 0 ? '✓ None' : rs(r.difference))}${kv('UPI paid (no cash)', rs(r.upi_paid))}</div>
+    ${r.counted_by_name ? `<span class="muted small">Counted by ${esc(r.counted_by_name)} · ${dtlabel(r.counted_at)}${r.count_note ? ' · ' + esc(r.count_note) : ''}</span>` : ''}</div>${act}`;
+}
+
+/* ---------- team ---------- */
+function vTeam() {
+  const sc = {}; S.score.forEach(s => { sc[s.driver_id] = s; });
+  const ROLE = { hq: 'HQ', supervisor: 'Supervisor', warehouse: 'Warehouse manager', driver: 'Collector' };
+  const E = S.editPerson && S.team.find(p => p.id === S.editPerson);
+  const staff = S.team.filter(p => p.role !== 'driver' && (p.role === 'hq' || !S.fr || p.franchise_id === S.fr));
+  const frOpts = v => selectOptions(S.franchises.filter(f => f.active || f.id === v).map(f => [f.id, f.code + ' · ' + f.name]), v);
+  const cols = S.fr ? 11 : 12;
+  return `
+  ${credsSheet()}<div class="head"><div><div class="eyebrow">Team</div><h1>Drivers and staff.</h1>
+    <div class="muted">Performance for the dates below. Add people, edit their details, move them to another franchise, or switch a login off.</div></div>
+    <button class="btn" data-act="person-add-toggle">${S.personAdd ? 'Close' : 'Add a person'}</button></div>
+  ${S.personAdd ? `<section class="card pad" style="border:2px solid var(--ox)"><h3>Add a person</h3>
+    <span class="muted">A login is created for the person. A password is generated and shown once after you save, or type your own (8 or more characters).</span>
+    <div class="inl"><div class="fld"><label for="pa-e">LOGIN EMAIL</label><input id="pa-e" type="email" style="min-width:220px"></div><div class="fld"><label for="pa-n">NAME</label><input id="pa-n"></div>
+    <div class="fld"><label for="pa-r">ROLE</label><select id="pa-r"><option value="driver">Collector (driver)</option><option value="warehouse">Warehouse manager</option><option value="supervisor">Supervisor</option></select></div>
+    <div class="fld"><label for="pa-f">FRANCHISE</label><select id="pa-f">${S.fr ? '' : '<option value="">Choose…</option>'}${S.franchises.filter(f => f.active).map(f => `<option value="${f.id}" ${f.id === S.fr ? 'selected' : ''}>${esc(f.code)} · ${esc(f.name)}</option>`).join('')}</select></div></div>
+    <div class="inl"><div class="fld"><label for="pa-p">PHONE</label><input id="pa-p"></div><div class="fld"><label for="pa-t">AREA (OPTIONAL)</label><input id="pa-t"></div><div class="fld"><label for="pa-v">VEHICLE NO. (COLLECTORS)</label><input id="pa-v"></div><div class="fld"><label for="pa-pw">PASSWORD (OPTIONAL)</label><input id="pa-pw" type="password" autocomplete="new-password" placeholder="blank = generate" style="width:170px"></div>
+    <button class="btn green" data-act="person-add-ok">Add person</button></div></section>` : ''}
+  ${filterBar()}
+  <section class="card"><div class="card-h"><h2>Drivers</h2><span class="muted small">${drivers().length}</span></div>
+    <div class="scroll"><table style="min-width:960px"><thead><tr><th>DRIVER</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>VEHICLE · AREA</th><th class="r">LEADS</th><th class="r">PICKUPS</th><th class="r">KG</th><th class="r">PAID OUT</th><th class="r">MIN / PICKUP</th><th class="r">WEIGH DIFF</th><th class="r">CASH SHORT</th><th class="r">CASH IN HAND</th><th></th></tr></thead>
+    <tbody>${drivers().map(d => { const s = sc[d.id] || {};
+      return `<tr style="${d.active ? '' : 'opacity:.55'}"><td class="b">${esc(d.full_name)}${d.active ? '' : ' <span class="badge b-flag">off</span>'}<br><span class="muted small">${esc(d.email || '')}</span></td>${!S.fr ? `<td>${frTag(d.franchise_code)}</td>` : ''}<td>${esc(d.vehicle_no || '—')}<br><span class="muted small">${esc(d.territory || '')}</span></td>
+      <td class="r">${s.leads_assigned ?? 0}</td><td class="r">${s.pickups ?? 0}</td><td class="r">${kg(s.kg)}</td><td class="r">${rs(s.amount)}</td><td class="r">${s.avg_minutes == null ? '—' : num(s.avg_minutes).toFixed(0)}</td>
+      <td class="r b" style="color:${s.variance_pct != null && Math.abs(num(s.variance_pct)) > 2 ? 'var(--ox)' : 'inherit'}">${s.variance_pct == null ? '—' : pct(s.variance_pct)}</td><td class="r ${num(s.cash_short) ? 'var-bad' : ''}" style="${num(s.cash_short) ? 'color:var(--ox);font-weight:700' : ''}">${num(s.cash_short) ? rs(s.cash_short) : '—'}</td><td class="r b">${rs(d.cash_in_hand)}</td>
+      <td class="r" style="white-space:nowrap">${S.resetAsk === d.id ? `${resetBox(d.id)}` : `<button class="btn ghost sm" data-act="person-reset-ask" data-id="${d.id}">Reset password</button> <button class="btn ghost sm" data-act="person-edit" data-id="${d.id}">Edit</button>`}</td></tr>`; }).join('') || `<tr><td colspan="${cols}" class="empty">No drivers.</td></tr>`}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Warehouse, supervisor and HQ logins</h2></div>
+    <div class="scroll"><table style="min-width:620px"><thead><tr><th>NAME</th><th>ROLE</th><th>FRANCHISE</th><th>EMAIL</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${staff.map(p => `<tr><td class="b">${esc(p.full_name)}</td><td>${esc(ROLE[p.role] || p.role)}</td><td>${p.role === 'hq' ? '<span class="muted small">All</span>' : frTag(p.franchise_code)}</td><td>${esc(p.email || '')}</td><td>${p.active ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-flag">Off</span>'}</td><td class="r" style="white-space:nowrap">${p.role === 'hq' ? '' : S.resetAsk === p.id ? `${resetBox(p.id)} ` : `<button class="btn ghost sm" data-act="person-reset-ask" data-id="${p.id}">Reset password</button> `}<button class="btn ghost sm" data-act="person-edit" data-id="${p.id}">Edit</button></td></tr>`).join('')}</tbody></table></div></section>
+  ${E ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Edit ${esc(E.full_name)}</h2><button class="linkbtn" data-act="person-close">Close</button></div>
+    <div class="inl"><div class="fld"><label for="pe-n">NAME</label><input id="pe-n" value="${esc(E.full_name)}"></div><div class="fld"><label for="pe-p">PHONE</label><input id="pe-p" value="${esc(E.phone || '')}"></div>
+    <div class="fld"><label for="pe-t">AREA</label><input id="pe-t" value="${esc(E.territory || '')}"></div><div class="fld"><label for="pe-v">VEHICLE NO.</label><input id="pe-v" value="${esc(E.vehicle_no || '')}"></div>
+    ${E.role === 'hq' ? '' : `<div class="fld"><label for="pe-f">FRANCHISE</label><select id="pe-f">${frOpts(E.franchise_id)}</select></div>`}
+    <div class="fld"><label for="pe-a">LOGIN</label><select id="pe-a"><option value="1" ${E.active ? 'selected' : ''}>Active</option><option value="0" ${E.active ? '' : 'selected'}>Off (cannot log in to work)</option></select></div>
+    <button class="btn green" data-act="person-save" data-id="${E.id}">Save</button></div>
+    <span class="muted small">A driver can only be switched off or moved to another franchise when they have no route on the road, no open leads and no cash in hand. Role and email cannot be changed here.</span></section>` : ''}`;
+}
+
+/* ---------- rates ---------- */
+function vRates() {
+  const cur = {}; S.rates.forEach(r => { cur[r.item_id] = r; });
+  const removed = S.allItems.filter(i => !i.active), R = S.removeItem && S.allItems.find(i => i.id === S.removeItem);
+  return `
+  <div class="head"><div><div class="eyebrow">Rates and materials</div><h1>What you pay per kg.</h1>
+    <div class="muted">Drivers cannot change rates. A new rate applies to bills not yet sent to the customer, from the moment you save it. Rates are the same for every franchise.</div></div>
+    <button class="btn" data-act="item-add-toggle">${S.addItem ? 'Close' : 'Add a material'}</button></div>
+  ${S.addItem ? `<section class="card pad" style="border:2px solid var(--ox)"><h3>Add a material</h3><div class="inl">
+    <div class="fld"><label for="ni-n">NAME</label><input id="ni-n" placeholder="e.g. Brass" style="min-width:220px"></div>
+    <div class="fld"><label for="ni-r">RATE ₹ PER KG</label><input id="ni-r" type="number" min="0" step="0.5" style="width:140px"></div>
+    <button class="btn green" data-act="item-add-ok">Add material</button></div>
+    <span class="muted small">It appears at once in every driver's pickup list, in every warehouse's weighing and stock screens, and in HQ requests.</span></section>` : ''}
+  <section class="card"><div class="card-h"><h2>Current rates</h2><span class="muted small">${S.items.length} materials</span></div>
+    <div class="scroll"><table style="min-width:620px"><thead><tr><th>MATERIAL</th><th class="r">NOW ₹/KG</th><th>SINCE</th><th class="r">NEW RATE ₹/KG</th><th></th><th></th></tr></thead>
+    <tbody>${S.items.map(i => { const c = cur[i.id]; return `<tr><td class="b">${esc(i.name)}</td><td class="r b">${c ? '₹' + num(c.rate_per_kg) : '—'}</td><td class="muted">${c ? dtlabel(c.effective_from) : ''}</td><td class="r"><input id="nr-${i.id}" type="number" min="0" step="0.5" style="width:110px;padding:8px;border:1px solid var(--line);background:var(--pearl);text-align:right" aria-label="New rate for ${esc(i.name)}"></td><td class="r"><button class="btn sm" data-act="set-rate" data-id="${i.id}">Set rate</button></td><td class="r"><button class="btn ghost sm" data-act="item-remove-open" data-id="${i.id}">Remove</button></td></tr>`; }).join('')}</tbody></table></div></section>
+  ${R ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Remove ${esc(R.name)}?</h2><button class="linkbtn" data-act="item-remove-close">Keep it</button></div>
+    <span class="muted">Drivers can no longer choose it for new pickups. Bills, weighings and stock history that already include it stay as they are. You can restore it later. It cannot be removed while any yard still holds it, an HQ request asks for it, or an unfinished load contains it.</span>
+    <button class="btn" data-act="item-remove-ok" data-id="${R.id}">Remove ${esc(R.name)}</button></section>` : ''}
+  ${removed.length ? `<section class="card"><div class="card-h"><h2>Removed materials</h2><span class="muted small">${removed.length}</span></div>
+    ${removed.map(i => `<div class="alert"><span style="flex:1"><b>${esc(i.name)}</b></span><button class="btn ghost sm" data-act="item-restore" data-id="${i.id}">Restore</button></div>`).join('')}</section>` : ''}
+  <section class="card"><div class="card-h"><h2>Rate history</h2><span class="muted small">Latest 100 changes</span></div>
+    <div class="scroll"><table style="min-width:480px"><thead><tr><th>WHEN</th><th>MATERIAL</th><th class="r">RATE ₹/KG</th><th>SET BY</th></tr></thead>
+    <tbody>${S.ratehist.map(r => `<tr><td class="muted">${dtlabel(r.effective_from)}</td><td class="b">${esc(itemName(r.item_id))}</td><td class="r">₹${num(r.rate_per_kg)}</td><td>${esc(personName(r.set_by))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No history.</td></tr>'}</tbody></table></div></section>`;
+}
+
+/* ---------- activity log ---------- */
+function auditText(a) {
+  const d = a.detail || {};
+  switch (a.action) {
+    case 'lead_reassigned': return `Moved lead <b>${esc(a.ref)}</b> from ${esc(personName(d.from))} to ${esc(personName(d.to))}.`;
+    case 'lead_failed': return `Pickup <b>${esc(a.ref)}</b> could not be completed${d.driver ? ' by ' + esc(personName(d.driver)) : ''}. Reason: ${esc(d.reason)}${d.note ? ' (' + esc(d.note) + ')' : ''}.`;
+    case 'leads_assigned': return `Gave ${esc(a.ref)} to <b>${esc(d.driver_name || '')}</b>${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
+    case 'leads_unassigned': return `Took back ${esc(a.ref)} from drivers${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
+    case 'lead_cancelled': return `Cancelled lead <b>${esc(a.ref)}</b>. Reason: ${esc(d.reason)}`;
+    case 'rate_set': return `Changed the <b>${esc(a.ref)}</b> rate from ₹${esc(d.old)} to ₹${esc(d.new)} per kg.`;
+    case 'profile_updated': return `Updated <b>${esc(a.ref)}</b>${d.was_active !== d.now_active ? (d.now_active ? ' (switched on)' : ' (switched off)') : ''}.`;
+    case 'franchise_added': return `Added franchise <b>${esc(a.ref)}</b> (${esc(d.name)}).`;
+    case 'franchise_updated': return `Updated franchise <b>${esc(a.ref)}</b>${d.was_active !== d.now_active ? (d.now_active ? ' (switched on)' : ' (switched off)') : ''}${d.old_code && d.old_code !== a.ref ? ', code was ' + esc(d.old_code) : ''}.`;
+    case 'person_added': return `Added <b>${esc(a.ref)}</b> as ${esc(d.role)} (${esc(d.email)}).`;
+    case 'item_added': return `Added the material <b>${esc(a.ref)}</b> at ₹${esc(d.rate)} per kg.`;
+    case 'item_removed': return `Removed the material <b>${esc(a.ref)}</b>.`;
+    case 'item_restored': return `Restored the material <b>${esc(a.ref)}</b>.`;
+    case 'password_reset': return `Reset the password of <b>${esc(a.ref)}</b>.`;
+    case 'dispute_resolved': return `Decided on <b>${esc(a.ref)}</b>: ${esc(({ recover_from_driver: 'recover from the driver', write_off: 'write off', no_action: 'no action' })[d.decision] || d.decision)} (difference ${rs(d.difference)}).`;
+    default: return esc(a.action) + (a.ref ? ' · ' + esc(a.ref) : '');
+  }
+}
+function vActivity() {
+  return `
+  <div><div class="eyebrow">Activity log</div><h1>What HQ decided, and when.</h1>
+    <div class="muted">Lead moves and cancellations, rate changes, team edits and cash decisions. Entries cannot be edited or deleted.</div></div>
+  <section class="card"><div class="card-h"><h2>Latest 200</h2></div>
+    ${S.audit.length ? `<div class="feed">${S.audit.map(a => `<div class="ev"><span class="dot b"></span><div>${auditText(a)}${a.franchise_id && !S.fr ? frTag(frCode(a.franchise_id)) : ''}<small>${esc(personName(a.by_id))} · ${dtlabel(a.at)}</small></div></div>`).join('')}</div>` : '<div class="empty">Nothing logged yet.</div>'}</section>`;
+}
+
+/* ---------- routing and render ---------- */
+const VIEWS = { overview: vOverview, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
+function navCounts() {
+  const o = S.ov; if (!o) return;
+  const set = (id, n, hot) => { const e = $(id); e.textContent = n || ''; e.classList.toggle('hot', !!hot && n > 0); };
+  set('#nav-leads', num(o.leads_late) + num(o.leads_unassigned), num(o.leads_late) > 0); set('#nav-loads', num(o.loads_flagged) + num(o.loads_waiting), num(o.loads_flagged) > 0);
+  set('#nav-cash', num(o.disputes_open) + num(o.counts_waiting) + num(o.counts_unverified), num(o.disputes_open) > 0);
+}
+let frHtml = '';
+function renderFrSel() {
+  const sel = $('#frsel'); if (!sel) return;
+  const html = '<option value="">All franchises (' + S.franchises.filter(f => f.active).length + ')</option>' + S.franchises.map(f => '<option value="' + f.id + '">' + esc(f.code) + ' · ' + esc(f.name) + (f.active ? '' : ' (off)') + '</option>').join('');
+  if (html !== frHtml) { sel.innerHTML = html; frHtml = html; }
+  sel.value = S.fr ? String(S.fr) : '';
+}
+function setFranchise(id) {
+  S.fr = id || null; store('scrappy_hq_fr', S.fr || undefined);
+  S.prevOv = null; S.feed = []; S.loadDetail = {}; S.billItems = {}; S.leadAct = null; S.billSel = null; S.loadSel = null; S.cashSel = null; S.cancelReq = null; S.editPerson = null;
+  S.lf.driver = ''; S.bf.driver = ''; S.fd = '';
+}
+function render() {
+  renderFrSel();
+  const v = curView();
+  const key = v + ':' + (typeof S.fr !== 'undefined' ? (S.fr || '') : ''), app = $('#app'), changed = key !== window.__viewKey;
+  if (!changed) app.classList.remove('enter');
+  app.innerHTML = VIEWS[v]();
+  if (changed) { window.__viewKey = key; app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter'); }
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.view === v));
+  navCounts();
+  if (v === 'pickups' && S.billSel != null && S.billItems[S.billSel] === undefined) loadBillItems(S.billSel);
+  if (v === 'loads' && S.loadSel != null && !S.loadDetail[S.loadSel]) loadLoadDetail(S.loadSel);
+}
+function rerenderIfIdle() {
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && $('#app').contains(a)) { navCounts(); return; }
+  render();
+}
+async function loadBillItems(id) {
+  try { S.billItems[id] = await rest(`bill_items?select=item_id,qty_kg,rate_per_kg,amount,typed_by_hand,photo_url&bill_id=eq.${id}&order=id`); } catch (e) { S.billItems[id] = []; }
+  if (curView() === 'pickups' && S.billSel === id) rerenderIfIdle();
+}
+async function go(v) { if (location.hash.slice(1) === v) { await reload(); return; } location.hash = v; }
+async function reload() { busyBar(true); try { await refresh(); } catch (e) { toast(e.message, true); } busyBar(false); render(); }
+window.addEventListener('hashchange', async () => { S.creds = null; S.resetAsk = null; scrollTo(0, 0); S.loadDetail = {}; S.billItems = {}; await reload(); });
+
+/* run an action, show a message, reload the data */
+async function act(btn, fn, okMsg) {
+  if (btn) btn.classList.add('busy'); busyBar(true);
+  try { const out = await fn(); S.loadDetail = {}; S.billItems = {}; await refresh(); toast(typeof okMsg === 'function' ? okMsg(out) : okMsg); return true; }
+  catch (e) { toast(e.message, true); try { await refresh(); } catch (_) {} return false; }
+  finally { if (btn) btn.classList.remove('busy'); busyBar(false); render(); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('change', async e => {
+  const t = e.target, a = t.dataset.act;
+  if (!a) return;
+  if (a === 'frsel') { setFranchise(t.value ? +t.value : null); await reload(); return; }
+  if (a === 'frsearch') { S.frQ = t.value.trim(); render(); }
+  if (a === 'frsort') { S.frSort = t.value; render(); }
+  if (a === 'frstatus') { S.frStatus = t.value; render(); }
+  if (a === 'range') { S.from = $('#from').value || S.from; S.to = $('#to').value || S.to; if (S.from > S.to) [S.from, S.to] = [S.to, S.from]; S.preset = ''; await reload(); }
+  if (a === 'lstatus') { S.lf.status = t.value; await reload(); }
+  if (a === 'ldriver') { S.lf.driver = t.value; await reload(); }
+  if (a === 'lsearch') { S.lf.q = t.value.trim(); await reload(); }
+  if (a === 'bstatus') { S.bf.status = t.value; await reload(); }
+  if (a === 'bdriver') { S.bf.driver = t.value; await reload(); }
+  if (a === 'bsearch') { S.bf.q = t.value.trim(); await reload(); }
+  if (a === 'loadfilter') { S.loadFilter = t.value; render(); }
+  if (a === 'reqfilter') { S.reqFilter = t.value; render(); }
+  if (a === 'fdriver') { S.fd = t.value; await reload(); }
+  if (a === 'lfile' && t.files && t.files[0]) {
+    S.upload = { name: t.files[0].name }; render();
+    try { S.upload = await readLeadFile(t.files[0]); } catch (err) { S.upload = { error: err.message }; }
+    render();
+  }
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
+  const a = b.dataset.act, id = +b.dataset.id;
+  if (a === 'logout') logout();
+  if (a === 'fr-open') { setFranchise(id); if (curView() === 'franchises') { location.hash = 'overview'; } else { await reload(); } return; }
+  if (a === 'fr-add-toggle') { S.frAdd = !S.frAdd; render(); }
+  if (a === 'fr-add-ok') {
+    const code = val('#fa-c').trim(), name = val('#fa-n').trim();
+    if (!code || !name) { toast('Enter the franchise code and name.', true); return; }
+    const people = ['warehouse', 'supervisor', 'driver'].map(role => ({ role, full_name: val('#fl-' + role + '-n').trim(), email: val('#fl-' + role + '-e').trim(), password: val('#fl-' + role + '-p'), vehicle_no: role === 'driver' ? val('#fl-driver-v').trim() : '' })).filter(p => p.full_name || p.email);
+    const half = people.find(p => !p.full_name || !p.email);
+    if (half) { toast('For the ' + ROLE_LOGIN[half.role].toLowerCase() + ', fill in both the name and the email, or leave that block empty.', true); return; }
+    b.classList.add('busy');
+    try {
+      const fid = await rpc('hq_add_franchise', { p_code: code, p_name: name, p_district: val('#fa-d'), p_constituency: val('#fa-k') });
+      let rows = [];
+      if (people.length) {
+        try { rows = (await loginsApi({ action: 'create', franchise_id: fid, people })).results; }
+        catch (err) { rows = people.map(p => ({ role: p.role, full_name: p.full_name, email: p.email, ok: false, error: err.message })); }
+      }
+      S.creds = people.length ? { title: 'Logins for ' + name + ' (' + code.toUpperCase() + ')', rows } : null;
+      S.frAdd = false; S.frEdit = null;
+      await refresh();
+      toast(people.length ? 'Franchise created. Save the passwords below.' : 'Franchise created. Add its people from Team.');
+    } catch (err) { toast(err.message, true); }
+    finally { b.classList.remove('busy'); render(); setTimeout(() => $('#cred') && $('#cred').scrollIntoView({ block: 'start' }), 0); }
+  }
+  if (a === 'creds-close') { S.creds = null; render(); }
+  if (a === 'creds-copy') { const txt = credsText(); try { await navigator.clipboard.writeText(txt); toast('Copied. Paste it somewhere safe.'); } catch (err) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast('Copied. Paste it somewhere safe.'); } catch (e2) { toast('Could not copy. Use Download CSV.', true); } ta.remove(); } }
+  if (a === 'creds-print') window.print();
+  if (a === 'creds-csv' && S.creds) downloadFile('scrappy-logins.csv', csvLine(['Role', 'Name', 'Login email', 'Password', 'Log in at']) + '\n' + S.creds.rows.filter(r => r.ok).map(r => csvLine([ROLE_LOGIN[r.role] || r.role, r.full_name, r.email, r.password || '(chosen by HQ)', loginUrl(r.role)])).join('\n') + '\n');
+  if (a === 'person-reset-ask') { S.resetAsk = b.dataset.id; render(); }
+  if (a === 'person-reset-cancel') { S.resetAsk = null; render(); }
+  if (a === 'person-reset') {
+    const pw = ($('#rp-pw') || {}).value || '';
+    if (pw && (pw.length < 8 || pw.length > 72)) { toast('A password must be 8 to 72 characters.', true); return; }
+    const p = S.team.find(x => x.id === b.dataset.id); b.classList.add('busy');
+    try { const r = await loginsApi({ action: 'reset_password', user_id: b.dataset.id, ...(pw ? { password: pw } : {}) }); S.creds = { title: (pw ? 'Password set for ' : 'New password for ') + (p ? p.full_name : 'the person'), rows: r.results }; S.resetAsk = null; }
+    catch (err) { toast(err.message, true); }
+    finally { b.classList.remove('busy'); render(); setTimeout(() => $('#cred') && $('#cred').scrollIntoView({ block: 'start' }), 0); }
+  }
+  if (a === 'fr-edit') { S.frEdit = id; render(); setTimeout(() => $('#fe-n') && $('#fe-n').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'fr-edit-close') { S.frEdit = null; render(); }
+  if (a === 'fr-save') { const ok = await act(b, () => rpc('hq_update_franchise', { p_id: id, p_code: val('#fe-c'), p_name: val('#fe-n'), p_district: val('#fe-d'), p_constituency: val('#fe-k'), p_active: val('#fe-a') === '1' }), c => c + ' saved.'); if (ok) { S.frEdit = null; render(); } }
+  if (a === 'person-add-toggle') { S.personAdd = !S.personAdd; render(); }
+  if (a === 'person-add-ok') {
+    const f = val('#pa-f'); if (!f) { toast('Choose the franchise.', true); return; }
+    if (!val('#pa-n').trim() || !val('#pa-e').trim()) { toast('Enter the name and the login email.', true); return; }
+    b.classList.add('busy');
+    try {
+      const r = await loginsApi({ action: 'create', franchise_id: +f, people: [{ role: val('#pa-r'), full_name: val('#pa-n'), email: val('#pa-e'), password: val('#pa-pw'), phone: val('#pa-p'), territory: val('#pa-t'), vehicle_no: val('#pa-v') }] });
+      S.creds = { title: 'New login', rows: r.results };
+      if (r.results.every(x => x.ok)) { S.personAdd = false; toast('Login created. Save the password below.'); } else toast(r.results[0].error, true);
+      await refresh();
+    } catch (err) { toast(err.message, true); }
+    finally { b.classList.remove('busy'); render(); setTimeout(() => $('#cred') && $('#cred').scrollIntoView({ block: 'start' }), 0); }
+  }
+  if (a === 'preset') { const p = b.dataset.p; S.preset = p; S.to = todayIST(); S.from = p === 'today' ? S.to : p === '7' ? addDays(S.to, -6) : p === '30' ? addDays(S.to, -29) : FAR_PAST; await reload(); }
+  if (a === 'go') { if (b.dataset.v === 'loads') S.loadFilter = b.dataset.f || 'attention'; if (b.dataset.v === 'leads' && b.dataset.f === 'late') { S.lf.status = 'scheduled'; } if (b.dataset.v === 'leads' && (b.dataset.f === 'unassigned' || b.dataset.f === 'failed')) { S.lf.status = b.dataset.f; } await go(b.dataset.v); }
+  if (a === 'metric') { S.metric = b.dataset.m; render(); }
+  /* leads */
+  if (a === 'leadtab') { S.leadTab = b.dataset.t; await reload(); }
+  if (a === 'lead-move') { S.leadAct = { id, mode: 'move' }; render(); }
+  if (a === 'lead-cancel') { S.leadAct = { id, mode: 'cancel' }; render(); }
+  if (a === 'lead-close') { S.leadAct = null; render(); }
+  if (a === 'lead-move-ok') { const d = val('#mv-d'); if (!d) { toast('Choose a driver.', true); return; } const ok = await act(b, () => rpc('hq_reassign_lead', { p_lead_id: id, p_driver_id: d }), n => `Lead moved to ${n}.`); if (ok) { S.leadAct = null; render(); } }
+  if (a === 'lead-cancel-ok') { const r = val('#cx-r').trim(); if (!r) { toast('Add a reason for cancelling.', true); return; } const ok = await act(b, () => rpc('hq_cancel_lead', { p_lead_id: id, p_reason: r }), c => `${c} cancelled.`); if (ok) { S.leadAct = null; render(); } }
+  if (a === 'template') downloadFile('scrappy-lead-template.csv', csvLine(COLS) + '\n' + csvLine(['Meera S.', '9847012345', 'Flat 3B, Skyline Apts', 'Kakkanad', 'meera@okaxis', 'KKD', '', addDays(todayIST(), 1).split('-').reverse().join('-'), '11:30 AM', 'Iron, paper', '10.015900', '76.341900']) + '\n');
+  if (a === 'upload-clear') { S.upload = null; render(); }
+  if (a === 'import' && S.upload && S.upload.rows) {
+    const U = S.upload; U.busy = true; render();
+    try {
+      const out = [];
+      for (let i = 0; i < U.rows.length; i += 100) out.push(...await api('/rest/v1/lead_import', { method: 'POST', body: U.rows.slice(i, i + 100), headers: { Prefer: 'return=representation' } }));
+      S.upload = { name: U.name, result: out, source: U.rows };
+      await refresh(); toast(`${out.filter(x => x.status === 'created').length} leads created.`);
+    } catch (err) { U.busy = false; U.error = err.message; toast(err.message, true); }
+    render();
+  }
+  if (a === 'errors-csv' && S.upload && S.upload.result) {
+    const bad = S.upload.result.filter(x => x.status === 'error');
+    downloadFile('leads-to-fix.csv', csvLine(COLS.concat(['error'])) + '\n' + bad.map(x => csvLine(COLS.map(c => x[c]).concat([x.message]))).join('\n') + '\n');
+  }
+  /* bills */
+  if (a === 'pick-bill') { S.billSel = id; render(); }
+  if (a === 'pdf') { b.classList.add('busy'); try { window.open(await makePdf(id), '_blank', 'noopener'); } catch (err) { toast(err.message, true); } b.classList.remove('busy'); }
+  /* loads */
+  if (a === 'pick-load') { S.loadSel = id; render(); }
+  if (a === 'resolve') { const n = val('#resnote').trim(); if (!n) { toast('Add a note explaining the decision.', true); return; } await act(b, () => rpc('resolve_flagged_load', { p_load_id: id, p_action: b.dataset.a, p_note: n }), r => r === 'reconciled' ? 'Accepted. The load is reconciled.' : 'Sent back for re-weighing.'); }
+  /* stock */
+  if (a === 'raise') { const k = num(val('#rq-k')); if (!val('#rq-f')) { toast('Choose the franchise this request is for.', true); return; } if (!(k > 0)) { toast('Enter the kg HQ needs.', true); return; } await act(b, () => rpc('raise_requirement', { p_item_id: +val('#rq-i'), p_required_kg: k, p_due_date: val('#rq-d') || null, p_note: val('#rq-n').trim() || null, p_franchise: val('#rq-f') ? +val('#rq-f') : null }), c => `Requirement ${c} raised.`); }
+  if (a === 'req-cancel') { S.cancelReq = id; render(); setTimeout(() => $('#cnote') && $('#cnote').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'req-cancel-close') { S.cancelReq = null; render(); }
+  if (a === 'req-cancel-ok') { const n = val('#cnote').trim(); if (!n) { toast('Add a reason for cancelling.', true); return; } const ok = await act(b, () => rpc('cancel_requirement', { p_requirement_id: id, p_note: n }), 'Requirement cancelled.'); if (ok) { S.cancelReq = null; render(); } }
+  if (a === 'stock-csv') {
+    downloadFile(`scrappy-stock-${S.from}_to_${S.to}.csv`, csvLine(['Material', 'Opening kg', 'Received kg', 'Released to HQ kg', 'Closing kg', 'Value INR', 'HQ still needs kg']) + '\n' + S.stock.map(r => csvLine([r.item_name, num(r.opening_kg).toFixed(1), num(r.received_kg).toFixed(1), num(r.released_kg).toFixed(1), num(r.closing_kg).toFixed(1), Math.round(num(r.closing_value)), num(r.hq_open_need_kg).toFixed(1)])).join('\n') + '\n');
+  }
+  /* cash */
+  if (a === 'pick-route') { S.cashSel = id; render(); }
+  if (a === 'issue-float') { const amt = Math.round(num(val('#fl-a'))), dr = val('#fl-d'); if (!dr) { toast('Choose a driver.', true); return; } if (!(amt > 0)) { toast('Enter an amount.', true); return; } await act(b, () => rpc('issue_float', { p_driver_id: dr, p_amount: amt, p_note: null }), bal => `${rs(amt)} float issued. The driver now holds ${rs(bal)}.`); }
+  if (a === 'dispute-open') { S.disputeAct = id; render(); }
+  if (a === 'dispute-close') { S.disputeAct = null; render(); }
+  if (a === 'dispute-ok') { const n = val('#dn').trim(); if (!n) { toast('Add a note explaining the decision.', true); return; } const ok = await act(b, () => rpc('hq_resolve_dispute', { p_settlement_id: id, p_decision: val('#dd'), p_note: n }), 'Decision recorded.'); if (ok) { S.disputeAct = null; render(); } }
+  /* team and rates */
+  if (a === 'person-edit') { S.editPerson = b.dataset.id; render(); setTimeout(() => $('#pe-n') && $('#pe-n').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'person-close') { S.editPerson = null; render(); }
+  if (a === 'person-save') { const ok = await act(b, () => rpc('hq_update_profile', { p_id: b.dataset.id, p_full_name: val('#pe-n'), p_phone: val('#pe-p'), p_territory: val('#pe-t'), p_vehicle_no: val('#pe-v'), p_active: val('#pe-a') === '1', p_franchise: $('#pe-f') ? +val('#pe-f') : null }), n => `${n} updated.`); if (ok) { S.editPerson = null; render(); } }
+  if (a === 'item-add-toggle') { S.addItem = !S.addItem; render(); }
+  if (a === 'item-add-ok') { const r = num(val('#ni-r')); if (!val('#ni-n').trim()) { toast('Enter the material name.', true); return; } if (!(r > 0)) { toast('Enter the rate per kg.', true); return; } const ok = await act(b, () => rpc('hq_add_item', { p_name: val('#ni-n'), p_rate: r }), () => 'Material added.'); if (ok) { S.addItem = false; render(); } }
+  if (a === 'item-remove-open') { S.removeItem = id; render(); setTimeout(() => document.querySelector('[data-act=item-remove-ok]') && document.querySelector('[data-act=item-remove-ok]').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'item-remove-close') { S.removeItem = null; render(); }
+  if (a === 'item-remove-ok') { const ok = await act(b, () => rpc('hq_set_item_active', { p_item_id: id, p_active: false }), n => n + ' removed.'); if (ok) { S.removeItem = null; render(); } }
+  if (a === 'item-restore') { await act(b, () => rpc('hq_set_item_active', { p_item_id: id, p_active: true }), n => n + ' restored.'); }
+  if (a === 'set-rate') { const r = num(val('#nr-' + id)); if (!(r > 0)) { toast('Enter the new rate per kg.', true); return; } await act(b, () => rpc('hq_set_rate', { p_item_id: id, p_rate: r }), n => `${n} rate changed to ₹${r} per kg.`); }
+});
+
+/* ---------- live updates: Supabase Realtime over a plain websocket, plus a 20 s refresh as a safety net ---------- */
+let ws = null, wsBeat = null, wsRetry = null, wsRef = 0, refreshTimer = null;
+const RT_TABLES = ['loads', 'bills', 'cash_ledger', 'load_weighings', 'hq_requirements', 'hq_releases', 'cash_settlements', 'leads', 'hq_audit', 'settlement_resolutions'];
+let lastRefreshAt = 0;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  const wait = Math.max(800, 15000 - (Date.now() - lastRefreshAt));
+  refreshTimer = setTimeout(async () => { lastRefreshAt = Date.now(); try { await refresh(); rerenderIfIdle(); } catch (e) {} }, wait);
+}
+function rtSend(topic, event, payload) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ topic, event, payload, ref: String(++wsRef) })); }
+function rtToken() { if (ws && ws.readyState === 1 && session) rtSend('realtime:hq', 'access_token', { access_token: session.access_token }); }
+function rtConnect() {
+  if (!session || ws) return;
+  try { ws = new WebSocket(`${SUPABASE_URL.replace('https', 'wss')}/realtime/v1/websocket?apikey=${SUPABASE_KEY}&vsn=1.0.0`); } catch (e) { ws = null; return; }
+  ws.onopen = () => {
+    rtSend('realtime:hq', 'phx_join', { config: { broadcast: { ack: false, self: false }, presence: { key: '' }, postgres_changes: RT_TABLES.map(t => ({ event: '*', schema: 'public', table: t })) }, access_token: session.access_token });
+    clearInterval(wsBeat); wsBeat = setInterval(() => rtSend('phoenix', 'heartbeat', {}), 25000);
+  };
+  ws.onmessage = m => {
+    let d; try { d = JSON.parse(m.data); } catch (e) { return; }
+    if (d.event === 'phx_reply' && d.topic === 'realtime:hq') { const ok = d.payload && d.payload.status === 'ok'; if (ok !== S.wsOpen) { S.wsOpen = ok; rerenderIfIdle(); } }
+    if (d.event === 'postgres_changes') scheduleRefresh();
+  };
+  ws.onclose = () => { clearInterval(wsBeat); ws = null; if (S.wsOpen) { S.wsOpen = false; rerenderIfIdle(); } if (session) { clearTimeout(wsRetry); wsRetry = setTimeout(rtConnect, 5000); } };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+}
+function rtStop() { clearInterval(wsBeat); clearTimeout(wsRetry); const w = ws; ws = null; S.wsOpen = false; if (w) { w.onclose = null; try { w.close(); } catch (e) {} } }
+setInterval(async () => { if (session && S.profile && document.visibilityState === 'visible' && Date.now() - lastRefreshAt > 25000) { lastRefreshAt = Date.now(); try { await refresh(); rerenderIfIdle(); } catch (e) {} } }, 30000);
+
+/* ---------- login ---------- */
+$('#login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('#email').value.trim(), pw = $('#password').value, err = $('#login-err'), btn = $('#login-btn');
+  err.textContent = '';
+  if (!email || !pw) { err.textContent = 'Enter your email and password.'; return; }
+  btn.classList.add('busy'); btn.textContent = 'Logging in…';
+  try { await authCall('password', { email, password: pw }); await start(); }
+  catch (e2) { shake(); err.textContent = /invalid/i.test(e2.message) ? 'Wrong email or password.' : e2.message; }
+  finally { btn.classList.remove('busy'); btn.textContent = 'Log in'; }
+});
+function logoutLocal(msg) {
+  window.__viewKey = null;
+  rtStop();
+  if (session) fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
+  session = null; store(SESSION_KEY, undefined); S.profile = null; S.prevOv = null; S.feed = [];
+  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
+  $('#login-err').textContent = typeof msg === 'string' ? msg : '';
+  $('#password').value = '';
+}
+async function start() {
+  $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
+  $('#app').innerHTML = '<div class="loading"><svg class="hop" viewBox="-4 -26 392 134" role="img" aria-label="Loading"><g class="h h0"><path d="M99.10 0.00L12.50 0.00A12.50 12.50 0 0 0 1.67 18.75L44.98 93.75A12.50 12.50 0 0 0 66.63 93.75L109.93 18.75A12.50 12.50 0 0 0 99.10 0.00Z"/></g><g transform="translate(141.6 0)"><g class="h h1"><circle cx="50" cy="50" r="50"/></g></g><g transform="translate(271.6 0)"><g class="h h2"><path d="M12.50 100.00L99.10 100.00A12.50 12.50 0 0 0 109.93 81.25L66.63 6.25A12.50 12.50 0 0 0 44.98 6.25L1.67 81.25A12.50 12.50 0 0 0 12.50 100.00Z"/></g></g></svg>Loading HQ…</div>';
+  try {
+    const p = await rest(`profiles?id=eq.${encodeURIComponent(session.user_id)}&select=id,full_name,role,active`);
+    const me = p && p[0];
+    if (!me || !me.active || me.role !== 'hq') { logout('This dashboard is for HQ logins only.'); return; }
+    S.profile = me;
+    $('#who-name').textContent = me.full_name; $('#who-role').textContent = 'HQ'; $('#who-meta').textContent = '';
+    api('/auth/v1/user').then(u => { if (u && u.email) $('#who-meta').textContent = u.email; }).catch(() => {});
+    await refresh(); render(); rtConnect();
+  } catch (e) { $('#app').innerHTML = `<div class="card pad"><b>Could not load the dashboard.</b><span class="muted">${esc(e.message)}</span><button class="btn" onclick="location.reload()">Try again</button></div>`; }
+}
+
+/* ---------- look and feel: icons, screen-change animation, busy bar ---------- */
+const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>"};
+document.querySelectorAll('nav a[data-view]').forEach(a => { const d = NAV_ICONS[a.dataset.view]; if (d) a.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'); });
+function busyBar(on) { const b = document.getElementById('topbar'); if (!b) return; b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } }
+function shake() { const f = document.getElementById('login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
+document.addEventListener('click', e => {
+  if (e.target.closest('.btn,.tab') && navigator.vibrate) { try { navigator.vibrate(8); } catch (_) {} }
+  const pw = e.target.closest('[data-pw]');
+  if (pw) { const i = document.getElementById('password'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; pw.textContent = show ? 'Hide' : 'Show'; pw.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); }
+});
+/* one login per person: the newest login wins; an older device is signed out within about 20 seconds */
+let sessChecking = false;
+async function checkSession() {
+  if (!session || sessChecking || document.visibilityState !== 'visible') return;
+  sessChecking = true;
+  try { const ok = await rpc('session_valid'); if (ok === false) logout('You were logged out because this account was opened on another device.'); }
+  catch (e) { /* offline or a short error: try again next time */ }
+  finally { sessChecking = false; }
+}
+setInterval(checkSession, 20000);
+document.addEventListener('visibilitychange', checkSession);
+/* lets the phone install this page as an app (full screen, no address bar) */
+if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
+function logout(msg) { logoutLocal(msg); location.replace('../' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+session && session.access_token ? start() : logout();
+</script>
+</body>
+</html>

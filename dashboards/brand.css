@@ -1,0 +1,169 @@
+/* Scrappy brand layer · Brand Book v3.5
+   Loaded after each dashboard's own styles. Colour, type, radius, shadow and motion only: it never changes layout,
+   so the phone and landscape layouts keep working as before. One small file, cached by the browser. */
+:root{
+  --ox:#8B1E24;--ox6:#74181E;--ox7:#5E1318;--ox-100:#F5DEDF;--ox-200:#E9B9BB;--ox-300:#D68A8E;--ox-t:#FBF1F1;
+  --ink:#2A2426;--pearl:#F7F7F7;--paper:#EFEEEC;--stone:#5A5452;--faint:#6B6563;--line:#E4E1DC;--line-strong:#C9C5BF;
+  --green:#2E7D4F;--green-t:#EAF5EE;--blue:#245C8F;--blue-t:#E9F1F9;--amber-t:#FBF1DC;--amber-d:#6B4507;
+  --head:'Sora',system-ui,'Segoe UI',Arial,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r:14px;
+  --e1:0 1px 2px rgba(48,10,12,.08);--e2:0 6px 18px rgba(48,10,12,.12);--e3:0 18px 40px rgba(48,10,12,.18);
+  --sh:0 1px 2px rgba(48,10,12,.08),0 8px 18px -12px rgba(48,10,12,.2);
+  --ease:cubic-bezier(.22,1,.36,1);--std:cubic-bezier(.65,0,.35,1);
+}
+@keyframes b-spin{to{transform:rotate(360deg)}}
+@keyframes b-bar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes b-fill{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+
+body{background:var(--pearl) radial-gradient(760px 280px at 88% -60px,rgba(139,30,36,.08),rgba(139,30,36,0) 70%) no-repeat;color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased}
+a{color:var(--ox)}
+::selection{background:var(--ox-100);color:var(--ink)}
+:focus-visible{outline:3px solid var(--ox);outline-offset:2px;border-radius:6px}
+.muted{color:var(--stone)}
+
+/* ---------- type ---------- */
+h1,h2,h3,.kpi .v,.mini b.v,.lead-time b,.lead-done b,.totalpill b,.cash-hero .big,.fr-card b,.brand-title{font-family:var(--head)}
+h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,2.6vw,32px)}
+h2{font-weight:700;letter-spacing:-.015em}
+h3{font-weight:700;letter-spacing:-.01em}
+main h1::after{content:"";display:block;width:40px;height:4px;margin-top:10px;border-radius:2px;background:var(--ox);transform:skewX(-20deg);transform-origin:left}
+#app.enter main h1::after{animation:b-bar .4s var(--std) .25s both}
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--head);font-size:11px;letter-spacing:.14em}
+.eyebrow::before{content:"";width:30px;height:9px;flex:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 10'%3E%3Cpath d='M1 1h9L5.5 9z' fill='%238B1E24'/%3E%3Ccircle cx='18' cy='5' r='4.4' fill='%238B1E24'/%3E%3Cpath d='M26 9h9L30.5 1z' fill='%238B1E24'/%3E%3C/svg%3E") center/contain no-repeat}
+.login .eyebrow::before{display:none}
+
+/* ---------- side menu (desktop only; the phone layouts keep their own) ---------- */
+@media (min-width:861px){
+  aside{background:radial-gradient(300px 240px at 0 0,rgba(139,30,36,.55),rgba(139,30,36,0) 72%),linear-gradient(180deg,#2A2426 0%,#1B1718 100%)}
+  nav a,nav button.navbtn{border-radius:12px}
+  nav a.on{background:linear-gradient(135deg,#9A2329,var(--ox6));box-shadow:0 8px 18px -8px rgba(139,30,36,.95),inset 0 1px 0 rgba(255,255,255,.14)}
+  .fr-card{border-radius:14px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.16)}
+  .logout-btn,.side-foot button{border-radius:12px;border-color:rgba(255,255,255,.28)}
+}
+nav a .count{font-family:var(--head);font-size:11px}
+.who span{display:block;word-break:break-all}
+.who .role{font-weight:600;color:#fff;font-size:12.5px;margin-top:1px;word-break:normal}
+.servicebar{display:none!important}
+
+/* ---------- buttons ---------- */
+.btn{min-height:48px;border-radius:12px;background:var(--ox);color:#fff;font-family:var(--head);font-weight:700;font-size:14.5px;letter-spacing:.005em;box-shadow:0 8px 16px -10px rgba(139,30,36,.9);transition:transform .15s,box-shadow .15s,background .15s,color .15s,border-color .15s}
+.btn:hover{background:var(--ox6);box-shadow:0 12px 22px -12px rgba(139,30,36,.95)}
+.btn:active{background:var(--ox7);transform:translateY(1px);box-shadow:none}
+.btn.ghost{background:#fff;color:var(--ox);border:1.5px solid var(--ox);box-shadow:none}
+.btn.ghost:hover{background:var(--ox-t);box-shadow:none}
+.btn.ghost:active{background:var(--ox-100)}
+.btn.green{background:var(--green);box-shadow:0 8px 16px -10px rgba(46,125,79,.9)}
+.btn.green:hover{background:#256B43}
+.btn.sm{min-height:38px;border-radius:10px;font-size:13px}
+.btn:disabled{background:var(--paper);color:var(--faint);box-shadow:none;filter:none;border-color:transparent}
+.linkbtn,.backbtn{color:var(--ox)}
+.mobile-foot button{border:1.5px solid var(--ox);color:var(--ox);border-radius:12px;font-family:var(--head);font-size:13.5px}
+.maplink{border-radius:50%;box-shadow:var(--e1)}
+
+/* ---------- cards, numbers ---------- */
+.card,.filters,.mini{border-radius:var(--r);border-color:var(--line);box-shadow:var(--sh)}
+.card-h{border-bottom-color:var(--line)}
+.kpi{position:relative;overflow:hidden;border-radius:16px;border-color:var(--line);box-shadow:var(--sh)}
+.kpi::before{content:"";position:absolute;left:0;top:0;right:0;height:3px;background:linear-gradient(90deg,var(--ox) 0,var(--ox-300) 55%,rgba(214,138,142,0) 100%)}
+.kpi .l{font-weight:600;color:var(--stone)}
+.kpi .v,.mini b.v{letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi.dark{background:linear-gradient(135deg,#3A2B2E 0%,#2A2426 58%,#4A161B 100%)}
+.kpi.dark::before{background:linear-gradient(90deg,#D68A8E,rgba(214,138,142,0) 85%)}
+
+/* ---------- hero cards with the three-shapes motif ---------- */
+.next,.cash-hero,.closed-card{position:relative;overflow:hidden;border-radius:20px}
+.next>*,.cash-hero>*,.closed-card>*{position:relative;z-index:1}
+.next::before,.cash-hero::before,.cash-hero::after,.closed-card::before{content:"";position:absolute;pointer-events:none;z-index:0;background:rgba(255,255,255,.07)}
+.next::before,.closed-card::before{right:34px;bottom:-30px;width:116px;height:106px;clip-path:polygon(50% 6%,97% 94%,3% 94%)}
+.cash-hero::before{right:-34px;top:-44px;width:190px;height:190px;border-radius:50%}
+.cash-hero::after{right:92px;bottom:-34px;width:104px;height:96px;clip-path:polygon(50% 6%,97% 94%,3% 94%);background:rgba(255,255,255,.06)}
+.cash-hero .big{font-size:clamp(40px,5.2vw,52px);letter-spacing:-.03em}
+.next h2{letter-spacing:-.02em}
+.closed-card .check{animation:b-fill .5s var(--ease) both}
+
+/* ---------- lists, leads ---------- */
+.lead{position:relative;overflow:hidden;border-radius:16px}
+.lead::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:0 4px 4px 0;background:#D9D3CD}
+.lead.live::before{background:var(--ox)}
+.lead.bad::before{background:var(--bad)}
+@media (max-width:560px){
+  .lead-top{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 12px;align-items:start}
+  .lead-time{grid-row:1 / span 2}
+  .lead-top .badge{grid-column:2;grid-row:1;justify-self:start}
+  .lead-main{grid-column:2;grid-row:2}
+}
+.lead-time{background:var(--ox-t);color:var(--ox7);border-radius:12px}
+.lead-time small{color:var(--ox6)}
+.chip{background:var(--paper);color:var(--stone);font-weight:500}
+.lead-fail{border-radius:12px}
+.item{border-left-width:4px}
+.item.on{background:var(--ox-t);border-left-color:var(--ox)}
+.opt{border-radius:var(--r);border-width:1.5px}
+.opt.on{background:var(--ox-t);border-color:var(--ox);box-shadow:0 0 0 3px rgba(139,30,36,.12)}
+.steps li{border-radius:12px}
+.sheet .panel{border-radius:20px}
+.sheet .back{background:rgba(27,23,24,.6)}
+
+/* ---------- tabs, badges ---------- */
+.tab{min-height:38px;border:1.5px solid var(--line-strong);background:#fff;color:var(--ink);font-weight:600;border-radius:999px}
+.tab:hover{border-color:var(--ox);color:var(--ox)}
+.tab.on,.tab.on:hover{background:var(--ox);border-color:var(--ox);color:#fff}
+.badge{font-family:var(--head);font-weight:600;font-size:11.5px;letter-spacing:.01em;border-radius:999px}
+.b-prog,.b-flag{background:#FBEAE7;color:#7A1E14}
+.b-ok{background:var(--green-t);color:#17462B}
+.b-cash{background:var(--amber-t);color:#4D3007}
+.b-blue{background:var(--blue-t);color:#173E63}
+.b-sched{background:var(--paper);color:var(--ink)}
+.notice{border-radius:12px;border-left:4px solid currentColor}
+.notice.info{background:var(--blue-t);color:#173E63}
+.notice.ok{background:var(--green-t);color:#17462B}
+.notice.bad{background:#FBEAE7;color:#7A1E14}
+
+/* ---------- tables ---------- */
+th{font-family:var(--head);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);background:#FAF8F7;border-bottom:1px solid var(--line)}
+td{border-top-color:#EEEBE7}
+tbody tr:hover,tr.pickrow:hover{background:#FCF6F5}
+tr.pickrow.on,.loadrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
+
+/* ---------- inputs ---------- */
+.field input,.field textarea,.filters input,.filters select,.fld input,.fld select,textarea,.wi,.qty input{border:1.5px solid #9A948F;border-radius:10px;background:#fff;color:var(--ink)}
+.field input:hover,.filters input:hover,.filters select:hover,.fld input:hover,.fld select:hover,textarea:hover,.qty input:hover{border-color:var(--ink)}
+.field input:focus,.field textarea:focus,.filters input:focus,.filters select:focus,.fld input:focus,.fld select:focus,textarea:focus,.wi:focus,.qty input:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.14)}
+.filters label,.fld label{font-family:var(--head);font-size:10.5px;letter-spacing:.1em}
+.bar,.bar i{border-radius:9px}
+.bar i{background:linear-gradient(90deg,var(--ox),#C4474E)}
+
+/* ---------- feedback ---------- */
+.toast{border-radius:12px;box-shadow:var(--e3)}
+.loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:56px 18px;color:var(--stone)}
+/* Brand loader 1 · Hop: reduce, reuse, recycle take turns to hop (Loader/scrappy-loader-1-hop) */
+.loading::before{display:none!important}
+.loading{gap:10px}
+.hop{width:64px;height:auto;display:block;overflow:visible;color:var(--ox)}
+.hop path,.hop circle{fill:currentColor}
+.hop .h{transform-box:fill-box;transform-origin:50% 100%;animation:b-hop 2.4s infinite both}
+.hop .h1{animation-delay:.2s}.hop .h2{animation-delay:.4s}
+@keyframes b-hop{
+  0%{transform:translateY(0) scale(1,1);animation-timing-function:cubic-bezier(.65,0,.35,1)}
+  14%{transform:translateY(0) scale(1.08,.88);animation-timing-function:cubic-bezier(.65,0,.35,1)}
+  28%{transform:translateY(-6px) scale(.94,1.1);animation-timing-function:cubic-bezier(.2,.6,.4,1)}
+  50%{transform:translateY(-18px) scale(.98,1.04);animation-timing-function:cubic-bezier(.2,.6,.4,1)}
+  70%{transform:translateY(-3px) scale(.97,1.06);animation-timing-function:cubic-bezier(.6,0,.8,.4)}
+  78%{transform:translateY(0) scale(1.08,.88);animation-timing-function:cubic-bezier(.6,0,.8,.4)}
+  90%,100%{transform:translateY(0) scale(1,1)}
+}
+.btn.busy::after{border-color:rgba(255,255,255,.45);border-top-color:#fff}
+.empty svg{stroke:var(--ox-200)}
+.empty b{font-family:var(--head)}
+span.live{border-radius:999px}
+#topbar{background:linear-gradient(90deg,var(--ox),var(--ox-300))}
+
+/* ---------- login screens inside a dashboard (only seen if a login runs out) ---------- */
+.login{background:radial-gradient(760px 520px at 14% 0%,#B02B32 0%,rgba(176,43,50,0) 62%),radial-gradient(620px 480px at 100% 100%,#300A0C 0%,rgba(48,10,12,0) 70%),var(--ox)}
+.login form{border-radius:20px;box-shadow:var(--e3)}
+.login h1{font-size:26px}
+.login h1::after{display:none}
+.err{color:#7A1E14}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}

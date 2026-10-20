@@ -1,0 +1,17 @@
+# HTTPS in front of the Django server. The address comes from SITE_ADDRESS in .env.
+# Websockets (live updates) pass through automatically.
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy web:8000 {
+		header_up X-Forwarded-Proto {scheme}
+		health_uri /healthz
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+	request_body {
+		max_size 5MB
+	}
+}

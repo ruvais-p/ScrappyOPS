@@ -1,0 +1,6 @@
+Django>=5.2,<5.3
+psycopg[binary]>=3.2
+PyJWT>=2.8
+bcrypt>=4.1
+reportlab>=4.0
+uvicorn[standard]>=0.30
