@@ -34,6 +34,8 @@ scrappy_backend/
       invoice.py      the branded A4 bill (ReportLab)
     management/commands/  create_hq, seed_defaults, seed_demo, import_from_supabase, regenerate_pdfs
     tests/            the automated tests
+  kwd/                the staff app (Scrappy Field): tables kwd_*, rules, query engine, screens in static/kwd/js. See kwd/README.md
+  portal/             one login page, the role -> dashboard gate (middleware), the /kwd/ page, WhiteNoise-served static files
   tools/              point_frontend.py (switch the website to this server), seed_leads.py, poke.py, check_realtime.py
   deploy/             entrypoint.sh, Caddyfile (HTTPS), backup.sh
   Dockerfile · docker-compose.yml · .env.example · requirements.txt
@@ -56,9 +58,13 @@ A page can read **only** the 19 listed tables/views and **only** the listed colu
 (collector: own work; warehouse and supervisor: own franchise; HQ: all). Tables cannot be written to directly; every change
 goes through a named action that checks the caller's role. Internal helpers (`hq_log`, …) are not reachable.
 
-## 3. Roles (unchanged)
+## 3. Roles
 
-`driver` (collector) · `warehouse` (warehouse manager) · `supervisor` · `hq`. Stock is released to HQ by the **supervisor**
+Scrap app (unchanged): `driver` (collector) · `warehouse` (warehouse manager) · `supervisor` · `hq`. Staff app (`kwd/`):
+`tso` · `zonal_manager` · `head_office` · `franchisee`. **One login page (`/login/`) for all of them; the role opens the right
+dashboard** and the gate keeps people out of the others (see `kwd/README.md`).
+
+Scrap roles: Stock is released to HQ by the **supervisor**
 (or HQ). Each non-HQ person belongs to exactly one franchise and cannot touch another franchise's data. The full permission
 table is in `SCRAPPY_APP_DEVELOPER_HANDOVER.md`.
 
@@ -134,7 +140,9 @@ docker compose exec web python manage.py regenerate_pdfs                        
 * Stock releases and cash payments take locks, so two people acting at the same moment can never overdraw stock or cash
   (proved by `core/tests/test_concurrency.py`).
 * Searches and filters are always passed to the database as values, never joined into the SQL text.
-* No cookies are used, so cross-site request forgery does not apply (the CSRF middleware is deliberately absent).
+* Data calls carry a token in a header (no cookie), so cross-site request forgery does not apply to them and the CSRF middleware
+  is deliberately absent. The one cookie (`scrappy_gate`, signed, http-only, SameSite=Lax) only decides which **page** opens
+  (`portal/gate.py`); it never authorises a data call, and it stops working as soon as that login session ends.
 * The public bill link is an unguessable 128-bit token and shows only that one bill.
 
 ## 9. Differences from the old system (be aware)
