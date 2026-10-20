@@ -1,0 +1,19 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8B1E24">
+  <title>Scrappy Field</title>
+  <link rel="manifest" href="{% static 'kwd/site.webmanifest' %}">
+  <link rel="icon" href="{% static 'kwd/brand/favicon.svg' %}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{% static 'kwd/brand/apple-touch-icon.png' %}">
+  <link rel="stylesheet" href="{% static 'kwd/css/theme.css' %}">
+  <link rel="stylesheet" href="{% static 'kwd/css/kwd.css' %}">
+</head>
+<body>
+  <div id="app"><div class="center"><div class="loading" role="status"><span>Starting…</span></div></div></div>
+  <noscript><p style="padding:24px">Please turn on JavaScript to use Scrappy.</p></noscript>
+  <script type="module" src="{% static 'kwd/js/app.js' %}"></script>
+</body>
+</html>

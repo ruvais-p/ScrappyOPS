@@ -31,20 +31,37 @@ INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.postgres",
+    "django.contrib.staticfiles",
     "core",
     "kwd",
+    "portal",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",          # serves /static/ (the staff app's scripts, styles and pictures)
     "core.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "portal.gate.PortalGate",                              # one login; the role decides which dashboard opens
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 X_FRAME_OPTIONS = "DENY"
-# No cookies are used anywhere (every call carries a login token in a header), so cross-site request forgery cannot happen
-# and the CSRF middleware is deliberately not installed.
+# Every data call carries a login token in a header, so the data calls cannot be forged from another site and the CSRF
+# middleware is deliberately not installed. The one cookie (portal.gate) only decides which PAGE opens; it never authorises a
+# data call, and it is SameSite=Lax + http-only.
 SILENCED_SYSTEM_CHECKS = ["security.W003"]
+
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "DIRS": [],
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": []},
+}]
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+WHITENOISE_USE_FINDERS = True        # serve the apps' static folders directly; `collectstatic` is optional
+WHITENOISE_AUTOREFRESH = DEBUG
 
 ROOT_URLCONF = "scrappy.urls"
 WSGI_APPLICATION = "scrappy.wsgi.application"

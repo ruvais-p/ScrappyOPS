@@ -74,6 +74,19 @@ def guarded(view):
     return wrapped
 
 
+@csrf_exempt
+def session_status(request):
+    """Is this login still the person's newest one? Polled by the page; never raises. valid is null when it cannot tell
+    (for example the access token just expired), so the page does not sign anyone out by mistake."""
+    try:
+        c = auth.context_from_request(request, required=False)
+    except auth.AuthError:
+        return jr({"valid": None})
+    if c is None:
+        return jr({"valid": None})
+    return jr({"valid": c.session_valid()})
+
+
 @guarded
 def query(request, ctx):
     if request.method != "POST":

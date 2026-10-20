@@ -157,7 +157,7 @@ async function startHo(root, profile) {
 async function boot() {
   const root = document.getElementById('app')
   const s = session.get()
-  if (!s || !s.user) { location.replace('/login/'); return }
+  if (!s || !s.user) { location.replace('/logout/'); return }   // clears the page cookie too, so the login page does not bounce back here
   patch(root, `<div class="center">${Loading('Starting…')}</div>`)
   const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', s.user.id).single()
   if (error) { patch(root, Blocked(errText(error))); return }
