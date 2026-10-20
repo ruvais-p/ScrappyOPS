@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.postgres",
     "core",
+    "kwd",
 ]
 
 MIDDLEWARE = [

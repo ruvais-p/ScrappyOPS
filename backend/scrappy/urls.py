@@ -15,6 +15,8 @@ urlpatterns = [
     # the two server-side helpers that used to be edge functions
     path("functions/v1/bill-pdf", api.bill_pdf),
     path("functions/v1/hq-logins", api.hq_logins),
+    # the staff monitoring (Scrappy Field) app
+    path("kwd/api/", include("kwd.urls")),
     # optional: serve the website files from this same server
     re_path(r"^(?P<path>.*)$", frontend.serve),
 ]
