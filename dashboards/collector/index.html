@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#8B1E24">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Scrappy">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Scrappy Collector</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Sora:wght@600;700&display=swap">
+<style>
+:root{
+  --ox:#8B1E24;--ox7:#5E1318;--ink:#2A2426;--pearl:#F6F4F2;--paper:#EFEEEC;--stone:#6E6866;
+  --line:#E5E0DB;--green:#2F5523;--green-t:#E7F0E2;--blue:#2B5470;--blue-t:#E6EEF4;--amber-t:#FBF1DE;--amber-d:#6B4507;--ox-t:#FBEFEA;
+  --head:'Space Grotesk',Arial,sans-serif;--body:'DM Sans',Arial,sans-serif;
+  --r:16px;--sh:0 1px 2px rgba(42,36,38,.07),0 5px 12px -8px rgba(42,36,38,.28);
+  --ease:cubic-bezier(.22,1,.36,1);--nav-h:68px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--pearl);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+a{color:var(--ox)}
+button{font:inherit;cursor:pointer}
+button:disabled{cursor:not-allowed;opacity:.5}
+input{font:inherit}
+:focus-visible{outline:3px solid var(--ox);outline-offset:2px}
+.hidden{display:none!important}
+
+/* ---------- motion ---------- */
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:scale(.88)}70%{transform:scale(1.04)}100%{opacity:1;transform:none}}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(139,30,36,.45)}100%{box-shadow:0 0 0 12px rgba(139,30,36,0)}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes barin{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes load{0%{width:0}60%{width:70%}100%{width:90%}}
+@keyframes shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-6px)}40%,60%{transform:translateX(6px)}}
+#app.enter>*{animation:rise .55s var(--ease) both}
+#app.enter>*:nth-child(2){animation-delay:.07s}
+#app.enter>*:nth-child(3){animation-delay:.14s}
+#app.enter>*:nth-child(4){animation-delay:.21s}
+#app.enter>*:nth-child(5){animation-delay:.28s}
+#app.enter>*:nth-child(n+6){animation-delay:.34s}
+#app.enter .kpi{animation:rise .5s var(--ease) both}
+#app.enter .kpi:nth-child(2){animation-delay:.08s}
+#app.enter .kpi:nth-child(3){animation-delay:.16s}
+#app.enter .kpi:nth-child(4){animation-delay:.24s}
+#app.enter .lead{animation:rise .5s var(--ease) both;animation-delay:calc(var(--i,0)*60ms + .2s)}
+#app.enter .item{animation:rise .45s var(--ease) both}
+#app.enter .bar i{animation:barin .9s var(--ease) both;animation-delay:.3s}
+#topbar{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--ox),#E8A1A5);z-index:100;opacity:0;transition:opacity .25s}
+#topbar.on{opacity:1;animation:load 1.8s var(--ease) forwards}
+
+/* ---------- login ---------- */
+.login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px 16px;background:radial-gradient(900px 500px at 50% -10%,#8B1E24 0%,#3a1a1d 45%,#2A2426 100%)}
+.login form{background:#fff;width:100%;max-width:390px;padding:30px 26px;display:flex;flex-direction:column;gap:15px;border-radius:22px;box-shadow:0 30px 60px -20px rgba(0,0,0,.55);animation:rise .7s var(--ease) both}
+.login form.shake{animation:shake .5s}
+.login-logo{width:180px;display:block}
+.login h1{font-size:26px;margin:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:700}
+.field input{padding:14px 14px;border:1.5px solid var(--line);background:var(--pearl);color:var(--ink);font-size:16px;border-radius:12px;transition:border-color .2s,box-shadow .2s,background .2s;width:100%}
+.field input:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.pw{position:relative}
+.pw input{padding-right:64px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--ox);font-weight:700;font-size:13px;padding:10px}
+.err{color:var(--ox);font-size:14px;min-height:20px}
+
+/* ---------- shell ---------- */
+.shell{display:flex;min-height:100vh}
+aside{width:250px;flex-shrink:0;background:linear-gradient(180deg,#2e2729 0%,#201b1d 100%);color:#fff;padding:26px 18px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.logo{width:150px;padding-left:4px}
+.logo img{width:100%;display:block}
+.fr-card{border:1px solid #ffffff2b;border-radius:14px;background:#ffffff0d;padding:12px;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.fr-card small{font-size:10px;letter-spacing:.14em;font-weight:700;color:#D3BEC0}
+.fr-card b{font-family:var(--head);font-size:17px;letter-spacing:-.02em;line-height:1.2}
+.fr-card .frc{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;letter-spacing:.1em;background:var(--ox);padding:2px 10px;border-radius:6px}
+.who small{display:block;font-size:10px;letter-spacing:.14em;font-weight:700;color:#D3BEC0}
+.who b{display:block;font-size:16px}
+.who span{font-size:12px;color:#D3D1C7}
+nav{display:flex;flex-direction:column;gap:4px}
+nav a{position:relative;color:#DDD7D8;text-decoration:none;font-size:15px;padding:12px 14px;border-radius:12px;display:flex;align-items:center;gap:12px;transition:background .2s,color .2s,transform .2s var(--ease)}
+nav a svg{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav a:hover{background:#ffffff14;transform:translateX(3px)}
+nav a.on{background:var(--ox);color:#fff;font-weight:700;box-shadow:0 8px 18px -8px rgba(139,30,36,.9)}
+nav a .count{margin-left:auto;font-size:12px;font-weight:700;background:#ffffff2e;padding:1px 8px;border-radius:99px}
+nav a .count:empty{display:none}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;font-size:12px;color:#D3D1C7}
+.side-foot button{background:transparent;border:1px solid #ffffff40;color:#fff;padding:11px 14px;font-size:13px;text-align:left;border-radius:12px;transition:background .2s}
+.side-foot button:hover{background:#ffffff14}
+.servicebar{display:flex;height:6px;border-radius:6px;overflow:hidden}
+.servicebar i{flex:1}
+main{flex:1;min-width:0;padding:32px 40px 60px;display:flex;flex-direction:column;gap:22px;max-width:1280px}
+.eyebrow{font-size:11px;letter-spacing:.17em;font-weight:700;color:var(--ox);text-transform:uppercase}
+h1{margin:4px 0;font-family:var(--head);font-size:36px;letter-spacing:-.04em;line-height:1.08}
+h2{margin:0;font-family:var(--head);font-size:21px;letter-spacing:-.03em;line-height:1.15}
+h3{margin:0;font-family:var(--head);font-size:18px;letter-spacing:-.02em}
+.muted{color:var(--stone)}
+.small{font-size:12px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.head-act{display:flex;gap:10px;align-items:center}
+.backbtn{background:none;border:0;color:var(--ox);font-weight:700;font-size:14px;padding:6px 0;display:inline-flex;align-items:center;gap:4px}
+.backbtn:hover{text-decoration:underline}
+
+/* ---------- buttons ---------- */
+.btn{border:0;background:linear-gradient(180deg,#9a2329,var(--ox));color:#fff;font-weight:700;font-size:15px;padding:14px 22px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:50px;border-radius:14px;box-shadow:0 8px 18px -10px rgba(139,30,36,.9);transition:transform .2s var(--ease),box-shadow .2s,background .2s,filter .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 12px 22px -10px rgba(139,30,36,.95)}
+.btn:active{transform:scale(.97);box-shadow:none}
+.btn.ghost{background:#fff;color:var(--ink);border:1.5px solid var(--ink);box-shadow:none}
+.btn.ghost:hover{background:var(--paper)}
+.btn.green{background:linear-gradient(180deg,#25903f,#1F7A3A);box-shadow:0 8px 18px -10px rgba(31,122,58,.9)}
+.btn.block{width:100%}
+.btn.busy{opacity:.7;pointer-events:none}
+.btn.busy::after{content:"";width:16px;height:16px;border:2.5px solid #ffffff80;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.btn:disabled{box-shadow:none;transform:none;filter:grayscale(.4)}
+.maplink{display:inline-flex;align-items:center;justify-content:center;width:46px;height:46px;vertical-align:middle;text-decoration:none;background:#fff;color:var(--ox);border:1.5px solid var(--ox);border-radius:50%;flex:none;transition:transform .2s var(--ease),background .2s,color .2s}
+.maplink:hover{background:var(--ox);color:#fff;transform:scale(1.08)}
+.maplink:active{transform:scale(.92)}
+.maplink svg{width:22px;height:22px;fill:currentColor}
+.rowend{display:inline-flex;align-items:center;justify-content:flex-end;gap:14px}
+.linkbtn{background:none;border:0;color:var(--ox);font-weight:700;font-size:14px;padding:8px 0;text-decoration:underline}
+
+/* ---------- cards ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:18px 20px;display:flex;flex-direction:column;gap:3px;text-decoration:none;color:var(--ink);transition:transform .25s var(--ease),box-shadow .25s}
+a.kpi:hover{transform:translateY(-3px)}
+.kpi.dark{background:linear-gradient(135deg,#3a3033,#2A2426);color:#fff;border-color:var(--ink)}
+.kpi .l{font-size:12px;font-weight:500;color:var(--stone)}
+.kpi.dark .l,.kpi.dark .s{color:#D3D1C7}
+.kpi .v{font-family:var(--head);font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--stone)}
+.cols{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.grow{flex:999 1 460px;min-width:0}
+.side{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--line)}
+.pad{padding:18px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1.5px solid var(--line);background:#fff;color:var(--ink);font-size:13px;font-weight:500;padding:9px 16px;min-height:42px;border-radius:99px;transition:background .2s,color .2s,border-color .2s,transform .2s var(--ease)}
+.tab:hover{border-color:var(--ink)}
+.tab:active{transform:scale(.95)}
+.tab.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-size:11px;letter-spacing:.08em;color:var(--stone);font-weight:700;text-align:left;padding:11px 8px}
+td{padding:13px 8px;border-top:1px solid var(--paper);vertical-align:middle}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:#FBFAF9}
+th:first-child,td:first-child{padding-left:18px}
+th:last-child,td:last-child{padding-right:18px}
+.r{text-align:right}
+.b{font-weight:700}
+.badge{font-size:12px;font-weight:700;padding:5px 11px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;border-radius:99px}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.b-prog{background:var(--ox-t);color:var(--ox)}
+.b-sched{background:var(--paper);color:var(--ink)}
+.b-ok{background:var(--green-t);color:var(--green)}
+.b-cash{background:var(--amber-t);color:var(--amber-d)}
+.b-flag{background:var(--ox-t);color:var(--ox)}
+.bar{height:9px;background:var(--paper);border-radius:9px;overflow:hidden}
+.bar i{display:block;height:9px;background:linear-gradient(90deg,var(--ox),#C4474E);border-radius:9px;transform-origin:left}
+.row-split{display:flex;justify-content:space-between;gap:10px}
+.total{border-top:2px solid var(--ink);padding-top:10px;font-weight:700}
+
+/* ---------- lead cards ---------- */
+.leads{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;padding:16px}
+.leads.bare{padding:0}
+.lead{content-visibility:auto;contain-intrinsic-size:auto 175px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--sh);transition:transform .25s var(--ease),box-shadow .25s,border-color .25s}
+.lead:hover{transform:translateY(-3px)}
+.lead.live{border-color:var(--ox);box-shadow:0 0 0 3px var(--ox-t),var(--sh)}
+.lead-top{display:flex;gap:12px;align-items:flex-start}
+.lead-time{flex:none;min-width:66px;text-align:center;background:var(--paper);border-radius:12px;padding:9px 6px}
+.lead-time b{font-family:var(--head);font-size:15px;display:block;line-height:1.15}
+.lead-time small{font-size:11px;color:var(--stone)}
+.lead-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.lead-main .nm{font-size:16px;font-weight:700}
+.lead-main .sub{font-size:13px;color:var(--stone)}
+.lead-main .addr{font-size:13px;opacity:.8;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lead-top .badge{flex:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;background:var(--paper);border-radius:99px;padding:3px 10px;color:var(--stone)}
+.lead-act{display:flex;align-items:center;gap:10px}
+.lead-act .btn{flex:1}
+.lead-done{display:flex;justify-content:space-between;align-items:center;border-top:1px dashed var(--line);padding-top:10px;color:var(--stone);font-size:13px}
+.lead-done b{color:var(--green);font-size:17px;font-family:var(--head)}
+
+/* ---------- next pickup hero ---------- */
+.next{position:relative;overflow:hidden;border-radius:22px;color:#fff;padding:22px;background:linear-gradient(135deg,#9a2329 0%,#5E1318 100%);box-shadow:0 20px 40px -22px rgba(94,19,24,.9);display:flex;flex-direction:column;gap:10px}
+.next::after{content:"";position:absolute;right:-50px;top:-50px;width:200px;height:200px;border-radius:50%;background:#ffffff14;pointer-events:none}
+.next .tag{font-size:11px;letter-spacing:.16em;font-weight:700;color:#F1D3D5}
+.next h2{font-size:28px;color:#fff;letter-spacing:-.03em}
+.next .soft{color:#F1D3D5;font-size:14px}
+.next-act{display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap;position:relative;z-index:1}
+.next .btn{background:#fff;color:var(--ox);box-shadow:0 10px 20px -12px rgba(0,0,0,.6);flex:1 1 140px}
+.next .maplink{background:transparent;color:#fff;border-color:#ffffff80}
+.next .maplink:hover{background:#fff;color:var(--ox)}
+
+/* ---------- pickup screen ---------- */
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.steps li{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--stone);display:flex;flex-direction:column;gap:2px;min-width:0;transition:background .4s,color .4s}
+.steps li small{font-size:11px;letter-spacing:.1em;font-weight:700}
+.steps li b{font-size:13px;line-height:1.25}
+.steps li.done{background:var(--green);border-color:var(--green);color:#fff}
+.steps li.cur{background:var(--ox);border-color:var(--ox);color:#fff;animation:ring 1.8s 3}
+.item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--paper);border-left:4px solid transparent;transition:background .25s,border-color .25s}
+.item.on{background:#FFF9F0;border-left-color:var(--ox)}
+.item .nm{display:block;font-size:16px;font-weight:700}
+.item .rt{display:block;font-size:13px;color:var(--stone)}
+.qty{display:flex;align-items:center;gap:10px}
+.qty input{width:100px;font-size:18px;font-weight:700;padding:12px 12px;border:1.5px solid var(--line);background:var(--pearl);color:var(--ink);text-align:right;border-radius:12px;transition:border-color .2s,box-shadow .2s,background .2s}
+.qty input:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.qty input:disabled{background:var(--paper);color:var(--stone)}
+.amt{min-width:78px;text-align:right;font-weight:700;font-size:15px}
+.opt{width:100%;text-align:left;display:flex;flex-direction:column;gap:3px;padding:15px;background:#fff;border:2px solid var(--line);border-radius:14px;color:var(--ink);transition:border-color .2s,background .2s,transform .2s var(--ease)}
+.opt:hover:not(:disabled){border-color:var(--ink);transform:translateY(-1px)}
+.opt.on{background:var(--ox-t);border-color:var(--ox)}
+.opt b{font-size:15px}
+.opt span{font-size:13px;color:var(--stone)}
+.closed-card{background:linear-gradient(135deg,#25903f,#14532a);color:#fff;padding:22px;display:flex;flex-direction:column;gap:10px;border-radius:20px;box-shadow:0 20px 40px -22px rgba(20,83,42,.9);animation:pop .6s var(--ease) both}
+.closed-card .muted{color:#D8EFDD}
+.check{width:60px;height:60px}
+.check circle{fill:none;stroke:#ffffff55;stroke-width:3}
+.check path{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:draw .6s .35s var(--ease) forwards}
+.totalpill{display:none}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes slideup{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center}
+.sheet .back{position:absolute;inset:0;background:rgba(20,12,14,.55);animation:fadein .25s both}
+.sheet .panel{position:relative;background:#fff;border-radius:22px 22px 0 0;width:100%;max-width:520px;max-height:92vh;overflow:auto;padding:20px 20px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:14px;animation:slideup .38s var(--ease) both}
+@media (min-width:861px){.sheet{align-items:center}.sheet .panel{border-radius:22px}}
+.reasons{display:grid;gap:8px}
+.reasons .opt{padding:12px 14px}
+.field textarea{padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--pearl);color:var(--ink);font:inherit;font-size:15px;resize:vertical;width:100%;transition:border-color .2s,box-shadow .2s,background .2s}
+.field textarea:focus{outline:0;border-color:var(--ox);background:#fff;box-shadow:0 0 0 4px rgba(139,30,36,.12)}
+.lead-fail{background:var(--ox-t);color:var(--ox);border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.5}
+.lead.bad{border-color:#E8B7B9}
+.lead-more{display:flex;justify-content:center;margin-top:-4px}
+.lead-more .linkbtn{font-size:13px;color:var(--stone);font-weight:500;padding:4px 8px}
+@media (hover:none){.btn:hover,.lead:hover,a.kpi:hover,.maplink:hover,.opt:hover:not(:disabled),nav a:hover{transform:none}}
+.cash-hero{background:linear-gradient(135deg,#9a2329,#5E1318);color:#fff;padding:26px 28px;display:flex;flex-direction:column;gap:12px;border-radius:22px;box-shadow:0 20px 40px -22px rgba(94,19,24,.9)}
+.cash-hero .big{font-family:var(--head);font-size:56px;font-weight:700;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums}
+.cash-hero .soft{color:#F1D3D5;font-size:13px}
+.empty{padding:40px 18px;text-align:center;color:var(--stone);display:flex;flex-direction:column;align-items:center;gap:6px}
+.empty svg{width:46px;height:46px;stroke:var(--line);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-bottom:4px}
+.empty b{color:var(--ink)}
+.notice{background:var(--amber-t);color:var(--amber-d);padding:12px 14px;font-size:13px;border-radius:12px}
+
+/* ---------- toast / loading ---------- */
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,24px) scale(.96);background:var(--ink);color:#fff;padding:13px 18px 13px 14px;font-weight:500;max-width:min(440px,calc(100vw - 32px));opacity:0;transition:all .35s var(--ease);pointer-events:none;z-index:60;border-radius:14px;display:flex;align-items:center;gap:12px;box-shadow:0 18px 40px -16px rgba(0,0,0,.6)}
+.toast .ic{flex:none;width:24px;height:24px;border-radius:50%;background:#2e9b4c;display:grid;place-items:center;font-size:14px;font-weight:700}
+.toast.bad .ic{background:#E5484D}
+.toast.show{transform:translate(-50%,0) scale(1);opacity:1}
+.toast.bad{background:var(--ox)}
+.loading{padding:60px 20px;text-align:center;color:var(--stone)}
+.sk{background:linear-gradient(90deg,#ebe7e3 25%,#f7f5f3 40%,#ebe7e3 60%);background-size:300% 100%;animation:shimmer 1.4s infinite linear;border-radius:14px}
+.mobile-foot{display:none}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- phones: top bar + bottom tabs ---------- */
+@media (max-width:860px){
+  body{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom))}
+  .shell{flex-direction:column}
+  aside{width:auto;height:auto;position:sticky;top:0;z-index:30;flex-direction:row;align-items:center;padding:10px 14px;gap:12px;border-radius:0 0 18px 18px;box-shadow:0 10px 24px -14px rgba(0,0,0,.6)}
+  .logo{width:84px;padding:0}
+  .who{display:none}
+  .fr-card{margin-left:auto;flex-direction:row;border:0;background:none;padding:0;gap:8px}
+  .fr-card small{display:none}
+  .fr-card b{font-size:14px}
+  .side-foot{display:none}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#fff;border-top:1px solid var(--line);box-shadow:0 -10px 30px -18px rgba(0,0,0,.35);display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:0 6px env(safe-area-inset-bottom);flex:none}
+  nav a{flex-direction:column;justify-content:center;gap:3px;color:var(--stone);font-size:11px;font-weight:500;padding:9px 4px 8px;border-radius:0;height:var(--nav-h)}
+  nav a:hover{background:none;transform:none}
+  nav a svg{width:25px;height:25px}
+  nav a::before{content:"";position:absolute;top:0;left:50%;width:0;height:3px;background:var(--ox);border-radius:0 0 4px 4px;transition:width .3s var(--ease),left .3s var(--ease)}
+  nav a.on{background:none;color:var(--ox);box-shadow:none;font-weight:700}
+  nav a.on::before{width:44px;left:calc(50% - 22px)}
+  nav a .count{position:absolute;top:6px;left:calc(50% + 6px);margin:0;background:var(--ox);color:#fff;min-width:18px;text-align:center;padding:0 5px;font-size:11px;line-height:18px}
+  .mobile-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 16px 24px;border-top:1px solid var(--line);background:#fff;font-size:13px;color:var(--stone)}
+  .mobile-foot b{color:var(--ink)}
+  .mobile-foot button{border:1.5px solid var(--ink);background:#fff;color:var(--ink);font-weight:700;font-size:14px;padding:11px 18px;min-height:44px;border-radius:12px}
+  main{padding:18px 14px 28px;gap:18px}
+  h1{font-size:27px}
+  .leads{grid-template-columns:1fr;padding:12px}
+  .steps{gap:4px}
+  .steps li{padding:8px 6px;border-radius:10px}
+  .steps li b{font-size:11px}
+  .item{padding:13px 14px}
+  .qty input{width:88px}
+  .cash-hero .big{font-size:46px}
+  .next h2{font-size:24px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi{padding:14px 15px}
+  .kpi .v{font-size:24px}
+  .toast{bottom:calc(var(--nav-h) + 16px)}
+  .totalpill{display:flex;align-items:center;gap:12px;position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:calc(var(--nav-h) + 14px + env(safe-area-inset-bottom));z-index:35;background:var(--ink);color:#fff;border:0;border-radius:99px;padding:12px 20px;box-shadow:0 18px 36px -14px rgba(0,0,0,.65);animation:pop .5s var(--ease) both;font-weight:700;white-space:nowrap}
+  .totalpill b{font-family:var(--head);font-size:18px}
+  .totalpill span{font-size:13px;color:#D3D1C7;font-weight:500}
+}
+@media (min-width:861px){aside{overflow-y:auto;overscroll-behavior:contain;height:100vh;height:100dvh;scrollbar-width:thin;scrollbar-color:#ffffff40 transparent}aside>*{flex-shrink:0}}
+@media (min-width:861px) and (max-height:560px){
+  aside{padding:12px 14px;gap:10px}
+  .logo{width:92px;padding:0}
+  .fr-card{padding:8px}.fr-card b{font-size:14px}.who b{font-size:14px}
+  nav a{padding:8px 12px;font-size:13px}
+  .side-foot{gap:8px}.side-foot>span{display:none}
+}
+@media (max-width:860px) and (max-height:480px){
+  :root{--nav-h:48px}
+  aside{position:static;padding:6px 12px;border-radius:0;box-shadow:none}
+  .logo{width:62px}
+  nav a{flex-direction:row;gap:6px;font-size:12px;padding:0 4px}
+  nav a svg{width:20px;height:20px}
+  nav a .count{top:4px;left:calc(50% + 22px)}
+  main{padding:12px 14px 20px}
+  .sheet .panel{max-height:96vh}
+}
+</style>
+<link rel="stylesheet" href="../brand.css">
+</head>
+<body>
+
+<div id="login" class="login hidden">
+  <img class="login-logo" src="../logo.webp" alt="Scrappy">
+  <form id="login-form" novalidate>
+    <h1 style="font-family:var(--head);letter-spacing:-.03em">Collector login</h1>
+    <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
+    <div class="field"><label for="password">Password</label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" data-pw aria-label="Show password">Show</button></div></div>
+    <div class="err" id="login-err" role="alert"></div>
+    <button class="btn block" type="submit" id="login-btn">Log in</button>
+    <span class="muted small">Accounts are created by Scrappy HQ. Forgot your password? Ask HQ to reset it.</span>
+  </form>
+</div>
+
+<div id="shell" class="shell hidden">
+  <aside>
+    <div class="logo"><img src="../logo.webp" alt="Scrappy"></div>
+    <div class="fr-card" id="fr-card"><small>FRANCHISE</small><b id="fr-name">&nbsp;</b><span class="frc" id="fr-code"></span></div>
+    <div class="who"><b id="who-name"></b><span class="role">Collector</span><span id="who-email"></span><span id="who-meta"></span></div>
+    <nav aria-label="Main">
+      <a href="#dashboard" data-view="dashboard"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a href="#pickup" data-view="pickup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 3.5 7v10L12 21.5 20.5 17V7z"/><path d="M3.5 7 12 11.5 20.5 7M12 11.5v10"/></svg><span>Pickup</span><span class="count" id="nav-open"></span></a>
+      <a href="#loads" data-view="loads"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg><span>Load</span></a>
+      <a href="#cash" data-view="cash"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3"/><path d="M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z"/><circle cx="16.5" cy="14.5" r="1"/></svg><span>Cash</span></a>
+    </nav>
+    <div class="side-foot">
+      <span>Leads are assigned by HQ. Rates are set by HQ.</span>
+      <button type="button" data-act="logout">Log out</button>
+      <div class="servicebar" aria-hidden="true"><i style="background:#8B1E24"></i><i style="background:#4F7F3B"></i><i style="background:#3D6F90"></i><i style="background:#29908F"></i><i style="background:#DE9827"></i></div>
+    </div>
+  </aside>
+  <main id="app" aria-live="polite"><div class="sk" style="height:34px;width:55%"></div><div class="sk" style="height:150px"></div><div class="sk" style="height:220px"></div></main>
+  <div class="mobile-foot">
+    <span>Logged in as <b id="who-mobile"></b><span id="fr-mobile"></span></span>
+    <button type="button" data-act="logout">Log out</button>
+  </div>
+</div>
+<div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheet-t"></div>
+<div id="topbar" aria-hidden="true"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =========================================================
+   Scrappy Collector Dashboard · connected to Supabase
+   The publishable key below is safe to include in a web page.
+   Data is protected by the database's access rules.
+   ========================================================= */
+const SUPABASE_URL = 'https://suluhhbomiuwwocrfpxg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_45-7fJZdo_jovQfhN0dhtw_FNmo1Fw1';
+const SESSION_KEY = 'scrappy_session';
+
+/* ---------- small helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+/* the customer's position comes with the lead (latitude, longitude); Google Maps opens with directions to it */
+function mapLink(l) {
+  const la = Number(l.latitude), lo = Number(l.longitude);
+  if (l.latitude == null || l.longitude == null || !isFinite(la) || !isFinite(lo)) return '';
+  return `<a class="maplink" href="https://www.google.com/maps/dir/?api=1&destination=${la},${lo}&travelmode=driving" target="_blank" rel="noopener" title="Open in Google Maps" aria-label="Open ${esc(l.customer_name)} in Google Maps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></a>`;
+}
+function callLink(l) {
+  const d = String(l.phone || '').replace(/\D/g, '').slice(-10);
+  if (d.length !== 10) return '';
+  return `<a class="maplink" href="tel:+91${d}" title="Call ${d}" aria-label="Call ${esc(l.customer_name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02l-2.2 2.2z"/></svg></a>`;
+}
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const num = v => Number(v || 0);
+const rs = n => '₹' + Math.round(num(n)).toLocaleString('en-IN');
+const kg = n => (Math.round(num(n) * 10) / 10).toFixed(1);
+const time = t => t ? new Date(t).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit' }).toUpperCase() : '—';
+const day = t => t ? new Date(t).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' }) : '';
+function toast(msg, bad) {
+  const t = $('#toast'); t.innerHTML = '<span class="ic">' + (bad ? '!' : '✓') + '</span><span></span>'; t.lastChild.textContent = msg; t.classList.toggle('bad', !!bad); t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), bad ? 4500 : 2800);
+}
+function store(k, v) { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+
+/* ---------- Supabase connection (plain HTTPS, no library needed) ---------- */
+let session = load(SESSION_KEY);
+
+async function authCall(grant, body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grant}`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.msg || data.message || 'Login failed');
+  session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in || 3600) * 1000, user_id: data.user && data.user.id };
+  store(SESSION_KEY, session);
+  return session;
+}
+async function ensureFresh() {
+  if (session && session.expires_at - Date.now() < 300000) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); }
+    catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+  }
+}
+async function api(path, { method = 'GET', body, retry = true } = {}) {
+  await ensureFresh();
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    method,
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session ? session.access_token : SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (res.status === 401 && retry && session) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); } catch (e) { logout('You were logged out. This account may have been opened on another device, or the session expired.'); throw e; }
+    return api(path, { method, body, retry: false });
+  }
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error((data && (data.message || data.msg)) || `Request failed (${res.status})`);
+  return data;
+}
+const rest = q => api('/rest/v1/' + q);
+const rpc = (fn, args = {}) => api('/rest/v1/rpc/' + fn, { method: 'POST', body: args });
+
+/* PDF bill: made on the server from the database; returns a link that works for a year */
+async function makePdf(billId) {
+  await ensureFresh();
+  const call = () => fetch(`${SUPABASE_URL}/functions/v1/bill-pdf`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bill_id: billId })
+  });
+  let res = await call();
+  if (res.status === 401) {
+    try { await authCall('refresh_token', { refresh_token: session.refresh_token }); res = await call(); } catch (e) {}
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) throw new Error(data.error || 'Could not make the PDF bill.');
+  store('pdfl_' + billId, data.url);
+  return data.url;
+}
+/* WhatsApp text = bill summary from the database + link to the PDF */
+async function buildWhatsApp(billId, reusePdf = false) {
+  const r = await rpc('bill_whatsapp', { p_bill_id: billId });
+  const w = Array.isArray(r) ? r[0] : r;
+  let msg = w.message, pdfOk = true;
+  const who = (S.profile && S.profile.full_name) || 'the collector';
+  try {
+    const url = (reusePdf && load('pdfl_' + billId)) || await makePdf(billId);
+    msg += `\n\nYour bill (PDF): ${url}\nPlease check it and tell ${who} if all is correct. This same link shows PAID once we pay you.`;
+  } catch (e) { pdfOk = false; }
+  msg += '\n\nScrappy · Waste management, made simple.';
+  store('wa_' + billId, `https://wa.me/${w.whatsapp_number}?text=${encodeURIComponent(msg)}`);
+  return pdfOk;
+}
+async function sharePdfFile(billId, billNo) {
+  const url = load('pdfl_' + billId) || await makePdf(billId);
+  const blob = await (await fetch(url)).blob();
+  const file = new File([blob], `Scrappy-bill-${billNo}.pdf`, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    await navigator.share({ files: [file], title: `Scrappy bill ${billNo}` });
+    return true;
+  }
+  window.open(url, '_blank', 'noopener');
+  return false;
+}
+
+/* ---------- state ---------- */
+const S = {
+  view: 'dashboard', leadTab: 'open', loadTab: null,
+  profile: null, leads: [], rates: [], cash: 0, ledger: [], loads: [], loadTotals: [], paidBills: [],
+  activeLead: null, billItems: [], method: null, busy: false
+};
+const openLoad = () => S.loads.find(l => l.status === 'open');
+const leadById = id => S.leads.find(l => l.lead_id === id);
+const openLeads = () => S.leads.filter(l => l.status !== 'closed' && l.status !== 'failed');
+const failedLeads = () => S.leads.filter(l => l.status === 'failed');
+const closedLeads = () => S.leads.filter(l => l.status === 'closed');
+const rateName = id => (S.rates.find(r => r.item_id === id) || {}).item_name || 'Item';
+
+async function refresh() {
+  const uid = session.user_id;
+  const [profile, leads, rates, cash, ledger, loads, totals, paid] = await Promise.all([
+    rest(`profiles?select=full_name,role,territory,vehicle_no,franchise_id&id=eq.${uid}`),
+    rpc('my_leads'),
+    rest('current_rates?select=item_id,item_name,rate_per_kg&order=item_id'),
+    rest(`driver_cash_in_hand?select=cash_in_hand&driver_id=eq.${uid}`),
+    rest(`cash_ledger?select=id,entry_type,amount,bill_id,note,created_at&driver_id=eq.${uid}&order=created_at.asc,id.asc`),
+    rest('loads?select=id,code,status,started_at,submitted_at,warehouse_kg&order=id.desc&limit=10'),
+    rest('load_item_totals?select=load_id,item_name,total_kg,total_value'),
+    rest('bill_totals?select=bill_id,bill_no,load_id,payment_method,total_kg,total_amount&status=eq.paid')
+  ]);
+  S.profile = profile[0] || null; S.leads = leads || []; S.rates = rates || [];
+  S.cash = num((cash[0] || {}).cash_in_hand); S.ledger = ledger || []; S.loads = loads || [];
+  S.loadTotals = totals || []; S.paidBills = paid || [];
+  if (S.activeLead) {
+    const l = leadById(S.activeLead);
+    S.billItems = l && l.bill_id ? await rest(`bill_items?select=item_id,qty_kg,rate_per_kg,amount&bill_id=eq.${l.bill_id}`) : [];
+    S.waOpenedAt = null;
+    if (l && l.bill_id && l.bill_status === 'sent') {
+      const b = await rest(`bills?select=whatsapp_opened_at&id=eq.${l.bill_id}`);
+      S.waOpenedAt = (b[0] || {}).whatsapp_opened_at || null;
+      await buildWhatsApp(l.bill_id, true); /* always rebuilt so a corrected phone number is used */
+    }
+  }
+}
+
+/* ---------- views ---------- */
+/* ---------- small UI helpers (look and feel only) ---------- */
+const greet = () => {
+  const h = +new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }) % 24;
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+};
+const emptyState = (title, sub) => `<div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><b>${title}</b><span>${sub}</span></div>`;
+const skeleton = () => `<div class="sk" style="height:34px;width:55%"></div><div class="sk" style="height:150px"></div>
+  <div class="kpis"><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div><div class="sk" style="height:96px"></div></div>
+  <div class="sk" style="height:220px"></div>`;
+function animateCounts() {
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const to = num(el.dataset.count); if (!to) return;
+    const f = el.dataset.fmt === 'kg' ? n => kg(n) + ' kg' : rs, t0 = performance.now();
+    const step = t => { const p = Math.min(1, (t - t0) / 750), e = 1 - Math.pow(1 - p, 3); el.textContent = f(to * e); if (p < 1) requestAnimationFrame(step); else el.textContent = f(to); };
+    requestAnimationFrame(step);
+  });
+}
+function shake() { const f = $('#login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
+
+function leadCard(l, i) {
+  const done = l.status === 'closed', failed = l.status === 'failed', canFail = !done && !failed && (!l.bill_status || l.bill_status === 'draft');
+  return `<article class="lead ${l.status === 'in_progress' ? 'live' : ''} ${failed ? 'bad' : ''}" style="--i:${i}">
+    <div class="lead-top">
+      <div class="lead-time"><b>${time(l.slot)}</b><small>${day(l.slot)}</small></div>
+      <div class="lead-main"><span class="nm">${esc(l.customer_name)}</span><span class="sub">${esc(l.lead_code)}${l.area ? ' · ' + esc(l.area) : ''}</span>${l.address ? `<span class="addr">${esc(l.address)}</span>` : ''}</div>
+      ${badge(l)}
+    </div>
+    ${l.items_said && !done && !failed ? `<div class="chips"><span class="chip">Said: ${esc(l.items_said)}</span></div>` : ''}
+    ${failed ? `<div class="lead-fail"><b>${esc(l.fail_reason)}</b>${l.fail_note ? '<br>' + esc(l.fail_note) : ''}<br><span class="small">${day(l.failed_at)} ${time(l.failed_at)} · the supervisor will give it out again</span></div>`
+      : done ? `<div class="lead-done"><span>${esc(l.bill_no || '')}</span><b>${rs(l.total_amount)}</b></div>`
+      : `<div class="lead-act"><button class="btn" data-act="open-lead" data-id="${l.lead_id}">${l.status === 'in_progress' ? 'Continue pickup' : 'Start pickup'} →</button>${mapLink(l)}${callLink(l)}</div>`}
+  </article>`;
+}
+
+function vDashboard() {
+  const p = S.profile || {}, open = openLeads(), closed = closedLeads(), ol = openLoad();
+  const next = open.find(l => l.status === 'in_progress') || open[0];
+  const totals = ol ? S.loadTotals.filter(t => t.load_id === ol.id) : [];
+  const totalKg = totals.reduce((a, t) => a + num(t.total_kg), 0);
+  const maxKg = Math.max(1, ...totals.map(t => num(t.total_kg)));
+  const bills = ol ? S.paidBills.filter(b => b.load_id === ol.id) : [];
+  const upi = bills.filter(b => b.payment_method === 'upi').reduce((a, b) => a + num(b.total_amount), 0);
+  const cash = bills.filter(b => b.payment_method === 'cash').reduce((a, b) => a + num(b.total_amount), 0);
+  const failed = failedLeads(), rows = S.leadTab === 'open' ? open : S.leadTab === 'failed' ? failed : closed;
+  const first = (p.full_name || '').split(' ')[0];
+  return `
+  <div class="head">
+    <div><div class="eyebrow">${ol ? 'Load ' + esc(ol.code) : 'No load open yet'}</div>
+      <h1>${greet()}, ${esc(first)}.</h1>
+      <div class="muted">${open.length ? `${open.length} pickup${open.length > 1 ? 's' : ''} waiting for you today.` : 'No open pickups. New leads from HQ will appear here.'}</div></div>
+  </div>
+  ${next ? `<section class="next">
+    <span class="tag">${next.status === 'in_progress' ? 'IN PROGRESS' : 'NEXT PICKUP'} · ${time(next.slot)}</span>
+    <h2>${esc(next.customer_name)}</h2>
+    <span class="soft">${esc(next.address || '')}${next.area ? ', ' + esc(next.area) : ''}${next.items_said ? ' · Said: ' + esc(next.items_said) : ''}</span>
+    <div class="next-act"><button class="btn" data-act="open-lead" data-id="${next.lead_id}">${next.status === 'in_progress' ? 'Continue' : 'Start'} pickup →</button>${mapLink(next)}${callLink(next)}</div>
+  </section>` : ''}
+  <div class="kpis">
+    <a class="kpi dark" href="#cash"><span class="l">Cash in hand</span><span class="v" data-count="${S.cash}">${rs(S.cash)}</span><span class="s">From HQ float</span></a>
+    <a class="kpi" href="#loads"><span class="l">Collected on this load</span><span class="v" data-count="${totalKg}" data-fmt="kg">${kg(totalKg)} kg</span><span class="s">${bills.length} pickup${bills.length === 1 ? '' : 's'} paid</span></a>
+    <div class="kpi"><span class="l">Paid to customers</span><span class="v" data-count="${upi + cash}">${rs(upi + cash)}</span><span class="s">UPI ${rs(upi)} · Cash ${rs(cash)}</span></div>
+    <div class="kpi"><span class="l">Leads</span><span class="v">${closed.length} / ${S.leads.length}</span><span class="s">closed · ${open.length} open</span></div>
+  </div>
+  <div class="cols">
+    <section class="card grow">
+      <div class="card-h"><h2>Leads from HQ</h2>
+        <div class="tabs" role="tablist">
+          <button class="tab ${S.leadTab === 'open' ? 'on' : ''}" role="tab" aria-selected="${S.leadTab === 'open'}" data-act="lead-tab" data-tab="open">Open (${open.length})</button>
+          <button class="tab ${S.leadTab === 'closed' ? 'on' : ''}" role="tab" aria-selected="${S.leadTab === 'closed'}" data-act="lead-tab" data-tab="closed">Closed (${closed.length})</button>
+          ${failed.length || S.leadTab === 'failed' ? `<button class="tab ${S.leadTab === 'failed' ? 'on' : ''}" role="tab" aria-selected="${S.leadTab === 'failed'}" data-act="lead-tab" data-tab="failed">Not completed (${failed.length})</button>` : ''}
+        </div></div>
+      ${rows.length ? `<div class="leads">${rows.map((l, i) => leadCard(l, i)).join('')}</div>` : emptyState((S.leadTab === 'failed' ? 'No pickups marked not completed' : 'No ' + S.leadTab + ' leads'), S.leadTab === 'open' ? 'New leads from HQ will appear here.' : (S.leadTab === 'failed' ? 'Pickups you could not complete are listed here with the reason.' : 'Closed pickups will be listed here.'))}
+    </section>
+    <section class="card side" style="padding:18px;gap:12px">
+      <div class="row-split" style="align-items:baseline"><h2>This load by item</h2><a href="#loads" class="b small">All loads</a></div>
+      ${totals.length ? totals.sort((a, b) => num(b.total_kg) - num(a.total_kg)).map(t => `<div style="display:flex;flex-direction:column;gap:5px">
+        <div class="row-split"><span class="b">${esc(t.item_name)}</span><span>${kg(t.total_kg)} kg</span></div>
+        <div class="bar"><i style="width:${Math.max(2, num(t.total_kg) / maxKg * 100)}%"></i></div></div>`).join('')
+        + `<div class="row-split total"><span>Total</span><span>${kg(totalKg)} kg</span></div>` : '<span class="muted">Nothing collected on this load yet.</span>'}
+    </section>
+  </div>`;
+}
+function badge(l) {
+  if (l.status === 'failed') return '<span class="badge b-flag">Not completed</span>';
+  if (l.status === 'closed') return `<span class="badge ${l.payment_method === 'cash' ? 'b-cash' : 'b-ok'}">Paid · ${l.payment_method === 'cash' ? 'Cash' : 'UPI'}</span>`;
+  if (l.status === 'in_progress') return `<span class="badge b-prog">${({ draft: 'Weighing', sent: 'Bill sent', confirmed: 'Confirmed' })[l.bill_status] || 'In progress'}</span>`;
+  return '<span class="badge b-sched">Scheduled</span>';
+}
+
+function vPickup() {
+  const l = S.activeLead && leadById(S.activeLead);
+  if (!l || l.status === 'failed') {
+    const open = openLeads();
+    return `<div><div class="eyebrow">Pickup</div><h1>Choose a lead.</h1><div class="muted">Only leads assigned to you by HQ are shown.</div></div>
+      <div class="leads bare">${open.length ? open.map((o, i) => leadCard(o, i)).join('') : emptyState('No open leads', 'New leads from HQ will appear here.')}</div>`;
+  }
+  const st = l.status === 'closed' ? 'paid' : (l.bill_status || 'draft');
+  const draft = st === 'draft';
+  const qty = Object.fromEntries(S.billItems.map(b => [b.item_id, b]));
+  const total = S.billItems.reduce((a, b) => a + num(b.amount), 0);
+  const tkg = S.billItems.reduce((a, b) => a + num(b.qty_kg), 0);
+  const idx = { draft: 0, sent: 2, confirmed: 3, paid: 4 }[st];
+  const labels = ['Weigh items', 'Send bill', 'Customer agrees', 'Pay', 'Closed'];
+  const wa = load('wa_' + l.bill_id);
+  const pdf = l.bill_id ? load('pdfl_' + l.bill_id) : null;
+  return `
+  <div class="head">
+    <div><button class="backbtn" data-act="back" aria-label="Back to all leads">‹ All leads</button>
+      <div class="eyebrow">${esc(l.lead_code)} · assigned by HQ</div><h1>${esc(l.customer_name)}</h1>
+      <div class="muted">${esc(l.address || '')}${l.area ? ', ' + esc(l.area) : ''}${l.items_said ? ' · Said: ' + esc(l.items_said) : ''}</div></div>
+    <div class="head-act">${mapLink(l)}${callLink(l)}</div>
+  </div>
+  <ol class="steps" aria-label="Pickup progress">${labels.map((t, i) => {
+    const done = i < idx || st === 'paid', cur = i === idx && st !== 'paid';
+    return `<li class="${done ? 'done' : cur ? 'cur' : ''}" ${cur ? 'aria-current="step"' : ''}><small>${done ? '✓' : '0' + (i + 1)}</small><b>${t}</b></li>`; }).join('')}</ol>
+  <div class="cols">
+    <section class="card grow">
+      <div class="card-h"><h2>Scrap items</h2><span class="muted small">${draft ? 'Enter kg for each item collected' : 'Bill locked'}</span></div>
+      ${S.rates.map(r => { const b = qty[r.item_id]; return `<div class="item ${b ? 'on' : ''}">
+        <div><span class="nm">${esc(r.item_name)}</span><span class="rt">₹${num(r.rate_per_kg)}/kg · HQ rate</span></div>
+        <div class="qty"><input type="number" inputmode="decimal" min="0" step="0.1" placeholder="0.0" aria-label="${esc(r.item_name)} kg"
+          value="${b ? num(b.qty_kg) : ''}" data-act="qty" data-item="${r.item_id}" ${draft ? '' : 'disabled'}>
+          <span class="amt">${b ? rs(b.amount) : ''}</span></div></div>`; }).join('')}
+    </section>
+    <section class="side">
+      <div class="card pad">
+        <div class="row-split" style="align-items:baseline"><h2>Bill</h2><span class="muted small">${esc(l.bill_no || '')}</span></div>
+        <div id="bill-lines" style="display:contents">${billLinesHtml(S.billItems.map(b => ({ name: rateName(b.item_id), kg: b.qty_kg, rate: b.rate_per_kg, amt: b.amount })))}</div>
+        <div class="row-split total" style="align-items:baseline"><span id="bill-tkg">Total · ${kg(tkg)} kg</span>
+          <span id="bill-total" style="font-family:var(--head);font-size:30px;letter-spacing:-.03em;color:var(--ox)">${rs(total)}</span></div>
+      </div>
+      ${st === 'draft' ? `<div class="card pad">
+        <span class="muted">Check the weights. Once sent, the bill is locked and only HQ can change it.</span>
+        <button class="btn block" data-act="send" ${S.billItems.length ? '' : 'disabled'}>Lock bill and send on WhatsApp</button>
+        <button class="btn ghost block" data-act="fail-open" data-id="${l.lead_id}">Pickup could not complete</button></div>` : ''}
+      ${st === 'sent' ? `<div class="card pad">
+        <b>✓ Bill locked</b>
+        ${S.waOpenedAt
+          ? `<b style="color:var(--green)">✓ Sent on WhatsApp at ${time(S.waOpenedAt)}</b>
+             ${wa ? `<a class="btn ghost block" href="${esc(wa)}" target="_blank" rel="noopener" data-act="share">Open WhatsApp again</a>` : ''}
+             <span class="muted">When the customer has checked the bill and agrees to the weights and amount, tap below.</span>`
+          : `<span class="muted">Step 1: send the bill to the customer on WhatsApp.</span>
+             ${wa ? `<a class="btn green block" href="${esc(wa)}" target="_blank" rel="noopener" data-act="share">Open WhatsApp to send bill</a>` : '<span class="notice">Could not load the WhatsApp link. Refresh the page.</span>'}`}
+        ${pdf ? `<div class="row-split" style="gap:8px"><a class="btn ghost" style="flex:1" href="${esc(pdf)}" target="_blank" rel="noopener">View PDF bill</a>
+          <button class="btn ghost" style="flex:1" data-act="share-file">Share PDF file</button></div>` : ''}
+        <button class="btn block" data-act="confirm" ${S.waOpenedAt ? '' : 'disabled'}>Customer agreed to the bill</button>
+        ${S.waOpenedAt ? '' : '<span class="muted small">This unlocks after the bill is sent on WhatsApp.</span>'}</div>` : ''}
+      ${st === 'confirmed' ? `<div class="card pad">
+        <b style="color:var(--green)">✓ Customer agreed</b>
+        <h3>Pay the customer</h3>
+        <button class="opt ${S.method === 'upi' ? 'on' : ''}" data-act="method" data-m="upi">
+          <b>UPI</b><span>Pay ${rs(total)} from the company UPI app${l.upi_masked ? ' to ' + esc(l.upi_masked) : ' (scan the customer\'s QR)'}, then enter the UTR number.</span></button>
+        ${S.method === 'upi' ? `<div class="field"><label for="utr">UTR / transaction number</label><input id="utr" inputmode="numeric" autocomplete="off" placeholder="12-digit UTR"></div>` : ''}
+        <button class="opt ${S.method === 'cash' ? 'on' : ''}" data-act="method" data-m="cash" ${total > S.cash ? 'disabled' : ''}>
+          <b>Cash (only if UPI is not possible)</b><span>${total > S.cash ? 'Not enough cash in hand (' + rs(S.cash) + '). Use UPI.' : 'Cash in hand after payment: ' + rs(S.cash - total)}</span></button>
+        <button class="btn block" data-act="pay" ${S.method ? '' : 'disabled'}>${S.method === 'cash' ? 'Record cash payment ' + rs(total) : S.method === 'upi' ? 'Record UPI payment ' + rs(total) : 'Choose UPI or cash'}</button></div>` : ''}
+      ${st === 'paid' ? `<div class="closed-card">
+        <svg class="check" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="27"/><path d="M18 31l8 8 16-17"/></svg>
+        <span style="font-size:11px;letter-spacing:.15em;font-weight:700;color:#C9EBD2">LEAD CLOSED</span>
+        <span style="font-family:var(--head);font-size:26px;font-weight:700;letter-spacing:-.03em">${rs(total)} paid by ${l.payment_method === 'cash' ? 'cash' : 'UPI'}</span>
+        <span class="muted">${kg(tkg)} kg added to your load. Cash in hand: ${rs(S.cash)}.</span>
+        ${pdf ? `<span class="muted">The customer's bill link now shows PAID.</span>
+          <a class="btn ghost" href="${esc(pdf)}" target="_blank" rel="noopener" style="background:transparent;color:#fff;border-color:#fff">View PDF bill</a>` : ''}
+        ${openLeads().length ? `<button class="btn ghost" data-act="open-lead" data-id="${openLeads()[0].lead_id}">Next lead · ${esc(openLeads()[0].customer_name)}</button>` : ''}
+        <a class="btn ghost" href="#loads" style="background:transparent;color:#fff;border-color:#fff">View load</a></div>` : ''}
+    </section>
+  </div>
+  ${st === 'draft' && total > 0 ? `<button class="totalpill" data-act="to-bill"><span>${kg(tkg)} kg</span><b>${rs(total)}</b><span>Review bill ↓</span></button>` : ''}`;
+}
+
+function vLoads() {
+  if (!S.loads.length) return `<div><div class="eyebrow">Collection data</div><h1>Your loads.</h1></div><div class="card empty">No loads yet. A load starts with your first pickup.</div>`;
+  const L = S.loads.find(x => x.id === S.loadTab) || S.loads[0];
+  const totals = S.loadTotals.filter(t => t.load_id === L.id);
+  const bills = S.paidBills.filter(b => b.load_id === L.id);
+  const tkg = totals.reduce((a, t) => a + num(t.total_kg), 0), tval = totals.reduce((a, t) => a + num(t.total_value), 0);
+  const cash = bills.filter(b => b.payment_method === 'cash').reduce((a, b) => a + num(b.total_amount), 0);
+  let status = { open: ['On route', 'b-sched'], submitted: ['At warehouse · weighing pending', 'b-sched'], reconciled: ['✓ Reconciled', 'b-ok'], flagged: ['! Flagged for HQ review', 'b-flag'] }[L.status];
+  const variance = L.warehouse_kg != null && tkg > 0 ? ((num(L.warehouse_kg) - tkg) / tkg * 100).toFixed(1) + '%' : '—';
+  const stillOpen = openLeads().filter(l => l.status === 'in_progress').length;
+  return `
+  <div><div class="eyebrow">Collection data</div><h1>What each load carried.</h1>
+    <div class="muted">Totals by item from paid bills. The warehouse checks them against its own weighing.</div></div>
+  <div class="tabs" role="tablist" aria-label="Loads">${S.loads.map(x => `<button class="tab ${x.id === L.id ? 'on' : ''}" role="tab" aria-selected="${x.id === L.id}" data-act="load-tab" data-id="${x.id}" style="text-align:left">
+    <b style="display:block">${esc(x.code)}</b><span class="small">${x.status === 'open' ? 'Today · open' : day(x.started_at)}</span></button>`).join('')}</div>
+  <div class="cols">
+    <section class="card grow">
+      <div class="card-h"><h2>${esc(L.code)} by item</h2><span class="muted small">${bills.length} paid pickups</span></div>
+      ${totals.length ? `<div class="scroll"><table style="min-width:420px">
+        <thead><tr><th>ITEM</th><th class="r">KG</th><th class="r">VALUE</th><th style="width:30%">SHARE</th></tr></thead>
+        <tbody>${totals.map(t => `<tr><td class="b">${esc(t.item_name)}</td><td class="r">${kg(t.total_kg)}</td><td class="r b">${rs(t.total_value)}</td>
+          <td><div class="bar"><i style="width:${(num(t.total_kg) / tkg * 100).toFixed(1)}%"></i></div></td></tr>`).join('')}
+          <tr style="border-top:2px solid var(--ink)"><td class="b">Total</td><td class="r b">${kg(tkg)}</td><td class="r b">${rs(tval)}</td>
+          <td class="muted small">UPI ${rs(tval - cash)} · Cash ${rs(cash)}</td></tr></tbody></table></div>` : '<div class="empty">No paid pickups on this load yet.</div>'}
+    </section>
+    <section class="side">
+      <div class="card pad">
+        <h3>Warehouse check</h3>
+        <div class="row-split"><span class="muted">Billed</span><b>${kg(tkg)} kg</b></div>
+        <div class="row-split"><span class="muted">Weighed at warehouse</span><b>${L.warehouse_kg != null ? kg(L.warehouse_kg) + ' kg' : 'Not yet'}</b></div>
+        <div class="row-split"><span class="muted">Variance</span><b>${variance}</b></div>
+        <span class="badge ${status[1]}" style="padding:9px 12px;font-size:13px">${status[0]}</span>
+      </div>
+      ${L.status === 'open' ? `<button class="btn block" data-act="end-route" ${stillOpen ? 'disabled' : ''}>End route and go to warehouse</button>
+        ${stillOpen ? `<span class="muted small">Finish the ${stillOpen} pickup${stillOpen > 1 ? 's' : ''} in progress first.</span>` : ''}` : ''}
+    </section>
+  </div>`;
+}
+
+function vCash() {
+  let bal = 0;
+  const rows = S.ledger.map(e => { bal += num(e.amount); return { ...e, bal }; }).reverse();
+  const floatIn = S.ledger.filter(e => e.entry_type === 'float_issued').reduce((a, e) => a + num(e.amount), 0);
+  const paidOut = -S.ledger.filter(e => e.entry_type === 'cash_payout').reduce((a, e) => a + num(e.amount), 0);
+  const handed = -S.ledger.filter(e => e.entry_type === 'handover').reduce((a, e) => a + num(e.amount), 0);
+  const label = { float_issued: 'Float from HQ', cash_payout: 'Cash paid to customer', handover: 'Handed over at warehouse' };
+  return `
+  <div><div class="eyebrow">Cash in hand</div><h1>Every rupee, accounted for.</h1>
+    <div class="muted">Cash comes only from the HQ float. Every cash payment is tied to a bill.</div></div>
+  <div class="cols" style="align-items:stretch">
+    <section class="cash-hero" style="flex:1 1 300px"><span class="soft">Cash in hand now</span><span class="big" data-count="${S.cash}">${rs(S.cash)}</span>
+      <span class="soft">Hand over the balance at the warehouse at the end of the day.</span></section>
+    <section class="card grow pad" style="gap:0">
+      <h2 style="margin-bottom:8px">How it adds up</h2>
+      <div class="row-split" style="padding:11px 0;border-top:1px solid var(--paper)"><span>Float received</span><b>${rs(floatIn)}</b></div>
+      <div class="row-split" style="padding:11px 0;border-top:1px solid var(--paper)"><span>Cash paid to customers</span><b>− ${rs(paidOut)}</b></div>
+      <div class="row-split" style="padding:11px 0;border-top:1px solid var(--paper)"><span>Handed over</span><b>− ${rs(handed)}</b></div>
+      <div class="row-split total" style="font-size:17px"><span>Cash in hand</span><span>${rs(S.cash)}</span></div>
+    </section>
+  </div>
+  <section class="card"><div class="card-h"><h2>Cash movements</h2></div>
+    ${rows.length ? `<div class="scroll"><table style="min-width:480px">
+      <thead><tr><th>WHEN</th><th>ENTRY</th><th class="r">AMOUNT</th><th class="r">BALANCE</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="muted">${day(r.created_at)} ${time(r.created_at)}</td><td><span class="b">${label[r.entry_type] || esc(r.entry_type)}</span>${r.note ? '<br><span class="muted small">' + esc(r.note) + '</span>' : ''}</td>
+        <td class="r b" style="color:${num(r.amount) > 0 ? 'var(--green)' : 'var(--ink)'}">${num(r.amount) > 0 ? '+ ' : '− '}${rs(Math.abs(num(r.amount)))}</td><td class="r">${rs(r.bal)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No cash movements yet.</div>'}
+  </section>`;
+}
+
+/* ---------- render & routing ---------- */
+const VIEWS = { dashboard: vDashboard, pickup: vPickup, loads: vLoads, cash: vCash };
+let lastKey = null;
+function render() {
+  const v = VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'dashboard';
+  const f = document.activeElement, keep = f && f.dataset && f.dataset.act === 'qty' ? { item: f.dataset.item, value: f.value } : null;
+  const key = v + ':' + (v === 'pickup' ? S.activeLead : ''), app = $('#app'), changed = key !== lastKey;
+  if (!changed) app.classList.remove('enter');
+  app.innerHTML = VIEWS[v]();
+  if (changed) { lastKey = key; app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter'); animateCounts(); }
+  if (keep) { const n = document.querySelector(`input[data-act="qty"][data-item="${keep.item}"]`); if (n && !n.disabled) { n.value = keep.value; n.focus(); } }
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('on', a.dataset.view === v));
+  $('#nav-open').textContent = openLeads().length || '';
+}
+window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+
+/* keep Load and Cash up to date: the warehouse weighs loads and counts cash while the driver is looking */
+let bgBusy = false;
+async function bgRefresh() {
+  const v = location.hash.slice(1);
+  if (bgBusy || !session || !S.profile || document.visibilityState !== 'visible' || (v !== 'loads' && v !== 'cash')) return;
+  bgBusy = true;
+  try { await refresh(); render(); } catch (e) { /* try again at the next tick */ }
+  bgBusy = false;
+}
+setInterval(bgRefresh, 15000);
+document.addEventListener('visibilitychange', bgRefresh);
+window.addEventListener('hashchange', bgRefresh);
+
+/* ---------- live bill: amounts update while typing; saves are queued, never dropped ---------- */
+const billLinesHtml = rows => rows.length ? rows.map(r => '<div class="row-split" style="font-size:14px;border-top:1px solid var(--paper);padding-top:8px"><span>' + esc(r.name) + ' · ' + kg(r.kg) + ' kg × ₹' + num(r.rate) + '</span><span class="b">' + rs(r.amt) + '</span></div>').join('') : '<span class="muted">No items yet.</span>';
+function liveBill() {
+  const lines = document.getElementById('bill-lines'); if (!lines) return;
+  const rows = [];
+  document.querySelectorAll('input[data-act="qty"]').forEach(inp => {
+    const r = S.rates.find(x => x.item_id === +inp.dataset.item), v = parseFloat(inp.value), ok = r && v > 0;
+    const amt = ok ? Math.round(v * num(r.rate_per_kg) * 100) / 100 : 0, span = inp.parentElement.querySelector('.amt'), row = inp.closest('.item');
+    if (span) span.textContent = ok ? rs(amt) : '';
+    if (row) row.classList.toggle('on', !!ok);
+    if (ok) rows.push({ name: r.item_name, kg: v, rate: r.rate_per_kg, amt });
+  });
+  lines.innerHTML = billLinesHtml(rows);
+  document.getElementById('bill-tkg').textContent = 'Total · ' + kg(rows.reduce((a, r) => a + r.kg, 0)) + ' kg';
+  document.getElementById('bill-total').textContent = rs(rows.reduce((a, r) => a + r.amt, 0));
+  const send = document.querySelector('[data-act="send"]'); if (send) send.disabled = !rows.length;
+}
+let saveChain = Promise.resolve(), saving = 0;
+function queueSave(billId, itemId, v) {
+  saving++;
+  saveChain = saveChain
+    .then(() => rpc('set_bill_item', { p_bill_id: billId, p_item_id: itemId, p_qty_kg: v, p_photo_url: null, p_typed: true }))
+    .catch(e => toast(e.message, true))
+    .then(async () => { saving--; if (!saving) { try { await refresh(); render(); liveBill(); } catch (_) {} } });
+}
+async function act(fn, okMsg) {
+  try { await saveChain; } catch (_) {} /* let any weight still being saved finish first */
+  if (S.busy) return; S.busy = true; document.body.style.cursor = 'progress'; const bar = $('#topbar'); bar.classList.remove('on'); void bar.offsetWidth; bar.classList.add('on');
+  try { const out = await fn(); await refresh(); render(); if (okMsg) toast(typeof okMsg === 'function' ? okMsg(out) : okMsg); return out; }
+  catch (e) { toast(e.message, true); try { await refresh(); render(); } catch (_) {} }
+  finally { S.busy = false; document.body.style.cursor = ''; $('#topbar').classList.remove('on'); }
+}
+
+/* ---------- actions ---------- */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT') return;
+  const a = b.dataset.act, l = S.activeLead && leadById(S.activeLead);
+  if (a === 'logout') return logout();
+  if (a === 'fail-open') { openFail(+b.dataset.id); return; }
+  if (a === 'fail-close') { closeFail(); return; }
+  if (a === 'fail-reason') { S.fail.reason = FAIL_REASONS[+b.dataset.i]; renderFail(); return; }
+  if (a === 'fail-submit') { submitFail(); return; }
+  if (a === 'to-bill') { const s = document.querySelector('#app .side'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+  if (a === 'lead-tab') { S.leadTab = b.dataset.tab; return render(); }
+  if (a === 'load-tab') { S.loadTab = +b.dataset.id; return render(); }
+  if (a === 'back') { S.activeLead = null; return render(); }
+  if (a === 'open-lead') {
+    const id = +b.dataset.id; S.method = null;
+    await act(async () => { await rpc('start_pickup', { p_lead_id: id }); S.activeLead = id; });
+    if (location.hash !== '#pickup') location.hash = 'pickup';
+    return;
+  }
+  if (a === 'send') {
+    return act(async () => {
+      await rpc('send_bill', { p_bill_id: l.bill_id });
+      return buildWhatsApp(l.bill_id);
+    }, pdfOk => pdfOk ? 'Bill locked and PDF ready. Now send it on WhatsApp.' : 'Bill locked. The PDF could not be made, so WhatsApp will send the text bill only.');
+  }
+  if (a === 'share') {
+    /* the link itself opens WhatsApp; this records that it was opened */
+    return act(() => rpc('mark_bill_shared', { p_bill_id: l.bill_id }));
+  }
+  if (a === 'share-file') {
+    return act(async () => {
+      const shared = await sharePdfFile(l.bill_id, l.bill_no);
+      if (shared && l.bill_status === 'sent') await rpc('mark_bill_shared', { p_bill_id: l.bill_id });
+    });
+  }
+  if (a === 'confirm') return act(() => rpc('confirm_bill', { p_bill_id: l.bill_id, p_proof_url: null }), 'Customer agreement recorded.');
+  if (a === 'method') { S.method = b.dataset.m; render(); if (S.method === 'upi') $('#utr') && $('#utr').focus(); return; }
+  if (a === 'pay') {
+    const utr = S.method === 'upi' ? ($('#utr') ? $('#utr').value.trim() : '') : null;
+    if (S.method === 'upi' && utr.length < 6) { toast('Enter the UTR number from the UPI app.', true); $('#utr') && $('#utr').focus(); return; }
+    return act(async () => {
+      await rpc('pay_bill', { p_bill_id: l.bill_id, p_method: S.method, p_upi_ref: utr });
+      try { await makePdf(l.bill_id); } catch (e) { /* the bill is paid; the PDF can be refreshed later */ }
+    }, 'Payment recorded. Lead closed.');
+  }
+  if (a === 'end-route') {
+    return act(() => rpc('end_route'), code => `Route ended. Take load ${code} to the warehouse for weighing.`);
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target; if (t.dataset.act !== 'qty') return;
+  const l = leadById(S.activeLead); if (!l) return;
+  const v = parseFloat(t.value);
+  if (t.value !== '' && (isNaN(v) || v < 0 || v > 5000)) { toast('Enter a weight between 0 and 5000 kg.', true); return; }
+  queueSave(l.bill_id, +t.dataset.item, isNaN(v) ? 0 : v);
+});
+document.addEventListener('input', e => { if (e.target.dataset && e.target.dataset.act === 'qty') liveBill(); });
+
+/* ---------- pickup could not complete ---------- */
+const FAIL_REASONS = ['Customer not at home', 'Customer cancelled', 'Phone not reachable', 'Wrong address or location',
+  'No scrap, or too little', 'Customer did not agree to the rate', 'Vehicle or other problem on my side', 'Other'];
+function openFail(id) {
+  if (!leadById(id)) return;
+  S.fail = { id, reason: null, note: '' };
+  renderFail(); $('#sheet').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+}
+function closeFail() { S.fail = null; const s = $('#sheet'); s.classList.add('hidden'); s.innerHTML = ''; document.body.style.overflow = ''; }
+function failReady() { const f = S.fail; return !!(f && f.reason && (f.reason !== 'Other' || (f.note || '').trim())); }
+function renderFail() {
+  const f = S.fail, l = f && leadById(f.id), s = $('#sheet'); if (!l) return closeFail();
+  if ($('#fail-note')) f.note = $('#fail-note').value;
+  s.innerHTML = `<div class="back" data-act="fail-close"></div><div class="panel">
+    <div class="row-split" style="align-items:flex-start"><div><div class="eyebrow">${esc(l.lead_code)}</div><h2 id="sheet-t">Pickup could not complete</h2><div class="muted small">${esc(l.customer_name)}${l.area ? ' · ' + esc(l.area) : ''}</div></div>
+      <button class="backbtn" data-act="fail-close" aria-label="Close">✕</button></div>
+    <div class="muted">Choose the reason. HQ and the warehouse will see it, and the supervisor will give the lead out again.${l.status === 'in_progress' ? ' The weights you entered for this pickup will be discarded.' : ''}</div>
+    <div class="reasons">${FAIL_REASONS.map((r, i) => `<button class="opt ${f.reason === r ? 'on' : ''}" data-act="fail-reason" data-i="${i}"><b>${esc(r)}</b></button>`).join('')}</div>
+    <div class="field"><label for="fail-note">NOTE ${f.reason === 'Other' ? '(required)' : '(optional)'}</label><textarea id="fail-note" rows="2" maxlength="300" placeholder="e.g. Rang the bell twice, phone switched off">${esc(f.note)}</textarea></div>
+    <button class="btn block" data-act="fail-submit" id="fail-go" ${failReady() ? '' : 'disabled'}>Mark as not completed</button></div>`;
+}
+document.addEventListener('input', e => { if (e.target.id === 'fail-note' && S.fail) { S.fail.note = e.target.value; const g = $('#fail-go'); if (g) g.disabled = !failReady(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.fail) closeFail(); });
+async function submitFail() {
+  const f = S.fail; if (!failReady()) return;
+  const note = ($('#fail-note').value || '').trim(), id = f.id, reason = f.reason;
+  const ok = await act(async () => { await rpc('fail_pickup', { p_lead_id: id, p_reason: reason, p_note: note || null }); if (S.activeLead === id) S.activeLead = null; return true; },
+    'Marked as not completed. HQ and the warehouse can see the reason.');
+  if (ok) closeFail();
+}
+
+/* small touches: a light buzz on buttons (phones that support it), numbers selected on focus, show/hide password */
+document.addEventListener('click', e => {
+  if (e.target.closest('.btn,.opt,.tab,.maplink') && navigator.vibrate) { try { navigator.vibrate(8); } catch (_) {} }
+  const pw = e.target.closest('[data-pw]');
+  if (pw) { const i = $('#password'), show = i.type === 'password'; i.type = show ? 'text' : 'password'; pw.textContent = show ? 'Hide' : 'Show'; pw.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); }
+});
+document.addEventListener('focusin', e => { if (e.target.matches && e.target.matches('.qty input:not(:disabled)')) { try { e.target.select(); } catch (_) {} } });
+
+/* ---------- login / logout ---------- */
+$('#login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const email = $('#email').value.trim(), pw = $('#password').value, err = $('#login-err'), btn = $('#login-btn');
+  err.textContent = '';
+  if (!email || !pw) { err.textContent = 'Enter your email and password.'; return; }
+  btn.classList.add('busy'); btn.textContent = 'Logging in…';
+  try { await authCall('password', { email, password: pw }); await start(); }
+  catch (e2) { shake(); err.textContent = /invalid/i.test(e2.message) ? 'Wrong email or password.' : e2.message; }
+  finally { btn.classList.remove('busy'); btn.textContent = 'Log in'; }
+});
+function logoutLocal(msg) {
+  if (session) fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
+  session = null; store(SESSION_KEY, undefined); lastKey = null;
+  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
+  $('#login-err').textContent = msg || '';
+}
+async function start() {
+  $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
+  $('#app').innerHTML = skeleton();
+  try {
+    await refresh();
+    if (!S.profile || S.profile.role !== 'driver') { logout('This login is not set up as a driver. Ask HQ.'); return; }
+    $('#who-name').textContent = S.profile.full_name;
+    try { const p = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); if (p.email) $('#who-email').textContent = p.email; } catch (e) {}
+    $('#who-mobile').textContent = S.profile.full_name;
+    try {
+      const fr = S.profile.franchise_id ? (await rest('franchises?select=code,name&id=eq.' + S.profile.franchise_id))[0] : null;
+      $('#fr-name').textContent = fr ? fr.name : 'Not assigned'; $('#fr-code').textContent = fr ? fr.code : '';
+      $('#fr-code').style.display = fr ? '' : 'none';
+      $('#fr-mobile').textContent = fr ? ' · ' + fr.name + ' (' + fr.code + ')' : '';
+    } catch (e) { /* the franchise label is optional; the dashboard still works */ }
+    $('#who-meta').textContent = [S.profile.territory, S.profile.vehicle_no].filter(Boolean).join(' · ');
+    const inProg = S.leads.find(l => l.status === 'in_progress');
+    if (inProg) { S.activeLead = inProg.lead_id; await refresh(); }
+    render();
+  } catch (e) { $('#app').innerHTML = `<div class="card pad"><b>Could not load your data.</b><span class="muted">${esc(e.message)}</span><button class="btn" onclick="location.reload()">Try again</button></div>`; }
+}
+/* one login per person: the newest login wins; an older device is signed out within about 20 seconds */
+let sessChecking = false;
+async function checkSession() {
+  if (!session || sessChecking || document.visibilityState !== 'visible') return;
+  sessChecking = true;
+  try { const ok = await rpc('session_valid'); if (ok === false) logout('You were logged out because this account was opened on another device.'); }
+  catch (e) { /* offline or a short error: try again next time */ }
+  finally { sessChecking = false; }
+}
+setInterval(checkSession, 20000);
+document.addEventListener('visibilitychange', checkSession);
+/* lets the phone install this page as an app (full screen, no address bar) */
+if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
+function logout(msg) { logoutLocal(msg); location.replace('../' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+session && session.access_token ? start() : logout();
+</script>
+</body>
+</html>
