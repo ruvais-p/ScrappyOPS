@@ -5,3 +5,5 @@ bcrypt>=4.1
 reportlab>=4.0
 uvicorn[standard]>=0.30
 whitenoise>=6.6
+Pillow>=10.3
+redis>=5.0

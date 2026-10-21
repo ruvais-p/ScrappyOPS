@@ -5,11 +5,13 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: scrappy
+      POSTGRES_USER: scrappy_admin
       POSTGRES_DB: scrappy
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD in .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD in .env}
     volumes:
       - dbdata:/var/lib/postgresql/data
+      - ./deploy/init-db-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U scrappy"]
       interval: 10s
@@ -20,16 +22,29 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://scrappy:${POSTGRES_PASSWORD}@db:5432/scrappy
+      DATABASE_URL: postgresql://scrappy:${POSTGRES_APP_PASSWORD}@db:5432/scrappy
       MEDIA_ROOT: /data/media
+      REDIS_URL: redis://redis:6379/0
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - media:/data/media
       - ./site:/srv/site:ro        # the website files made by tools/point_frontend.py (leave empty if the website is elsewhere)
     expose:
       - "8000"
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   proxy:
     image: caddy:2

@@ -118,12 +118,14 @@ SINGLE_SESSION = env_bool("SINGLE_SESSION", True)   # newest login wins, like be
 PUBLIC_BASE_URL = env("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")  # used in the customer's bill link
 MEDIA_ROOT = Path(env("MEDIA_ROOT", str(BASE_DIR / "media")))
 FRONTEND_DIR = env("FRONTEND_DIR", "")   # optional: folder with the scrappy_app files, served by this server at /
-CORS_ALLOWED_ORIGINS = [o.strip() for o in env("CORS_ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+CORS_ALLOWED_ORIGINS = [o.strip() for o in env("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip() and o.strip() != "*"]
 BILL_BADGE_FILE = Path(env("BILL_BADGE_FILE", str(BASE_DIR / "core" / "static_assets" / "bill-badge.png")))
 
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 if env("REDIS_URL"):
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": env("REDIS_URL")}}
+elif not DEBUG:
+    raise RuntimeError("Set REDIS_URL in production; login rate limits require a shared cache.")
 
 if not DEBUG:
     # live sites are https only. Set SECURE_SSL_REDIRECT=0 only for a quick test over plain http.

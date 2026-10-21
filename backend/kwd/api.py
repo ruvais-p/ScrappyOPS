@@ -141,13 +141,12 @@ def storage_upload(request, ctx):
     data = request.body
     if not data or len(data) > MAX_PHOTO:
         raise ApiError("The photo is empty or too large (limit 8 MB).")
-    ctype = request.headers.get("Content-Type", "")
-    if not ctype.startswith("image/"):
-        raise ApiError("Only photos can be uploaded.")
     try:
         storage.save(path, data)
     except FileExistsError:
         raise ApiError("The resource already exists", status=409, code="Duplicate")
+    except ValueError:
+        raise ApiError("Upload a valid JPEG, PNG, or WebP photo under 8 MB.")
     return jr({"path": path})
 
 
@@ -165,19 +164,20 @@ def storage_sign(request, ctx):
     if not storage.exists(path):
         raise ApiError("Object not found", status=404)
     seconds = min(int(b.get("expiresIn") or 3600), 86400 * 7)
-    return jr({"signedUrl": f"/kwd/api/storage/object?token={storage.sign(path, seconds)}&e={seconds}"})
+    return jr({"signedUrl": f"/kwd/api/storage/object?token={storage.sign(path, seconds)}"})
 
 
 def storage_object(request):
     """The link a signed address points to. It works for the time it was made for, for whoever holds it."""
     try:
-        seconds = min(int(request.GET.get("e", "3600")), 86400 * 7)
-        path = storage.unsign(request.GET.get("token", ""), seconds)
+        path = storage.unsign(request.GET.get("token", ""), 86400 * 7)
     except Exception:
         raise Http404()
     if not storage.exists(path):
         raise Http404()
-    import mimetypes
-    resp = FileResponse(open(storage.file_of(path), "rb"), content_type=mimetypes.guess_type(path)[0] or "image/jpeg")
+    resp = FileResponse(open(storage.file_of(path), "rb"), content_type="image/jpeg")
     resp["Cache-Control"] = "private, max-age=300"
+    resp["X-Content-Type-Options"] = "nosniff"
+    resp["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    resp["Content-Disposition"] = 'inline; filename="photo.jpg"'
     return resp
