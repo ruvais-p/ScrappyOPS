@@ -192,6 +192,9 @@ class Command(BaseCommand):
                 done += 1
             except FileExistsError:
                 skipped += 1
+            except ValueError:                           # not a readable JPEG/PNG/WebP picture: storage refuses it
+                self.stdout.write(self.style.WARNING(f"skipped (not a readable photo): {p}"))
+                skipped += 1
         self.stdout.write(f"photos: {done} copied, {skipped} already here or skipped, {missing} not found in the source")
 
     def fetch_photo(self, folder, url, key, path):

@@ -80,10 +80,10 @@ class ClaimTests(KwdCase):
     def test_bills_travel_amounts_and_duplicate_detection(self):
         d = self.start_day(self.tso, odo=1000)
         self.end_day(self.tso, d, odo=1100)
-        photo = self.tso.upload("same-bill.png")
+        photo = self.tso.upload("same-bill.jpg")
         a = self.tso.insert("expense_items", {"day_id": d["id"], "category": "bus_train", "amount": 60, "description": "bus to Aluva", "bill_path": photo}, select="*", single=True)
         self.assertEqual(a["flags"], [])
-        photo2 = self.tso.upload("copy-of-bill.png")                                                    # the same picture again
+        photo2 = self.tso.upload("copy-of-bill.jpg")                                                    # the same picture again
         b = self.tso.insert("expense_items", {"day_id": d["id"], "category": "auto_taxi", "amount": 350, "description": "auto fare", "bill_path": photo2}, select="*", single=True)
         self.assertEqual(b["flags"], ["duplicate_bill"])
         c = self.tso.insert("expense_items", {"day_id": d["id"], "category": "lodging", "amount": 1500, "description": "lodge room"}, select="*", single=True)
