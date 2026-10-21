@@ -19,6 +19,7 @@ from django.test import Client, TestCase, override_settings
 from core.models import User
 from core.services.common import fetch, fetch_one
 from kwd import schema, storage
+from kwd.tests.base import PNG
 
 PW = "Old#Supabase1"
 
@@ -151,11 +152,21 @@ class ImportTests(TestCase):
         with tempfile.TemporaryDirectory() as media, tempfile.TemporaryDirectory() as bucket, override_settings(MEDIA_ROOT=Path(media)):
             f = Path(bucket) / self.photo
             f.parent.mkdir(parents=True)
-            f.write_bytes(b"jpeg-bytes")
+            f.write_bytes(PNG)
             out = self.run_import("--storage-dir", bucket)
             self.assertIn("1 copied", out)
-            self.assertEqual(storage.file_of(self.photo).read_bytes(), b"jpeg-bytes")
+            self.assertTrue(storage.file_of(self.photo).read_bytes().startswith(b"\xff\xd8"))      # saved as a JPEG, like every upload
             self.assertTrue(storage.exists(self.photo))
+
+    def test_a_photo_that_is_not_a_picture_is_skipped_not_fatal(self):
+        with tempfile.TemporaryDirectory() as media, tempfile.TemporaryDirectory() as bucket, override_settings(MEDIA_ROOT=Path(media)):
+            f = Path(bucket) / self.photo
+            f.parent.mkdir(parents=True)
+            f.write_bytes(b"jpeg-bytes")
+            out = self.run_import("--storage-dir", bucket)
+            self.assertIn("not a readable photo", out)
+            self.assertIn("Staff app data imported.", out)
+            self.assertFalse(storage.exists(self.photo))
 
     def test_without_a_photo_source_it_says_what_is_missing(self):
         with tempfile.TemporaryDirectory() as media, override_settings(MEDIA_ROOT=Path(media)):
