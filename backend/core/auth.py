@@ -62,8 +62,15 @@ def _bad_login():
 
 def login(email, password, ip=""):
     email = (email or "").strip().lower()
-    key = f"loginfail:{email}:{ip}"
-    if cache.get(key, 0) >= settings.LOGIN_MAX_FAILURES:
+    keys = (f"loginfail:account:{email[:254]}:{ip[:64]}", f"loginfail:ip:{ip[:64]}")
+    try:
+        locked = any(cache.get(key, 0) >= settings.LOGIN_MAX_FAILURES for key in keys)
+    except Exception as exc:
+        if not settings.DEBUG:
+            raise AuthError({"code": 503, "error_code": "rate_limit_unavailable", "error": "temporarily_unavailable",
+                             "msg": "Login is temporarily unavailable.", "error_description": "Login is temporarily unavailable."}, 503) from exc
+        locked = False
+    if locked:
         raise AuthError({"code": 429, "error_code": "over_request_rate_limit", "error": "too_many_requests",
                          "msg": "Too many attempts. Try again in a few minutes.",
                          "error_description": "Too many attempts. Try again in a few minutes."}, 429)
@@ -72,12 +79,18 @@ def login(email, password, ip=""):
     ok = check_password(password or "", user.password if user else make_password("x"))
     if not (user and ok):
         try:
-            cache.add(key, 0, settings.LOGIN_LOCK_SECONDS)
-            cache.incr(key)
-        except Exception:
-            pass
+            for key in keys:
+                cache.add(key, 0, settings.LOGIN_LOCK_SECONDS)
+                cache.incr(key)
+        except Exception as exc:
+            if not settings.DEBUG:
+                raise AuthError({"code": 503, "error_code": "rate_limit_unavailable", "error": "temporarily_unavailable",
+                                 "msg": "Login is temporarily unavailable.", "error_description": "Login is temporarily unavailable."}, 503) from exc
         raise _bad_login()
-    cache.delete(key)
+    try:
+        cache.delete(keys[0])
+    except Exception:
+        pass
     with transaction.atomic():
         refresh = secrets.token_urlsafe(32)
         session = AuthSession.objects.create(user=user, refresh_hash=_hash(refresh),

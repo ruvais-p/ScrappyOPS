@@ -1,6 +1,7 @@
 """The HTTP surface. Same addresses and answer formats as the service this replaces."""
 import inspect
 import json
+import ipaddress
 import logging
 import time
 from datetime import date, datetime
@@ -62,8 +63,12 @@ def healthz(request):
 
 # ---------------------------------------------------------------------------------------------- login
 def _client_ip(request):
-    fwd = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    return (fwd.split(",")[0].strip() if fwd else request.META.get("REMOTE_ADDR", "")) or ""
+    # Caddy overwrites X-Real-IP; never trust the caller-controlled X-Forwarded-For chain.
+    candidate = request.META.get("HTTP_X_REAL_IP", "") or request.META.get("REMOTE_ADDR", "")
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return "unknown"
 
 
 def token(request):

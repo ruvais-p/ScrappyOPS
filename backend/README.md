@@ -84,24 +84,48 @@ export FRONTEND_DIR=$PWD/site PUBLIC_BASE_URL=http://127.0.0.1:8000
 uvicorn scrappy.asgi:application --port 8000               # open http://127.0.0.1:8000
 ```
 
+### Run the complete app with Docker
+
+From this `backend/` folder, run:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+This starts PostgreSQL and Django, serves the dashboards at `http://127.0.0.1:8000`, and prepares the demo accounts below.
+The demo password and database password in this local-only compose file are for development; do not use them on an internet-facing deployment.
+
+| Role | Login |
+|---|---|
+| HQ | `hq@scrappy.test` |
+| Supervisor | `supervisor@scrappy.test` |
+| Warehouse | `warehouse@scrappy.test` |
+| Collector | `driver@scrappy.test` |
+
+Password for all four accounts: `Scrappy#2026`.
+
+Stop the services with `Ctrl+C`; add `-d` to run them in the background, then use `docker compose -f docker-compose.dev.yml down` to stop them.
+
 Run the tests: `python manage.py test core --settings=scrappy.settings_test` (the test settings use a fast password method; never use them live).
 
 ## 5. Go live (Docker, one machine)
 
 1. A Linux machine (2 GB RAM is plenty to start) with Docker, and a domain name pointing at it (for example `api.scrappy.in`).
-2. Copy this folder to the machine. `cp .env.example .env`, then fill in `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`,
+2. Copy this folder to the machine. `cp .env.example .env`, then fill in `DJANGO_SECRET_KEY`, the database passwords,
    `DJANGO_ALLOWED_HOSTS`, `PUBLIC_BASE_URL=https://api.scrappy.in`, and add `SITE_ADDRESS=api.scrappy.in`.
 3. Make the website files: `python tools/point_frontend.py /path/to/scrappy_app ./site` (no `--api`: the pages and the data
    share one address). Set `FRONTEND_DIR=/srv/site` in `.env`.
    *Prefer to keep the website on Cloudflare?* Run `python tools/point_frontend.py /path/to/scrappy_app ./out --api https://api.scrappy.in`,
    upload `./out` to Cloudflare, and set `CORS_ALLOWED_ORIGINS=https://your-site-address` in `.env`.
-4. `docker compose up -d --build`. HTTPS certificates are fetched and renewed automatically.
-5. Create the first HQ login: `docker compose exec web python manage.py create_hq --email you@company.com --name "Your Name"`.
+4. Generate distinct random `POSTGRES_ADMIN_PASSWORD` and `POSTGRES_APP_PASSWORD` values in `.env`, plus `DJANGO_SECRET_KEY`; set the age public recipient for encrypted backups. `DATABASE_URL` must use the same app password. HTTPS certificates are fetched and renewed automatically.
+   The database init script creates the restricted web role only on a fresh volume. On an existing volume, migrate roles first as its current database administrator; do not remove the volume to trigger initialization. For the old local `scrappy` superuser volume, connect as `scrappy` and run (replace passwords with generated values):
+   `CREATE ROLE scrappy_admin LOGIN SUPERUSER PASSWORD '...'; ALTER ROLE scrappy WITH PASSWORD '...' NOSUPERUSER NOCREATEDB NOCREATEROLE; GRANT CONNECT ON DATABASE scrappy TO scrappy; GRANT USAGE, CREATE ON SCHEMA public TO scrappy; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO scrappy; GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO scrappy;`
+5. `docker compose up -d --build` (Redis is started for shared login throttling).
+6. Create the first HQ login: `docker compose exec web python manage.py create_hq --email you@company.com --name "Your Name"`.
    HQ then creates every other login from the **Team** screen.
-6. Set up the nightly backup (section 7).
+7. Set up the nightly backup (section 7). Install `age`, then export `BACKUP_AGE_RECIPIENT` for the scheduled job.
 
-Several server processes are started (4). If you later run more than one **machine**, add `REDIS_URL` so the wrong-password
-counters are shared; live updates already work across processes (the database tells every process).
+Several server processes are started (4). Redis shares login failure counters across workers. Keep the web and database services on the private Compose network; publish only Caddy.
 
 ## 6. Move the existing data from Supabase
 
@@ -124,7 +148,7 @@ docker compose exec web python manage.py regenerate_pdfs                        
 
 ## 7. Backups and day-to-day
 
-* **Database + PDF bills** both matter. `deploy/backup.sh /backups` writes both (run nightly from cron, and copy the files off the machine).
+* **Database + PDF bills** both matter. `deploy/backup.sh /backups` writes age-encrypted archives only (run nightly from cron, copy them off-machine, and keep the age private key separately). Install `age` and provide `BACKUP_AGE_RECIPIENT` to the job.
 * Update: pull the new code, `docker compose up -d --build` (tables are updated automatically).
 * Reset a password: HQ → Team. Switch off the "one login per person" rule: `SINGLE_SESSION=0`.
 * Weighing tolerance (default 2%): `WEIGHING_TOLERANCE_PCT`.
@@ -133,7 +157,10 @@ docker compose exec web python manage.py regenerate_pdfs                        
 ## 8. Security notes
 
 * Logins use bcrypt/PBKDF2 hashes; tokens are signed (HS256, `JWT_SECRET`, defaults to the secret key) and expire in one hour;
-  refresh tokens are random and stored only as hashes. 10 wrong passwords per email and address pause login for 15 minutes.
+  refresh tokens are random and stored only as hashes. Redis enforces shared per-IP and per-account/address failure limits; if Redis is unavailable, production login fails closed.
+* Uploaded pictures are decoded and re-encoded as JPEG, have bounded size/dimensions, and are delivered with a sandbox CSP. Signed photo links carry their own expiration.
+* The web process uses the restricted `scrappy` database role; PostgreSQL administration credentials stay in the database container. Exact Google hostnames are used for the map-link fetcher.
+* Caddy sets a browser CSP. Existing pages still require inline script/style allowances; move inline code to external scripts or nonces to make that policy stricter.
 * "Newest login wins": a new login signs the person out on other devices at once (the old device's token stops working).
 * Records that must never change are protected twice (in the Python code **and** by database triggers): the cash ledger, the
   activity log, releases to HQ, cash-count decisions, weighings (only "superseded"), and bills after they are sent.

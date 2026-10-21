@@ -1,0 +1,36 @@
+# Local development: docker compose -f docker-compose.dev.yml up --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: scrappy
+      POSTGRES_DB: scrappy
+      POSTGRES_PASSWORD: scrappy-local-only
+    volumes:
+      - dev_dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scrappy -d scrappy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: .
+    environment:
+      DJANGO_DEBUG: "1"
+      DATABASE_URL: postgresql://scrappy:scrappy-local-only@db:5432/scrappy
+      FRONTEND_DIR: /tmp/scrappy-site
+      PUBLIC_BASE_URL: http://127.0.0.1:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../dashboards:/source:ro
+    command: >-
+      sh -c "python tools/point_frontend.py /source /tmp/scrappy-site && python manage.py seed_demo
+      && exec uvicorn scrappy.asgi:application --host 0.0.0.0 --port 8000 --workers 1"
+
+volumes:
+  dev_dbdata:

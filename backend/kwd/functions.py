@@ -107,7 +107,7 @@ def admin_users(ctx, body):
 
 
 # ---------------------------------------------------------------------------------------------- resolve-map-link
-ALLOWED_HOSTS = [re.compile(p) for p in (r"^maps\.app\.goo\.gl$", r"^goo\.gl$", r"^(www\.)?google\.[a-z.]+$", r"^maps\.google\.[a-z.]+$", r"^consent\.google\.[a-z.]+$")]
+ALLOWED_HOSTS = {"maps.app.goo.gl", "goo.gl", "google.com", "www.google.com", "maps.google.com", "consent.google.com"}
 PATTERNS = [
     re.compile(r"!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)"),
     re.compile(r"[?&](?:q|query|ll|destination|daddr)=(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)"),
@@ -121,7 +121,11 @@ PLUS = re.compile(r"(?:^|[\s,=+])([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQ
 
 
 def _allowed(u):
-    return u.scheme == "https" and any(r.match(u.hostname or "") for r in ALLOWED_HOSTS)
+    try:
+        return (u.scheme == "https" and u.hostname in ALLOWED_HOSTS and
+                u.username is None and u.password is None and u.port in (None, 443))
+    except ValueError:
+        return False
 
 
 def _decode_safe(t):
