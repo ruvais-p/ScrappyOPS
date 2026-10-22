@@ -17,7 +17,7 @@ from core.models import (AuthSession, Bill, BillItem, Franchise, HqAudit, Immuta
                          User)
 from core.services import hq as hq_service            # noqa: F401  (registers the HQ actions)
 from core.services import lead_import                 # noqa: F401
-from core.services import pickup, warehouse           # noqa: F401  (register the collector and warehouse actions)
+from core.services import dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse and stock-to-HQ actions)
 from core.services.common import ApiError, Ctx, UUID_RE, btrim
 from core.services.registry import RPC, rpc
 

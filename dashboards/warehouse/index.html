@@ -335,6 +335,8 @@ td input[type=checkbox],th input[type=checkbox]{width:18px;height:18px;accent-co
       <a href="#reconcile" data-view="reconcile">Reconcile loads <span class="count" id="nav-wait"></span></a>
       <a href="#inventory" data-view="inventory">Inventory</a>
       <a href="#requirements" data-view="requirements">HQ requirements <span class="count" id="nav-req"></span></a>
+      <a href="#dispatch" data-view="dispatch">Loading for HQ <span class="count" id="nav-dp"></span></a>
+      <a href="#prices" data-view="prices" id="nav-prices">Sale prices</a>
       <a href="#finance" data-view="finance">Finance <span class="count" id="nav-fin"></span></a>
       <button class="navbtn mob-only" data-act="logout" type="button">Log out</button>
     </nav>
@@ -420,13 +422,12 @@ const rpc = (fn, args = {}) => api('/rest/v1/rpc/' + fn, { method: 'POST', body:
 const FAR_PAST = '2026-01-01';
 const S = {
   profile: null, role: '', tol: 2, items: [], profiles: [], loads: [], totals: {}, paid: {}, wmap: {}, reqs: [], rels: [],
-  stock: [], moves: [], routes: [], txns: [], cash: [], pk: {},
+  stock: [], moves: [], routes: [], txns: [], cash: [], pk: {}, dp: [], pv: null, dpf: 'active', dpd: { veh: '', note: '', kg: {}, edit: null },
   from: addDays(todayIST(), -6), to: todayIST(), preset: '7', status: 'submitted', sel: null, draft: {}, notes: {},
-  rs: 'all', rel: null, cancel: null, fd: 'all', ft: 'all', rsel: null, feed: [], snap: null, wsOpen: false, lastOk: 0,
+  rs: 'all', cancel: null, fd: 'all', ft: 'all', rsel: null, feed: [], snap: null, wsOpen: false, lastOk: 0,
   lv: null, lc: { unassigned: 0, failed_recent: 0, open_today: 0 }, lf: { tab: 'assign', driver: '', q: '' }, lsel: [], lsplit: false, lsplitDrv: [], ldrv: ''
 };
 const canWeigh = () => S.role === 'warehouse' || S.role === 'hq';
-const canRelease = () => S.role === 'supervisor' || S.role === 'hq'; /* only the supervisor (or HQ) releases stock to HQ */
 const canVerify = () => S.role === 'supervisor' || S.role === 'hq';
 const canAssign = () => S.role === 'supervisor' || S.role === 'hq';
 const isHQ = () => S.role === 'hq';
@@ -461,7 +462,7 @@ const waitingLoads = () => S.loads.filter(l => l.status === 'submitted');
 /* ---------- data ---------- */
 async function refresh() {
   const to = S.to < todayIST() ? todayIST() : S.to;
-  const [items, profiles, loads, totals, paid, wts, reqs, rels, stock, moves, routes, txns, cash, lcnt] = await Promise.all([
+  const [items, profiles, loads, totals, paid, wts, reqs, rels, stock, moves, routes, txns, cash, lcnt, dps, pv] = await Promise.all([
     rest('scrap_items?select=id,name&active=eq.true&order=id'),
     rest('profiles?select=id,full_name,role,vehicle_no,territory,active'),
     rest('loads?select=id,code,driver_id,vehicle_no,status,started_at,submitted_at,warehouse_kg,weighed_at,weighing_note,resolved_at,resolved_by,resolution_note&order=id.desc&limit=1000'),
@@ -475,10 +476,13 @@ async function refresh() {
     rpc('wh_route_cash', { p_from: addDays(todayIST(), -90), p_to: to }),
     rpc('wh_transactions', { p_from: S.from, p_to: S.to, p_driver: S.fd === 'all' ? null : S.fd, p_limit: 300 }),
     rest('driver_cash_in_hand?select=*'),
-    rpc('wh_lead_counts')
+    rpc('wh_lead_counts'),
+    rpc('wh_dispatches', { p_limit: 200 }),
+    seesPrice() ? rpc('sup_stock_value') : Promise.resolve(null)
   ]);
   S.items = items; S.profiles = profiles; S.loads = loads; S.reqs = reqs; S.rels = rels; S.stock = stock; S.moves = moves;
   S.routes = routes; S.txns = txns; S.cash = cash; if (lcnt && lcnt[0]) S.lc = lcnt[0];
+  S.dp = dps || []; S.pv = pv;
   S.totals = {}; totals.forEach(t => { (S.totals[t.load_id] = S.totals[t.load_id] || {})[t.item_name] = { kg: num(t.total_kg), value: num(t.total_value) }; });
   S.paid = {}; paid.forEach(b => { S.paid[b.load_id] = (S.paid[b.load_id] || 0) + 1; });
   S.wmap = {}; wts.forEach(w => { (S.wmap[w.load_id] = S.wmap[w.load_id] || {})[w.item_id] = w; });
@@ -494,10 +498,11 @@ async function loadTol() { try { S.tol = num(await rpc('wh_tolerance_pct')) || 2
 
 /* ---------- live feed: what changed since the last refresh ---------- */
 function snapshot() {
-  const o = { loads: {}, paid: { ...S.paid }, reqs: {}, rels: {}, routes: {} };
+  const o = { loads: {}, paid: { ...S.paid }, reqs: {}, rels: {}, routes: {}, dp: {} };
   S.loads.forEach(l => { o.loads[l.id] = l.status; });
   S.reqs.forEach(r => { o.reqs[r.id] = r.status; });
   S.rels.forEach(r => { o.rels[r.id] = 1; });
+  S.dp.forEach(d => { o.dp[d.id] = d.status; });
   S.routes.forEach(r => { o.routes[r.load_id] = r.route_status; });
   return o;
 }
@@ -518,6 +523,15 @@ function diffFeed() {
   });
   S.reqs.forEach(r => { if (old.reqs[r.id] === undefined) ev('b', `<b>HQ</b> raised <b>${esc(r.code)}</b>: ${kg(r.required_kg)} kg ${esc(r.item_name)}.`); });
   S.rels.forEach(r => { if (old.rels[r.id] === undefined) ev('g', `<b>${kg(r.kg)} kg ${esc((itemById(r.item_id) || {}).name || '')}</b> released to HQ (${esc(r.code)}).`); });
+  S.dp.forEach(d => {
+    const was = old.dp[d.id];
+    if (was === undefined) { if (d.status === 'pending') ev('b', `<b>${esc(d.prepared_by_name)}</b> loaded <b>${esc(d.code)}</b> (${kg(d.total_kg)} kg, ${esc(d.vehicle_no)}) for HQ. Waiting for the supervisor.`); }
+    else if (was !== d.status) {
+      if (d.status === 'finalized') ev('g', `<b>${esc(d.code)}</b> finalized by ${esc(d.reviewed_by_name || 'the supervisor')}.`);
+      else if (d.status === 'rejected') ev('a', `<b>${esc(d.code)}</b> was sent back${d.review_note ? ': ' + esc(d.review_note) : ''}.`);
+      else if (d.status === 'pending') ev('b', `<b>${esc(d.code)}</b> was corrected and sent again.`);
+    }
+  });
   S.routes.forEach(r => {
     const was = old.routes[r.load_id];
     if (was !== undefined && was !== r.route_status && ['counted', 'verified', 'disputed'].includes(r.route_status))
@@ -552,6 +566,7 @@ function vOverview() {
   <div class="head"><div><div class="eyebrow">Warehouse · ${dlabel(S.from)} – ${dlabel(S.to)}</div><h1>Today at the yard.</h1>
     <div class="muted">Loads, weighing, HQ requirements and cash update live as drivers work.</div></div></div>
   ${filterBar()}
+  ${dpBanner()}
   <div class="kpis">
     <div class="kpi dark"><span class="l">Stock in yard now</span><span class="v">${kg(stockKg)} kg</span><span class="s">Weighed in, minus released to HQ</span></div>
     <button class="kpi" data-act="goto" data-v="reconcile" data-s="submitted"><span class="l">Waiting for weighing</span><span class="v">${waiting.length} load${waiting.length === 1 ? '' : 's'}</span><span class="s">${kg(waiting.reduce((a, l) => a + billedTotal(l), 0))} kg billed</span></button>
@@ -792,10 +807,10 @@ function vRequirements() {
   const reqKg = counted.reduce((a, r) => a + num(r.required_kg), 0), relKg = counted.reduce((a, r) => a + Math.min(num(r.required_kg), num(r.released_kg)), 0);
   const rels = S.rels.filter(x => inRange(dayOf(x.released_at)));
   const extra = `<div class="f"><label for="rsf">STATUS</label><select id="rsf" data-act="rstatus">${selectOptions([['all', 'All active'], ['open', 'Not started'], ['partial', 'Partly released'], ['completed', 'Completed'], ['cancelled', 'Cancelled']], S.rs)}</select></div>`;
-  const R = S.rel && S.reqs.find(r => r.id === S.rel), C = S.cancel && S.reqs.find(r => r.id === S.cancel);
+  const C = S.cancel && S.reqs.find(r => r.id === S.cancel);
   return `
   <div><div class="eyebrow">HQ requirements</div><h1>What HQ has asked for.</h1>
-    <div class="muted">HQ is the only buyer. Release stock against each request and track it until it is complete.</div></div>
+    <div class="muted">HQ is the only buyer. The warehouse manager loads the vehicle against each request; the supervisor finalizes it.</div></div>
   ${isHQ() ? `<section class="card pad"><h3>Raise a new requirement</h3><div class="inl">
     <div class="fld"><label for="rq-i">MATERIAL</label><select id="rq-i">${S.items.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join('')}</select></div>
     <div class="fld"><label for="rq-k">KG NEEDED</label><input id="rq-k" type="number" min="0" step="0.1" style="width:130px"></div>
@@ -817,31 +832,118 @@ function vRequirements() {
       <td><div class="bar"><i style="width:${Math.max(2, pct).toFixed(0)}%;${r.status === 'completed' ? 'background:#4F7F3B' : ''}"></i></div></td>
       <td class="r ${act && yard < num(r.remaining_kg) ? 'var-bad' : ''}">${kg(yard)}</td>
       <td><span class="badge ${RST[r.status][1]}">${RST[r.status][0]}</span></td>
-      <td class="r" style="white-space:nowrap">${act && canRelease() ? `<button class="btn sm" data-act="rel-open" data-id="${r.id}">Release</button> ` : ''}${act && isHQ() ? `<button class="btn ghost sm" data-act="cancel-open" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No requirements match.</td></tr>'}</tbody></table></div></section>
-  ${R ? relPanel(R) : ''}${C ? cancelPanel(C) : ''}
+      <td class="r" style="white-space:nowrap">${act && canPrepare() ? `<button class="btn sm" data-act="goto" data-v="dispatch">Load vehicle</button> ` : ''}${act && isHQ() ? `<button class="btn ghost sm" data-act="cancel-open" data-id="${r.id}">Cancel</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="11" class="empty">No requirements match.</td></tr>'}</tbody></table></div></section>
+  ${C ? cancelPanel(C) : ''}
   <section class="card"><div class="card-h"><h2>Released stock</h2><span class="muted small">${rels.length} in range</span></div>
     ${rels.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>RELEASE</th><th>DATE</th><th>FOR</th><th>MATERIAL</th><th class="r">KG</th><th>VEHICLE</th><th>RELEASED BY</th></tr></thead>
     <tbody>${rels.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${dlabel(dayOf(x.released_at))}</td><td>${esc(reqCode(x.requirement_id))}</td><td>${esc((itemById(x.item_id) || {}).name || '')}</td><td class="r b">${kg(x.kg)}</td><td>${esc(x.vehicle_no)}</td><td>${esc(personName(x.released_by))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No releases in this range.</div>'}
   </section>`;
-}
-function relPanel(R) {
-  const left = num(R.remaining_kg), yard = stockNow(R.item_id), max = Math.max(0, Math.min(left, Math.floor(yard * 10) / 10));
-  return `<section class="card pad" style="border:2px solid var(--ox)">
-    <div class="row-split" style="flex-wrap:wrap"><h2>Release stock for ${esc(R.code)} · ${esc(R.item_name)}</h2><button class="linkbtn" data-act="rel-close">Close</button></div>
-    <div class="muted">HQ needs <b>${kg(left)} kg</b> more. In the yard now: <b>${kg(yard)} kg</b>.</div>
-    ${yard < left ? `<div class="notice">Not enough ${esc(R.item_name)} in stock to complete this request. You can release a partial amount of up to ${kg(max)} kg.</div>` : ''}
-    <div class="inl">
-      <div class="fld"><label for="rkg">KG TO RELEASE</label><input id="rkg" type="number" step="0.1" min="0" max="${max}" value="${max}" style="width:140px"></div>
-      <div class="fld"><label for="rveh">VEHICLE / DISPATCH NO.</label><input id="rveh" style="width:200px" placeholder="e.g. KL-07-HQ-5566"></div>
-      <div class="fld" style="flex:1 1 180px"><label for="rnote">NOTE (OPTIONAL)</label><input id="rnote"></div>
-      <button class="btn green" data-act="rel-confirm" data-id="${R.id}" ${max <= 0 ? 'disabled' : ''}>Confirm release to HQ</button>
-    </div></section>`;
 }
 function cancelPanel(C) {
   return `<section class="card pad" style="border:2px solid var(--ox)">
     <div class="row-split" style="flex-wrap:wrap"><h2>Cancel ${esc(C.code)} · ${esc(C.item_name)}</h2><button class="linkbtn" data-act="cancel-close">Keep it</button></div>
     <div class="fld"><label for="cnote">REASON (REQUIRED)</label><input id="cnote"></div>
     <button class="btn" data-act="cancel-confirm" data-id="${C.id}">Cancel this requirement</button></section>`;
+}
+
+/* ---------- loading for HQ: the warehouse manager enters the quantity of each material, the supervisor finalizes ---------- */
+const rs2 = n => (num(n) < 0 ? '−₹' : '₹') + Math.abs(num(n)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const canPrepare = () => S.role === 'warehouse';
+const canFinalize = () => S.role === 'supervisor';
+const seesPrice = () => S.role === 'supervisor';
+const DPST = { pending: ['Waiting for supervisor', 'b-cash'], finalized: ['✓ Finalized', 'b-ok'], rejected: ['Sent back', 'b-flag'], withdrawn: ['Withdrawn', 'b-sched'] };
+const dpBadge = s => `<span class="badge ${(DPST[s] || ['', 'b-sched'])[1]}">${esc((DPST[s] || [s])[0])}</span>`;
+const dpLines = (d, f) => d.lines.filter(f);
+const waitingKg = (itemId, skip) => S.dp.filter(d => d.status === 'pending' && d.id !== skip).reduce((a, d) => a + dpLines(d, x => x.item_id === itemId).reduce((b, x) => b + num(x.kg), 0), 0);
+const waitingReq = (reqId, skip) => S.dp.filter(d => d.status === 'pending' && d.id !== skip).reduce((a, d) => a + dpLines(d, x => x.requirement_id === reqId).reduce((b, x) => b + num(x.kg), 0), 0);
+const dpActive = () => S.dp.filter(d => d.status === 'pending' || d.status === 'rejected');
+function dpBanner() {
+  const pend = S.dp.filter(d => d.status === 'pending').length, back = S.dp.filter(d => d.status === 'rejected').length;
+  if (canFinalize() && pend) return `<div class="notice info"><b>${pend} load${pend === 1 ? '' : 's'} for HQ waiting for your approval.</b> <button class="linkbtn" data-act="goto" data-v="dispatch">Review</button></div>`;
+  if (canPrepare() && back) return `<div class="notice bad"><b>${back} load${back === 1 ? ' was' : 's were'} sent back by the supervisor.</b> <button class="linkbtn" data-act="goto" data-v="dispatch">Correct</button></div>`;
+  return '';
+}
+function dpComposer() {
+  const D = S.dpd, editing = D.edit && S.dp.find(d => d.id === D.edit);
+  const reqs = S.reqs.filter(r => r.status === 'open' || r.status === 'partial');
+  const rows = reqs.map(r => {
+    const room = Math.max(0, num(r.remaining_kg) - waitingReq(r.id, D.edit)), yard = Math.max(0, stockNow(r.item_id) - waitingKg(r.item_id, D.edit));
+    return `<tr><td class="b">${esc(r.item_name)}<br><span class="muted small">${esc(r.code)}</span></td><td class="r">${kg(room)}</td><td class="r ${yard < room ? 'var-bad' : ''}">${kg(yard)}</td>
+      <td class="r"><input type="number" min="0" step="0.1" style="width:120px" data-act="dpkg" data-id="${r.id}" aria-label="Kg of ${esc(r.item_name)} loaded" value="${esc(D.kg[r.id] ?? '')}"></td></tr>`;
+  }).join('');
+  const total = reqs.reduce((a, r) => a + num(D.kg[r.id]), 0);
+  return `<section class="card pad" ${editing ? 'style="border:2px solid var(--ox)"' : ''}>
+    <div class="row-split" style="flex-wrap:wrap"><h2>${editing ? `Correct ${esc(editing.code)}` : 'Load a vehicle for HQ'}</h2>${editing ? '<button class="linkbtn" data-act="dp-cancel-edit">Stop editing</button>' : ''}</div>
+    <div class="muted">${editing && editing.review_note ? `<b>Supervisor said:</b> ${esc(editing.review_note)}<br>` : ''}Enter the quantity of each material that went on the vehicle, then send it to the supervisor. Nothing leaves the stock until the supervisor finalizes it.</div>
+    ${reqs.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL / REQUEST</th><th class="r">HQ STILL NEEDS</th><th class="r">IN YARD</th><th class="r">KG LOADED</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">HQ has no open requirement. Nothing to load.</div>'}
+    <div class="inl">
+      <div class="fld"><label for="dp-veh">VEHICLE NO.</label><input id="dp-veh" style="width:200px" placeholder="e.g. KL-07-HQ-5566" value="${esc(D.veh)}"></div>
+      <div class="fld" style="flex:1 1 200px"><label for="dp-note">NOTE (OPTIONAL)</label><input id="dp-note" value="${esc(D.note)}"></div>
+      <div class="fld"><label>TOTAL</label><b id="dp-total" style="padding:10px 0;display:block">${kg(total)} kg</b></div>
+      <button class="btn green" data-act="dp-send" ${reqs.length ? '' : 'disabled'}>${editing ? 'Resend for approval' : 'Send to supervisor for approval'}</button>
+    </div></section>`;
+}
+function dpCard(d) {
+  const price = seesPrice(), fin = d.status === 'finalized';
+  const priceCols = price ? '<th class="r">HQ PRICE / KG</th><th class="r">AMOUNT</th>' : '';
+  const rows = d.lines.map(x => {
+    let cells = '';
+    if (price) {
+      const p = fin ? x.price_per_kg : x.expected_price_per_kg, a = fin ? x.amount : x.expected_amount;
+      cells = p == null ? '<td class="r var-bad" colspan="2">price not set by HQ</td>' : `<td class="r">${rs2(p)}${fin ? '' : ' <span class="muted small">today</span>'}</td><td class="r b">${rs2(a)}</td>`;
+    }
+    return `<tr><td class="b">${esc(x.item_name)}</td><td>${esc(x.requirement_code)}</td><td class="r b">${kg(x.kg)}</td>${cells}</tr>`;
+  }).join('');
+  const foot = price ? `<tr><td class="b" colspan="2">Total</td><td class="r b">${kg(d.total_kg)}</td><td></td><td class="r b">${d.total_amount == null ? '—' : rs2(d.total_amount)}</td></tr>`
+    : `<tr><td class="b" colspan="2">Total</td><td class="r b">${kg(d.total_kg)}</td></tr>`;
+  let act = '';
+  if (d.status === 'pending' && canFinalize()) act = `<div class="inl"><div class="fld" style="flex:1 1 220px"><label for="dpn-${d.id}">NOTE (REQUIRED WHEN SENDING BACK)</label><input id="dpn-${d.id}"></div>
+      <button class="btn green" data-act="dp-finalize" data-id="${d.id}">Finalize</button><button class="btn ghost" data-act="dp-reject" data-id="${d.id}">Send back</button></div>`;
+  else if ((d.status === 'pending' || d.status === 'rejected') && canPrepare()) act = `<div class="row-split" style="flex-wrap:wrap;gap:8px"><button class="btn sm" data-act="dp-edit" data-id="${d.id}">${d.status === 'rejected' ? 'Correct and resend' : 'Edit'}</button><button class="btn ghost sm" data-act="dp-withdraw" data-id="${d.id}">Withdraw</button></div>`;
+  const review = d.reviewed_by_name ? `<span class="muted small">${d.status === 'finalized' ? 'Finalized' : 'Reviewed'} by ${esc(d.reviewed_by_name)} · ${dlabel(dayOf(d.reviewed_at))} ${tlabel(d.reviewed_at)}${d.review_note ? ' · ' + esc(d.review_note) : ''}</span>` : '';
+  return `<section class="card pad"><div class="row-split" style="flex-wrap:wrap"><div><h2>${esc(d.code)} · ${esc(d.vehicle_no)}</h2>
+    <span class="muted small">Prepared by ${esc(d.prepared_by_name)} · ${dlabel(dayOf(d.prepared_at))} ${tlabel(d.prepared_at)}${d.note ? ' · ' + esc(d.note) : ''}</span></div>${dpBadge(d.status)}</div>
+    <div class="scroll"><table style="min-width:420px"><thead><tr><th>MATERIAL</th><th>REQUEST</th><th class="r">KG</th>${priceCols}</tr></thead><tbody>${rows}${foot}</tbody></table></div>
+    ${review}${act}</section>`;
+}
+function vDispatch() {
+  const tab = S.dpf, list = tab === 'finalized' ? S.dp.filter(d => d.status === 'finalized') : tab === 'all' ? S.dp : dpActive();
+  const T = [['active', 'Waiting / sent back'], ['finalized', 'Finalized'], ['all', 'All']];
+  return `
+  <div><div class="eyebrow">Loading for HQ</div><h1>Vehicle loads for HQ.</h1>
+    <div class="muted">The warehouse manager enters the quantity of each material loaded. The supervisor checks it and finalizes it. Only then does the stock leave the yard.</div></div>
+  ${dpBanner()}
+  ${canPrepare() ? dpComposer() : ''}
+  <div class="filters"><div class="tabs">${T.map(t => `<button class="tab ${tab === t[0] ? 'on' : ''}" data-act="dptab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div><span class="sp"></span>
+    <span class="live ${S.wsOpen ? '' : 'off'}"><i></i>${S.wsOpen ? 'LIVE' : 'AUTO-REFRESH'}</span></div>
+  ${list.length ? list.map(dpCard).join('') : '<section class="card"><div class="empty">No loads here.</div></section>'}`;
+}
+
+/* ---------- sale prices: what HQ pays for the stock (supervisor only) ---------- */
+function vPrices() {
+  if (!seesPrice()) return '<div class="card pad"><div class="empty">Only the supervisor can see the sale prices.</div></div>';
+  const v = S.pv;
+  if (!v) return '<div class="card pad"><div class="empty">Loading prices…</div></div>';
+  const sold = S.dp.filter(d => d.status === 'finalized' && inRange(dayOf(d.reviewed_at)));
+  return `
+  <div><div class="eyebrow">Sale prices</div><h1>What HQ pays for your stock.</h1>
+    <div class="muted">HQ is the only buyer. These are the prices HQ pays per kg, set by HQ. A load is priced when you finalize it and the price on it never changes afterwards.</div></div>
+  ${filterBar()}
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Stock value now</span><span class="v">${rs2(v.total_value)}</span><span class="s">${v.unpriced_items ? `${v.unpriced_items} material${v.unpriced_items === 1 ? '' : 's'} in stock without a price` : 'Yard stock at the price HQ pays'}</span></div>
+    <div class="kpi"><span class="l">Sold to HQ, all time</span><span class="v">${rs2(v.sold_amount)}</span><span class="s">${kg(v.sold_kg)} kg in ${v.sold_loads} load${v.sold_loads === 1 ? '' : 's'}</span></div>
+    <button class="kpi" data-act="goto" data-v="dispatch"><span class="l">Waiting for your approval</span><span class="v">${v.pending_loads}</span><span class="s">Loads for HQ</span></button>
+  </div>
+  <section class="card"><div class="card-h"><h2>Stock and price per material</h2></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>MATERIAL</th><th class="r">IN YARD</th><th class="r">ON WAITING LOADS</th><th class="r">HQ PAYS / KG</th><th class="r">STOCK VALUE</th></tr></thead>
+    <tbody>${v.items.map(r => `<tr><td class="b">${esc(r.item_name)}</td><td class="r">${kg(r.stock_kg)} kg</td><td class="r">${num(r.waiting_kg) ? kg(r.waiting_kg) + ' kg' : '—'}</td>
+      <td class="r">${r.price_per_kg == null ? '<span class="var-bad">not set by HQ</span>' : `${rs2(r.price_per_kg)}<br><span class="muted small">since ${dlabel(dayOf(r.price_since))}</span>`}</td>
+      <td class="r b">${r.value == null ? '—' : rs2(r.value)}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">No materials.</td></tr>'}
+    <tr><td class="b" colspan="4">Total</td><td class="r b">${rs2(v.total_value)}</td></tr></tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Sold to HQ</h2><span class="muted small">${sold.length} load${sold.length === 1 ? '' : 's'} in range</span></div>
+    ${sold.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>LOAD</th><th>DATE</th><th>VEHICLE</th><th>MATERIALS</th><th class="r">KG</th><th class="r">AMOUNT</th></tr></thead>
+    <tbody>${sold.map(d => `<tr><td class="b">${esc(d.code)}</td><td>${dlabel(dayOf(d.reviewed_at))}</td><td>${esc(d.vehicle_no)}</td><td>${d.lines.map(x => `${esc(x.item_name)} ${kg(x.kg)} kg @ ${rs2(x.price_per_kg)}`).join('<br>')}</td><td class="r">${kg(d.total_kg)}</td><td class="r b">${rs2(d.total_amount)}</td></tr>`).join('')}
+    <tr><td class="b" colspan="5">Total in range</td><td class="r b">${rs2(sold.reduce((a, d) => a + num(d.total_amount), 0))}</td></tr></tbody></table></div>` : '<div class="empty">Nothing sold to HQ in this range.</div>'}</section>`;
 }
 
 /* ---------- finance ---------- */
@@ -917,11 +1019,12 @@ function settleDetail(r) {
 }
 
 /* ---------- routing and render ---------- */
-const VIEWS = { overview: vOverview, leads: vLeads, reconcile: vReconcile, inventory: vInventory, requirements: vRequirements, finance: vFinance };
+const VIEWS = { overview: vOverview, leads: vLeads, reconcile: vReconcile, inventory: vInventory, requirements: vRequirements, dispatch: vDispatch, prices: vPrices, finance: vFinance };
 const curView = () => VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
 function navCounts() {
   const w = waitingLoads().length, r = S.reqs.filter(x => x.status === 'open' || x.status === 'partial').length, f = needsFin();
   $('#nav-wait').textContent = w || ''; $('#nav-req').textContent = r || ''; $('#nav-fin').textContent = f || '';
+  { const n = S.dp.filter(d => d.status === (canFinalize() ? 'pending' : 'rejected')).length; $('#nav-dp').textContent = n || ''; $('#nav-prices').style.display = seesPrice() ? '' : 'none'; }
   { const lc = S.lc || {}; $('#nav-leads').textContent = (num(lc.unassigned) + num(lc.failed_recent)) || ''; }
 }
 function render() {
@@ -960,6 +1063,9 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.act === 'w') { const L = S.loads.find(l => l.id === S.sel); (S.draft[L.id] || (S.draft[L.id] = {}))[t.dataset.item] = t.value; updateRows(L); }
   if (t.id === 'note' && S.sel) S.notes[S.sel] = t.value;
+  if (t.dataset.act === 'dpkg') { S.dpd.kg[t.dataset.id] = t.value; const el = $('#dp-total'); if (el) el.textContent = kg(Object.values(S.dpd.kg).reduce((a, v) => a + num(v), 0)) + ' kg'; }
+  if (t.id === 'dp-veh') S.dpd.veh = t.value;
+  if (t.id === 'dp-note') S.dpd.note = t.value;
   if (t.dataset.act === 'cnt') {
     const r = S.routes.find(x => x.load_id === S.rsel), d = num(t.value) - num(r.expected_cash), el = $('#cntd');
     el.className = 'small ' + (d ? 'var-bad' : 'muted'); el.textContent = d ? `Difference ${rs(d)} from the expected balance. A note is required.` : 'Matches the expected balance.';
@@ -1029,20 +1135,37 @@ document.addEventListener('click', async e => {
     const k = num(val('#rq-k')); if (!(k > 0)) { toast('Enter the kg HQ needs.', true); return; }
     await act(b, () => rpc('raise_requirement', { p_item_id: +val('#rq-i'), p_required_kg: k, p_due_date: val('#rq-d') || null, p_note: val('#rq-n').trim() || null }), c => `Requirement ${c} raised.`);
   }
-  if (a === 'rel-open') { S.rel = +b.dataset.id; S.cancel = null; render(); setTimeout(() => $('#rkg') && $('#rkg').scrollIntoView({ block: 'center' }), 0); }
-  if (a === 'rel-close') { S.rel = null; render(); }
-  if (a === 'cancel-open') { S.cancel = +b.dataset.id; S.rel = null; render(); setTimeout(() => $('#cnote') && $('#cnote').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'cancel-open') { S.cancel = +b.dataset.id; render(); setTimeout(() => $('#cnote') && $('#cnote').scrollIntoView({ block: 'center' }), 0); }
   if (a === 'cancel-close') { S.cancel = null; render(); }
   if (a === 'cancel-confirm') {
     const n = val('#cnote').trim(); if (!n) { toast('Add a reason for cancelling.', true); return; }
     const ok = await act(b, () => rpc('cancel_requirement', { p_requirement_id: +b.dataset.id, p_note: n }), 'Requirement cancelled.'); if (ok) { S.cancel = null; render(); }
   }
-  if (a === 'rel-confirm') {
-    const v = Math.round(num(val('#rkg')) * 10) / 10, veh = val('#rveh').trim();
-    if (!(v > 0)) { toast('Enter the kg to release.', true); return; }
-    if (!veh) { toast('Enter the vehicle or dispatch number.', true); return; }
-    const ok = await act(b, () => rpc('release_to_hq', { p_requirement_id: +b.dataset.id, p_kg: v, p_vehicle_no: veh, p_note: val('#rnote').trim() || null }), c => `${kg(v)} kg released to HQ (${c}).`);
-    if (ok) { S.rel = null; render(); }
+  if (a === 'dptab') { S.dpf = b.dataset.t; render(); }
+  if (a === 'dp-send') {
+    const D = S.dpd, lines = Object.entries(D.kg).map(([id, v]) => ({ requirement_id: +id, kg: Math.round(num(v) * 10) / 10 })).filter(x => x.kg > 0);
+    if (!lines.length) { toast('Enter the quantity of at least one material.', true); return; }
+    if (!D.veh.trim()) { toast('Enter the vehicle number.', true); return; }
+    const ok = await act(b, () => rpc('wh_submit_dispatch', { p_lines: lines, p_vehicle_no: D.veh.trim(), p_note: D.note.trim() || null, p_dispatch_id: D.edit || null }),
+      c => `${c} sent to the supervisor for approval.`);
+    if (ok) { S.dpd = { veh: '', note: '', kg: {}, edit: null }; render(); }
+  }
+  if (a === 'dp-edit') {
+    const d = S.dp.find(x => x.id === +b.dataset.id); if (!d) return;
+    S.dpd = { veh: d.vehicle_no, note: d.note || '', kg: Object.fromEntries(d.lines.map(x => [x.requirement_id, String(num(x.kg))])), edit: d.id };
+    S.dpf = 'active'; render(); window.scrollTo(0, 0);
+  }
+  if (a === 'dp-cancel-edit') { S.dpd = { veh: '', note: '', kg: {}, edit: null }; render(); }
+  if (a === 'dp-withdraw') {
+    const id = +b.dataset.id; if (!confirm('Withdraw this load? It will not go to HQ.')) return;
+    const ok = await act(b, () => rpc('wh_withdraw_dispatch', { p_dispatch_id: id, p_note: null }), c => `${c} withdrawn.`);
+    if (ok && S.dpd.edit === id) S.dpd = { veh: '', note: '', kg: {}, edit: null };
+  }
+  if (a === 'dp-finalize' || a === 'dp-reject') {
+    const id = +b.dataset.id, n = val('#dpn-' + id).trim(), fin = a === 'dp-finalize';
+    if (!fin && !n) { toast('Add a note so the warehouse manager knows what to correct.', true); return; }
+    await act(b, () => rpc('sup_review_dispatch', { p_dispatch_id: id, p_decision: fin ? 'finalize' : 'reject', p_note: n || null }),
+      r => fin ? `${r.code} finalized: ${rs2(r.amount)} at HQ's price. Stock released.` : `${r.code} sent back to the warehouse manager.`);
   }
   if (a === 'issue-float') {
     const amt = Math.round(num(val('#fl-a'))), dr = val('#fl-d');
@@ -1067,7 +1190,7 @@ document.addEventListener('click', async e => {
 
 /* ---------- live updates: Supabase Realtime over a plain websocket, plus a 20 s refresh as a safety net ---------- */
 let ws = null, wsBeat = null, wsRetry = null, wsRef = 0, refreshTimer = null;
-const RT_TABLES = ['leads', 'loads', 'bills', 'cash_ledger', 'load_weighings', 'hq_requirements', 'hq_releases', 'cash_settlements'];
+const RT_TABLES = ['leads', 'loads', 'bills', 'cash_ledger', 'load_weighings', 'hq_requirements', 'hq_releases', 'hq_dispatches', 'cash_settlements'];
 let lastRefreshAt = 0;
 function scheduleRefresh() {
   clearTimeout(refreshTimer);
@@ -1137,7 +1260,7 @@ async function start() {
 }
 
 /* ---------- look and feel: icons, screen-change animation, busy bar ---------- */
-const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>"};
+const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>","dispatch":"<rect x=\"2\" y=\"7\" width=\"12\" height=\"9\" rx=\"1.5\"/><path d=\"M14 10h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"18\" r=\"1.8\"/><circle cx=\"17\" cy=\"18\" r=\"1.8\"/>","prices":"<path d=\"M6 5h12M6 9h12M9 5c5 0 5 7 0 7H6l7 7\"/>"};
 document.querySelectorAll('nav a[data-view]').forEach(a => { const d = NAV_ICONS[a.dataset.view]; if (d) a.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'); });
 function busyBar(on) { const b = document.getElementById('topbar'); if (!b) return; b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } }
 function shake() { const f = document.getElementById('login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
