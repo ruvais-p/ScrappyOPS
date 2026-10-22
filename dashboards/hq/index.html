@@ -455,7 +455,7 @@ const S = {
   loads: [], loadFilter: 'attention', loadSel: null, loadDetail: {}, score: [],
   stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
   routes: [], txns: [], cashSel: null, resolutions: [], disputes: [], fd: '', disputeAct: null,
-  rates: [], ratehist: [], editPerson: null, audit: [],
+  rates: [], ratehist: [], buy: [], editPerson: null, audit: [],
   feed: [], prevOv: null, wsOpen: false,
   allItems: [], addItem: false, removeItem: null, creds: null, resetAsk: null,
   fr: load('scrappy_hq_fr') || null, franchises: [], fran: [], frQ: '', frSort: 'attention', frStatus: 'active', frEdit: null, frAdd: false, personAdd: false
@@ -502,7 +502,7 @@ const LOAD = {
       rpc('hq_open_disputes', { p_franchise: S.fr || null })]);
   },
   team: async () => { S.score = await rpc('hq_driver_scorecard', rangeArgs()); },
-  rates: async () => { [S.rates, S.ratehist] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100')]); },
+  rates: async () => { [S.rates, S.ratehist, S.buy] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100'), rpc('hq_buy_rates')]); },
   activity: async () => { S.audit = await rest('hq_audit?select=id,at,by_id,action,ref,detail,franchise_id&order=id.desc&limit=200' + frq()); }
 };
 async function refresh() {
@@ -1047,6 +1047,12 @@ function vRates() {
     <button class="btn" data-act="item-remove-ok" data-id="${R.id}">Remove ${esc(R.name)}</button></section>` : ''}
   ${removed.length ? `<section class="card"><div class="card-h"><h2>Removed materials</h2><span class="muted small">${removed.length}</span></div>
     ${removed.map(i => `<div class="alert"><span style="flex:1"><b>${esc(i.name)}</b></span><button class="btn ghost sm" data-act="item-restore" data-id="${i.id}">Restore</button></div>`).join('')}</section>` : ''}
+  <section class="card"><div class="card-h"><h2>What HQ pays the franchises</h2><span class="muted small">Sale price of their stock, per kg</span></div>
+    <div class="muted" style="padding:0 18px 8px">When a supervisor finalizes a load for HQ, each material is priced at the amount below and that price is kept on the load. Supervisors see these prices; warehouse managers and drivers do not. The price is the same for every franchise.</div>
+    <div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL</th><th class="r">HQ PAYS ₹/KG</th><th>SINCE</th><th class="r">NEW PRICE ₹/KG</th><th></th></tr></thead>
+    <tbody>${S.buy.map(i => `<tr><td class="b">${esc(i.item_name)}</td><td class="r b">${i.rate_per_kg == null ? '<span class="var-bad">not set</span>' : '₹' + num(i.rate_per_kg)}</td><td class="muted">${i.effective_from ? dtlabel(i.effective_from) : ''}</td>
+      <td class="r"><input id="nb-${i.item_id}" type="number" min="0" step="0.5" style="width:110px;padding:8px;border:1px solid var(--line);background:var(--pearl);text-align:right" aria-label="New purchase price for ${esc(i.item_name)}"></td>
+      <td class="r"><button class="btn sm" data-act="set-buy" data-id="${i.item_id}">Set</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No materials.</td></tr>'}</tbody></table></div></section>
   <section class="card"><div class="card-h"><h2>Rate history</h2><span class="muted small">Latest 100 changes</span></div>
     <div class="scroll"><table style="min-width:480px"><thead><tr><th>WHEN</th><th>MATERIAL</th><th class="r">RATE ₹/KG</th><th>SET BY</th></tr></thead>
     <tbody>${S.ratehist.map(r => `<tr><td class="muted">${dtlabel(r.effective_from)}</td><td class="b">${esc(itemName(r.item_id))}</td><td class="r">₹${num(r.rate_per_kg)}</td><td>${esc(personName(r.set_by))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No history.</td></tr>'}</tbody></table></div></section>`;
@@ -1272,6 +1278,7 @@ document.addEventListener('click', async e => {
   if (a === 'item-remove-close') { S.removeItem = null; render(); }
   if (a === 'item-remove-ok') { const ok = await act(b, () => rpc('hq_set_item_active', { p_item_id: id, p_active: false }), n => n + ' removed.'); if (ok) { S.removeItem = null; render(); } }
   if (a === 'item-restore') { await act(b, () => rpc('hq_set_item_active', { p_item_id: id, p_active: true }), n => n + ' restored.'); }
+  if (a === 'set-buy') { const r = num(val('#nb-' + id)); if (!(r > 0)) { toast('Enter the new price per kg.', true); return; } await act(b, () => rpc('hq_set_buy_rate', { p_item_id: id, p_rate: r }), n => `HQ now pays ₹${r} per kg for ${n}.`); }
   if (a === 'set-rate') { const r = num(val('#nr-' + id)); if (!(r > 0)) { toast('Enter the new rate per kg.', true); return; } await act(b, () => rpc('hq_set_rate', { p_item_id: id, p_rate: r }), n => `${n} rate changed to ₹${r} per kg.`); }
 });
 
