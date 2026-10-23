@@ -379,8 +379,9 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
     received = Decimal(str(p_amount_received or 0))
     if received > total:
         raise ApiError("Money received cannot be more than the sale total")
-    row = fetch_one("update kwd_fr_sales set total = %(t)s, amount_received = %(r)s, needs_install = %(i)s, installation_status = %(is)s, flags = %(fl)s where id = %(id)s returning *",
-                    {"t": total, "r": received, "i": install, "is": "pending" if install else "not_needed", "fl": sorted(set(fl)), "id": s["id"]})
+    invoice_no = trim(p_invoice_no) or f"FR-{sale_date:%Y}-{str(s['id']).replace('-', '')[:12].upper()}"
+    row = fetch_one("update kwd_fr_sales set invoice_no = %(inv)s, total = %(t)s, amount_received = %(r)s, needs_install = %(i)s, installation_status = %(is)s, flags = %(fl)s where id = %(id)s returning *",
+                    {"inv": invoice_no, "t": total, "r": received, "i": install, "is": "pending" if install else "not_needed", "fl": sorted(set(fl)), "id": s["id"]})
     if p_lead:
         fetch("update kwd_fr_leads set status = 'won', last_update_at = now() where id = %(i)s returning 1", {"i": p_lead})
     from kwd.rules import RULES
