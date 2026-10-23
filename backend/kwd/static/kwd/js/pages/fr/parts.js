@@ -1,6 +1,6 @@
 /* Franchise pieces shared by several screens: status pills, the "record a sale" form and the one-sale sheet.
    Both forms are widgets; the screen that opens them provides the actions saleClose and saleChanged (and data in ctx.data). */
-import { html, raw, supabase, errText, toast } from '../../core.js'
+import { html, raw, supabase, errText, toast, esc } from '../../core.js'
 import { Icon } from '../../ui.js'
 import { fmtINR, fmtDate, istDate, addDays } from '../../lib.js'
 import { Loading } from '../../ui.js'
@@ -72,12 +72,12 @@ export const saleForm = {
       <div class="summary" style="margin:14px 0"><div class="summary-row"><span>Total</span><span><b>${fmtINR(total)}</b></span></div></div>
       <div class="grid2">
         <label>Money received now (₹)<input type="number" min="0" inputmode="decimal" data-bind="f.received" value="${f.received}" placeholder="0"></label>
-        <label>Invoice no.<input data-bind="f.invoice_no" value="${f.invoice_no}"></label>
+        <label>Invoice no. (optional)<input data-bind="f.invoice_no" value="${f.invoice_no}" placeholder="Auto-generated if blank"></label>
       </div>
       <label>Sale date<input type="date" data-bind="f.sale_date" data-live value="${f.sale_date}" min="${addDays(istDate(), -7)}" max="${istDate()}"></label>
       ${f.sale_date < istDate() ? html`<p class="muted small">A sale dated before today is marked "entered for an earlier date".</p>` : ''}
       ${errLine(S.err)}
-      <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="save">${S.busy ? 'Saving…' : 'Record sale'}</button>` })
+      <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="save">${S.busy ? 'Saving…' : 'Record sale & create invoice'}</button>` })
   },
   actions: {
     close() { parentCall(this, 'saleClose') },
@@ -109,7 +109,7 @@ export const saleForm = {
       })
       this.set({ busy: false })
       if (error) return this.set({ err: errText(error) })
-      toast('Sale recorded. Stock updated.')
+      toast('Sale recorded and invoice created. Open the sale to print it.')
       parentCall(this, 'saleChanged')
       parentCall(this, 'saleClose')
     },
@@ -146,6 +146,7 @@ export const saleSheet = {
         <div class="summary-row"><span>Received</span><span>${fmtINR(s.amount_received)}</span></div>
         ${due > 0 ? html`<div class="summary-row"><span>Still to collect</span><span class="text-bad">${fmtINR(due)}</span></div>` : ''}
       </div>
+      <button class="btn primary block" ${!S.items ? raw('disabled') : ''} data-act="printInvoice">${Icon('download', 16)} Print invoice</button>
 
       ${!locked && due > 0 ? html`<div class="subcard" style="margin-bottom:12px">
         <label>Money received so far (₹)<input type="number" inputmode="decimal" min="${s.amount_received}" max="${s.total}" data-bind="pay" data-live value="${S.pay}"></label>
@@ -189,6 +190,7 @@ export const saleSheet = {
   },
   actions: {
     close() { parentCall(this, 'saleClose') },
+    printInvoice() { if (this.S.items) printSaleInvoice(this.S.s, this.S.items, this.ctx) },
     pickPhoto() { document.getElementById('install-photo').click() },
     async patchSale(values, msg) {
       this.set({ busy: true, err: '' })
@@ -240,6 +242,38 @@ export const saleSheet = {
       parentCall(this, 'saleClose')
     },
   },
+}
+
+export function printSaleInvoice(sale, items, ctx) {
+  const { byId, fr, frs = [], districts = [] } = ctx.data
+  const seller = fr || frs.find((f) => f.id === sale.franchise_id) || {}
+  const district = districts.find((d) => d.id === sale.district_id)
+  const amount = (n) => fmtINR(n)
+  const rows = items.map((i) => `<tr><td>${esc((byId[i.product_id] || {}).name || 'Product')}</td><td class="num">${esc(i.qty)}</td><td class="num">${esc(amount(i.unit_price))}</td><td class="num">${esc(amount(i.line_total))}</td></tr>`).join('')
+  const due = Math.max(0, Number(sale.total || 0) - Number(sale.amount_received || 0))
+  const address = [seller.address, seller.territory].filter(Boolean).map(esc).join('<br>')
+  const sellerGstin = seller.gstin ? `<div>GSTIN: ${esc(seller.gstin)}</div>` : ''
+  const customerAddress = [sale.place, district && district.name].filter(Boolean).map(esc).join(', ')
+  const win = window.open('', '_blank')
+  if (!win) { toast('Allow pop-ups to print the invoice.', 'bad'); return }
+  win.document.open()
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${esc(sale.invoice_no || '')}</title>
+    <style>
+      @page{size:A4;margin:16mm}*{box-sizing:border-box}body{font:14px/1.45 Arial,sans-serif;color:#242021;max-width:760px;margin:32px auto;padding:0 20px}
+      .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #7c1723;padding-bottom:18px}.seller{font-size:13px;color:#51494b}.seller strong{font-size:20px;color:#211d1e}.title{text-align:right}.title h1{font-size:28px;letter-spacing:.08em;margin:0;color:#7c1723}.title div{margin-top:6px}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0}.label{text-transform:uppercase;font-size:10px;letter-spacing:.08em;color:#766c6e;margin-bottom:5px}.box strong{font-size:16px}.muted{color:#766c6e}
+      table{width:100%;border-collapse:collapse;margin-top:18px}th{font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.06em;color:#655b5d;border-bottom:1px solid #aaa;padding:10px 8px}td{padding:11px 8px;border-bottom:1px solid #e1dcdd}.num{text-align:right;white-space:nowrap}
+      .totals{width:min(340px,100%);margin:20px 0 0 auto}.line{display:flex;justify-content:space-between;padding:6px 0}.grand{font-size:19px;font-weight:700;border-top:2px solid #272123;margin-top:5px;padding-top:12px}.status{display:inline-block;padding:4px 9px;border:1px solid #bbb;border-radius:20px;font-size:12px}.cancel{color:#a11d2b;font-size:22px;font-weight:bold;border:3px solid #a11d2b;padding:5px 12px;transform:rotate(-6deg);display:inline-block;margin-top:12px}.foot{border-top:1px solid #ddd;margin-top:42px;padding-top:12px;color:#766c6e;font-size:11px}
+      @media print{body{margin:0 auto;padding:0}.foot{position:fixed;bottom:0;left:0;right:0}}
+    </style></head><body>
+    <header class="top"><div class="seller"><strong>${esc(seller.business_name || 'Franchise')}</strong>${address ? `<div>${address}</div>` : ''}${sellerGstin}${seller.profile && seller.profile.phone ? `<div>${esc(seller.profile.phone)}</div>` : ''}</div>
+      <div class="title"><h1>INVOICE</h1><div><b>${esc(sale.invoice_no || 'Invoice number unavailable')}</b></div><div>${esc(fmtDate(sale.sale_date))}</div>${sale.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}</div></header>
+    <section class="meta"><div class="box"><div class="label">Bill to</div><strong>${esc(sale.customer_name || '—')}</strong><div>${esc(customerAddress || '—')}</div>${sale.phone ? `<div>${esc(sale.phone)}</div>` : ''}</div>
+      <div class="box"><div class="label">Payment status</div><span class="status">${esc(sale.payment_status || 'unpaid')}</span>${seller.gstin ? `<div style="margin-top:10px"><span class="label">Seller GSTIN</span><br>${esc(seller.gstin)}</div>` : ''}</div></section>
+    <table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+    <section class="totals"><div class="line"><span>Total</span><span>${esc(amount(sale.total))}</span></div><div class="line"><span>Amount received</span><span>${esc(amount(sale.amount_received))}</span></div><div class="line grand"><span>Balance due</span><span>${esc(amount(due))}</span></div></section>
+    <footer class="foot">Thank you for your purchase.</footer><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))</script></body></html>`)
+  win.document.close()
 }
 
 async function hoFlag(sc, flag) {

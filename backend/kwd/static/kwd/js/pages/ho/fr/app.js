@@ -8,6 +8,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: 'dashboard' },
   { id: 'leads', label: 'Leads', icon: 'followup' },
   { id: 'sales', label: 'Sales', icon: 'rupee' },
+  { id: 'invoices', label: 'Invoices', icon: 'list' },
   { id: 'stock', label: 'Stock', icon: 'box' },
   { id: 'meetings', label: 'Meetings', icon: 'present' },
   { id: 'franchisees', label: 'Franchisees', icon: 'users' },
@@ -15,7 +16,7 @@ const TABS = [
 ]
 const SIDE = [{ label: 'Franchise', items: TABS.slice(0, 5) }, { label: 'Set up', items: TABS.slice(5) }]
 const PAGES = {
-  overview: () => import('./overview.js'), leads: () => import('./leads.js'), sales: () => import('./sales.js'), stock: () => import('./stock.js'),
+  overview: () => import('./overview.js'), leads: () => import('./leads.js'), sales: () => import('./sales.js'), invoices: () => import('./invoices.js'), stock: () => import('./stock.js'),
   meetings: () => import('./meetings.js'), franchisees: () => import('./franchisees.js'), targets: () => import('./targets.js'),
 }
 
