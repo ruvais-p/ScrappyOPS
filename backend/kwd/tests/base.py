@@ -12,8 +12,17 @@ from core.services.common import fetch, fetch_one
 
 PW = "Test#Pass123"
 IST = ZoneInfo("Asia/Kolkata")
-PNG = (b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?"
-       b"\x00\x05\xfe\x02\xfe\xdc\xccY\xe7\x00\x00\x00\x00IEND\xaeB`\x82")
+
+
+def _png():
+    import io
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (8, 8), (200, 40, 40)).save(out, format="PNG")
+    return out.getvalue()
+
+
+PNG = _png()          # a real (tiny) picture: storage decodes every upload and saves it again as a JPEG
 
 
 class QueryError(Exception):
@@ -67,7 +76,7 @@ class Person:
         return out
 
     def upload(self, name=None):
-        path = f"{self.uid}/{name or uuid.uuid4().hex[:12]}.png"
+        path = f"{self.uid}/{name or uuid.uuid4().hex[:12]}.jpg"
         r = self.client.post(f"/kwd/api/storage/upload?path={path}", data=PNG, content_type="image/png", **self.h)
         assert r.status_code == 200, r.content
         return path

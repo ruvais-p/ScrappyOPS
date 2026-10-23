@@ -98,21 +98,21 @@ class StorageTests(KwdCase):
         self.assertEqual(self.client.post(f"/kwd/api/storage/upload?path={too_deep}", data=PNG, content_type="image/jpeg", **self.tso.h).status_code, 403)
 
     def test_upload_sign_and_read(self):
-        path = self.tso.upload("evidence.png")
+        path = self.tso.upload("evidence.jpg")
         r = self.client.post(f"/kwd/api/storage/upload?path={path}", data=PNG, content_type="image/png", **self.tso.h)
         self.assertEqual(r.status_code, 409)                                                     # a file is never replaced
-        other = f"{self.tso2_id}/mine.png"
+        other = f"{self.tso2_id}/mine.jpg"
         r = self.client.post(f"/kwd/api/storage/upload?path={other}", data=PNG, content_type="image/png", **self.tso.h)
         self.assertEqual(r.status_code, 403)                                                     # only into your own folder
-        r = self.client.post(f"/kwd/api/storage/upload?path={self.tso_id}/x.png", data=b"not an image", content_type="text/plain", **self.tso.h)
+        r = self.client.post(f"/kwd/api/storage/upload?path={self.tso_id}/x.jpg", data=b"not an image", content_type="text/plain", **self.tso.h)
         self.assertEqual(r.status_code, 400)
-        r = self.client.post(f"/kwd/api/storage/upload?path={self.tso_id}/../hack.png", data=PNG, content_type="image/png", **self.tso.h)
+        r = self.client.post(f"/kwd/api/storage/upload?path={self.tso_id}/../hack.jpg", data=PNG, content_type="image/png", **self.tso.h)
         self.assertEqual(r.status_code, 403)
         for who, ok in ((self.tso, True), (self.zm, True), (self.ho, True), (self.tso2, False), (self.fr, False)):
             r = who.raw("/kwd/api/storage/sign", {"path": path, "expiresIn": 300})
             self.assertEqual(r.status_code == 200, ok, who.email)
         url = self.zm.raw("/kwd/api/storage/sign", {"path": path, "expiresIn": 300}).json()["signedUrl"]
         got = self.client.get(url)
-        self.assertEqual((got.status_code, got["Content-Type"]), (200, "image/png"))
-        self.assertEqual(b"".join(got.streaming_content), PNG)
+        self.assertEqual((got.status_code, got["Content-Type"]), (200, "image/jpeg"))
+        self.assertTrue(b"".join(got.streaming_content).startswith(b"\xff\xd8"))          # stored as a JPEG, whatever was sent
         self.assertEqual(self.client.get("/kwd/api/storage/object?token=garbage").status_code, 404)
