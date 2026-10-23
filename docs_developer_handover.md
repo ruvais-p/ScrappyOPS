@@ -128,6 +128,13 @@ Tabs: **Overview**, **Franchises**, **Leads** (upload + reassign/cancel), **Pick
 
 **HQ requirements and releases:** HQ raises a requirement (code `RQ-0001`...) for an item and kg. The supervisor releases stock against it (code `RL-0301`...) with a vehicle number. The database refuses a release larger than the remaining need or than the stock, refuses a cancelled requirement, and locks the item row so two releases cannot race.
 
+**Vehicle loads for HQ (dispatch flow, added after the first handover):** stock now leaves the yard in two hands.
+1. HQ raises requirements as before and sets **what it pays the franchise per kg** for each material (`hq_set_buy_rate`, HQ's Rates tab; price history in `hq_buy_rates`, current price in view `current_hq_buy_rates`). The price is the same for every franchise.
+2. When the HQ pickup vehicle is loaded, the **warehouse manager** enters the quantity of each material and the vehicle number and sends it to the supervisor (`wh_submit_dispatch`, code `DP-0001`...). One load carries one franchise's stock, one line per HQ request. Nothing leaves the stock yet, but the kg are reserved so two waiting loads cannot promise the same stock or more than HQ asked for.
+3. The **supervisor** finalizes it or sends it back with a reason (`sup_review_dispatch`). A different person from the preparer must decide. Finalizing creates the normal `hq_releases` rows (so stock and requirement progress work as before) and fixes the price per kg and the amount on each line; a later price change never alters a finalized load. If HQ has not set a price for a material the supervisor is told to ask HQ. A sent-back load is corrected and resent with the same code (`wh_submit_dispatch` with `p_dispatch_id`); the warehouse manager can also withdraw it (`wh_withdraw_dispatch`).
+4. **Prices are for the supervisor and HQ only**: `sup_stock_value` (the supervisor's "Sale prices" section: stock, HQ price per kg, stock value, sold to HQ, waiting for approval) and the price columns of `wh_dispatches` are refused or left out for warehouse managers and drivers. The tables are not readable through `/rest/v1`.
+The old one-step `release_to_hq` still exists in the API but the warehouse screen no longer offers it.
+
 **Cash:** 
 - `issue_float` (warehouse/hq): positive amount up to ₹5,00,000 to an active driver, written to `cash_ledger` as `float_issued`.
 - Paying a customer in cash reduces the driver's cash-in-hand; the driver cannot pay cash beyond cash in hand.

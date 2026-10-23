@@ -458,6 +458,64 @@ class HqRelease(AppendOnlyModel):
         super().save(*args, **kwargs)
 
 
+class HqBuyRate(models.Model):
+    """What HQ pays a franchise per kg for each material (the sale price of the franchise's stock). Price history: the newest
+    rate whose effective_from has passed is the current one. Only HQ sets it; supervisors read it, warehouse managers never see it."""
+    item = models.ForeignKey(ScrapItem, on_delete=models.CASCADE, related_name="buy_rates")
+    rate_per_kg = models.DecimalField(max_digits=12, decimal_places=2)
+    effective_from = models.DateTimeField(db_default=Now())
+    set_by = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", db_column="set_by")
+
+    class Meta:
+        db_table = "hq_buy_rates"
+        constraints = [models.CheckConstraint(condition=Q(rate_per_kg__gt=0), name="hq_buy_rates_positive")]
+
+
+DISPATCH_STATUSES = ("pending", "finalized", "rejected", "withdrawn")
+
+
+class HqDispatch(models.Model):
+    """One vehicle load of stock going to HQ. The warehouse manager enters the quantity of each material and sends it to the
+    supervisor (pending); the supervisor finalizes it (which records the releases and the price) or sends it back (rejected)."""
+    code = models.TextField(unique=True)
+    franchise = models.ForeignKey(Franchise, on_delete=models.PROTECT)
+    vehicle_no = models.TextField()
+    status = models.TextField(default="pending")
+    note = models.TextField(null=True, blank=True)
+    prepared_by = models.ForeignKey(Profile, on_delete=models.PROTECT, related_name="+", db_column="prepared_by")
+    prepared_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", db_column="reviewed_by")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "hq_dispatches"
+        indexes = [models.Index(fields=["franchise", "status"], name="hq_dispatches_franchise_idx")]
+        constraints = [models.CheckConstraint(condition=Q(status__in=DISPATCH_STATUSES), name="hq_dispatches_status_check")]
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = f"DP-{next_number('dispatch_code'):04d}"
+        super().save(*args, **kwargs)
+
+
+class HqDispatchLine(models.Model):
+    dispatch = models.ForeignKey(HqDispatch, on_delete=models.CASCADE, related_name="lines")
+    requirement = models.ForeignKey(HqRequirement, on_delete=models.PROTECT, related_name="+")
+    item = models.ForeignKey(ScrapItem, on_delete=models.PROTECT, related_name="+")
+    kg = models.DecimalField(max_digits=14, decimal_places=3)
+    price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)     # fixed when the supervisor finalizes
+    amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    release = models.ForeignKey(HqRelease, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        db_table = "hq_dispatch_lines"
+        constraints = [
+            models.CheckConstraint(condition=Q(kg__gt=0), name="hq_dispatch_lines_kg_check"),
+            models.UniqueConstraint(fields=["dispatch", "requirement"], name="hq_dispatch_lines_once"),
+        ]
+
+
 class CashSettlement(models.Model):
     """The cash a collector handed back at the warehouse, counted by one person and verified by another."""
     load = models.OneToOneField(Load, on_delete=models.PROTECT, related_name="settlement")

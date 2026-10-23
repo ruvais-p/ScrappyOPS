@@ -22,13 +22,14 @@ scrappy_backend/
   scrappy/            settings, URLs, ASGI entry (also serves the live-update websocket)
   core/
     models.py         every table (same names and columns as the old database)
-    migrations/       0001 tables · 0002 reporting views, running numbers, tamper guards · 0003 live-update notes
+    migrations/       0001 tables · 0002 reporting views, running numbers, tamper guards · 0003 live-update notes · 0004 vehicle loads for HQ and HQ's purchase price
     auth.py           login, refresh, logout, "newest login wins", rate limit
     api/              views.py (HTTP), rest.py (table reads, per-role), frontend.py (optional: serve the website)
     realtime.py       live updates websocket
     services/
       pickup.py       collector: start, weigh, send, WhatsApp text, agree, pay, could-not-complete, end route
       warehouse.py    weighing + tolerance, stock, HQ requirements, releases, float, cash count, verify, leads assign/split, reports
+      dispatch.py     vehicle loads for HQ: warehouse manager enters quantities, supervisor finalizes; HQ's purchase price (sale price of stock)
       hq.py           HQ reports, franchises, people, rates, materials, lead moves, dispute decisions
       lead_import.py  HQ Excel upload checks (phone, date, time, location, driver, franchise, duplicates)
       invoice.py      the branded A4 bill (ReportLab)

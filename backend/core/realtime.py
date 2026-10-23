@@ -24,7 +24,7 @@ from core.models import AuthSession, Profile
 log = logging.getLogger("scrappy.realtime")
 
 # who may be told about which table
-STAFF_TABLES = {"hq_requirements", "hq_releases", "settlement_resolutions"}
+STAFF_TABLES = {"hq_requirements", "hq_releases", "hq_dispatches", "settlement_resolutions"}
 HQ_ONLY_TABLES = {"hq_audit"}
 HEARTBEAT_TIMEOUT = 90          # seconds of silence before a page is considered gone
 
