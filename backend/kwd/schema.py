@@ -51,9 +51,11 @@ TABLES = {
                                       "amount_received:n payment_status:t needs_install:b delivery_status:t dispatched_on:d delivered_on:d delivered_at:ts delivery_note:t "
                                       "installation_status:t install_planned_on:d installed_on:d installed_at:ts install_note:t install_photo:t flags:a status:t "
                                       "cancel_reason:t cancelled_by:u cancelled_at:ts ho_flag:b ho_flag_reason:t created_by:u created_at:ts"), {"payment_status"}),
-    "fr_sale_items": ("kwd_fr_sale_items", cols("id:u sale_id:u product_id:u qty:i unit_price:n line_total:n"), {"line_total"}),
+    "fr_sale_items": ("kwd_fr_sale_items", cols("id:u sale_id:u product_id:u hsn_sac:t qty:i unit_price:n gst_percent:n gst_amount:n line_total:n"), {"gst_amount", "line_total"}),
     "fr_stock_moves": ("kwd_fr_stock_moves", cols("id:u franchise_id:u product_id:u qty:i kind:t sale_id:u ref_no:t note:t created_by:u created_at:ts"), set()),
     "fr_targets": ("kwd_fr_targets", cols("id:u franchise_id:u month:d product_id:u target_units:i target_amount:n set_by:u updated_at:ts"), set()),
+    "fr_company_settings": ("kwd_fr_company_settings", cols("id:i company_name:t address:t phone:t gstin:t email:t state:t updated_by:u updated_at:ts"), set()),
+    "fr_payment_receipts": ("kwd_fr_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
 }
 
 # views the pages read (computed from the rows the caller may see; see engine.VIEWS)

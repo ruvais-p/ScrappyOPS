@@ -8,25 +8,28 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: 'dashboard' },
   { id: 'leads', label: 'Leads', icon: 'followup' },
   { id: 'sales', label: 'Sales', icon: 'rupee' },
-  { id: 'invoices', label: 'Invoices', icon: 'list' },
+  { id: 'invoices', label: 'Billing', icon: 'rupee' },
   { id: 'stock', label: 'Stock', icon: 'box' },
   { id: 'meetings', label: 'Meetings', icon: 'present' },
   { id: 'franchisees', label: 'Franchisees', icon: 'users' },
   { id: 'targets', label: 'Targets & prices', icon: 'target' },
+  { id: 'company-settings', label: 'Company settings', icon: 'sliders' },
 ]
 const SIDE = [{ label: 'Franchise', items: TABS.slice(0, 5) }, { label: 'Set up', items: TABS.slice(5) }]
 const PAGES = {
   overview: () => import('./overview.js'), leads: () => import('./leads.js'), sales: () => import('./sales.js'), invoices: () => import('./invoices.js'), stock: () => import('./stock.js'),
-  meetings: () => import('./meetings.js'), franchisees: () => import('./franchisees.js'), targets: () => import('./targets.js'),
+  meetings: () => import('./meetings.js'), franchisees: () => import('./franchisees.js'), targets: () => import('./targets.js'), 'company-settings': () => import('./company-settings.js'),
 }
 
 export async function start(root, { profile, onSwitch }) {
   patch(root, `<div class="center">${Loading('Loading franchise module…')}</div>`)
-  const [fr, { products, byId }, districts] = await Promise.all([reloadFranchises(), loadProducts(), loadDistricts()])
+  const [fr, { products, byId }, districts, company] = await Promise.all([
+    reloadFranchises(), loadProducts(), loadDistricts(), supabase.from('fr_company_settings').select('*').eq('id', 1).maybeSingle(),
+  ])
   if (fr.error) return patch(root, Blocked(errText(fr.error)))
 
   const state = { route: { page: 'overview' }, screen: null, token: 0 }
-  const data = { frs: fr.data, products, byId, districts, reload }
+  const data = { frs: fr.data, products, byId, districts, company: company.data, reload }
   async function reload() { const r = await reloadFranchises(); if (!r.error) data.frs = r.data; if (state.screen) state.screen.render() }
 
   root.innerHTML = `<div class="shell mgr"><div class="dc" data-r="top"></div><div class="desk"><div class="dc" data-r="side"></div><main class="content" data-r="page"></main></div><div class="dc" data-r="tabs"></div></div>`

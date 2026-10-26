@@ -99,6 +99,7 @@ ACTIONS = {
     "flag_day": lambda ctx, a: days.flag_day(ctx, a.get("p_day"), a.get("p_flag"), a.get("p_reason")),
     "fr_record_sale": lambda ctx, a: franchise.record_sale(ctx, **{k: v for k, v in a.items()}),
     "fr_cancel_sale": lambda ctx, a: franchise.cancel_sale(ctx, a.get("p_sale"), a.get("p_reason")),
+    "fr_receive_payment": lambda ctx, a: franchise.receive_payment(ctx, a.get("p_sale"), a.get("p_amount"), a.get("p_method"), a.get("p_reference")),
 }
 
 

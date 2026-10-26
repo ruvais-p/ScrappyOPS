@@ -56,6 +56,29 @@ class FrProducts(FrFranchises):
     defaults = {"is_active": True, "unit": "unit", "needs_install": False, "sort": 0}
 
 
+class FrCompanySettings(Rules):
+    api = "fr_company_settings"
+    audit = ("INSERT", "UPDATE")
+    defaults = {"id": 1}
+
+    def insert_check(self, ctx, S, P, new):
+        return ctx.role == HO and new.get("id") == 1
+
+    def update_using(self, ctx, S, a):
+        return S.is_ho()
+
+    def update_check(self, ctx, S, P, new):
+        return ctx.role == HO and new.get("id") == 1
+
+    def before_insert(self, ctx, new):
+        new["id"], new["updated_by"], new["updated_at"] = 1, ctx.uid, now()
+        return new
+
+    def before_update(self, ctx, old, new, keys):
+        new["id"], new["updated_by"], new["updated_at"] = 1, ctx.uid, now()
+        return new
+
+
 class FrTargets(Rules):
     api = "fr_targets"
     audit = ("INSERT", "UPDATE", "DELETE")
@@ -324,13 +347,23 @@ class FrStockMoves(Rules):
 
 # ---------------------------------------------------------------------------------------------- actions
 def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_phone=None, p_district=None, p_place=None,
-                p_sale_date=None, p_invoice_no=None, p_amount_received=None, p_items=None):
-    """A franchisee records a sale. Stock leaves automatically; the lead (if any) is closed as won."""
+                p_sale_date=None, p_invoice_no=None, p_amount_received=None, p_items=None, p_franchise=None):
+    """A franchisee records a sale, or Head Office records one for a franchisee."""
     from datetime import date
     from uuid import UUID
-    f = ctx.franchise_id
-    if f is None or ctx.role != FR:
-        raise ApiError("Only a franchisee can record a sale")
+    if ctx.role == FR:
+        f = ctx.franchise_id
+        if f is None:
+            raise ApiError("Franchise not found")
+    elif ctx.role == HO and p_franchise:
+        try:
+            f = str(UUID(str(p_franchise)))
+        except (ValueError, TypeError):
+            raise ApiError("Choose an active franchisee")
+        if not fetch_one("select id from kwd_fr_franchises where id = %(f)s and is_active", {"f": f}):
+            raise ApiError("Choose an active franchisee")
+    else:
+        raise ApiError("Choose a franchisee to record this bill")
     if not isinstance(p_items, list) or not p_items:
         raise ApiError("Add at least one product")
     if len(trim(p_customer_name)) < 2:
@@ -356,12 +389,18 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
     for it in p_items:
         try:
             pid, q, pr = UUID(str(it["product_id"])), int(it["qty"]), Decimal(str(it["unit_price"]))
+            gst = Decimal(str(it.get("gst_percent") or 0))
+            hsn = trim(it.get("hsn_sac"))
         except Exception:
-            raise ApiError("Quantity must be at least 1")
+            raise ApiError("Enter valid product, quantity, price and GST details")
         if q <= 0:
             raise ApiError("Quantity must be at least 1")
         if pr <= 0:
             raise ApiError("Enter the selling price")
+        if gst < 0 or gst > 100:
+            raise ApiError("GST must be between 0 and 100 percent")
+        if ctx.role == HO and not hsn:
+            raise ApiError("Enter HSN/SAC for each product")
         prod = fetch_one("select * from kwd_fr_products where id = %(i)s and is_active", {"i": pid})
         if not prod:
             raise ApiError("Unknown product")
@@ -369,10 +408,11 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
         have = on_hand(f, pid)
         if have < q:
             raise ApiError(f"Only {have} of {prod['name']} in stock")
-        fetch_one("insert into kwd_fr_sale_items (sale_id, product_id, qty, unit_price) values (%(s)s, %(p)s, %(q)s, %(u)s) returning id",
-                  {"s": s["id"], "p": pid, "q": q, "u": pr})
+        fetch_one("insert into kwd_fr_sale_items (sale_id, product_id, hsn_sac, qty, unit_price, gst_percent) "
+                  "values (%(s)s, %(p)s, %(h)s, %(q)s, %(u)s, %(g)s) returning id",
+                  {"s": s["id"], "p": pid, "h": hsn or None, "q": q, "u": pr, "g": gst})
         add_stock_move(ctx.uid, f, pid, -q, "sale", s["id"])
-        total += q * pr
+        total += q * pr * (Decimal(1) + gst / Decimal(100))
         install = install or prod["needs_install"]
         if prod["list_price"] is not None and pr < prod["list_price"] * Decimal("0.9"):
             fl.append("below_list_price")
@@ -408,3 +448,37 @@ def cancel_sale(ctx, p_sale, p_reason):
     from kwd.rules import RULES
     RULES["fr_sales"]._audit(ctx, "UPDATE", sl, row, row["id"])
     return None
+
+
+def receive_payment(ctx, p_sale, p_amount, p_method, p_reference=None):
+    """Record an additional customer payment against an active franchise invoice (Head Office only)."""
+    from decimal import InvalidOperation
+
+    if ctx.role != HO:
+        raise ApiError("Only Head Office can record invoice payments")
+    try:
+        amount = Decimal(str(p_amount))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ApiError("Enter a valid payment amount")
+    if amount <= 0:
+        raise ApiError("Payment amount must be greater than zero")
+    if p_method not in ("cash", "upi", "bank_transfer", "cheque", "card", "other"):
+        raise ApiError("Choose a payment method")
+    sale = fetch_one("select * from kwd_fr_sales where id = %(i)s for update", {"i": p_sale})
+    if not sale or sale["status"] != "active":
+        raise ApiError("Active invoice not found")
+    due = Decimal(str(sale["total"])) - Decimal(str(sale["amount_received"]))
+    if due <= 0:
+        raise ApiError("This invoice has no balance due")
+    if amount > due:
+        raise ApiError(f"Payment cannot exceed the balance due ({due})")
+    receipt = fetch_one(
+        "insert into kwd_fr_payment_receipts (sale_id, amount, method, reference, received_by) "
+        "values (%(s)s, %(a)s, %(m)s, %(r)s, %(u)s) returning *",
+        {"s": sale["id"], "a": amount, "m": p_method, "r": trim(p_reference) or None, "u": ctx.uid},
+    )
+    row = fetch_one("update kwd_fr_sales set amount_received = amount_received + %(a)s where id = %(i)s returning *",
+                    {"a": amount, "i": sale["id"]})
+    from kwd.rules import RULES
+    RULES["fr_sales"]._audit(ctx, "UPDATE", sale, row, row["id"])
+    return receipt["id"]

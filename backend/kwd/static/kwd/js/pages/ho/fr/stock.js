@@ -29,7 +29,7 @@ export default {
     const fname = (id) => (frs.find((f) => f.id === id) || {}).business_name || '—'
     const shown = S.moves.filter((m) => (S.only === 'adjust' ? ['damaged', 'returned', 'count_adjust'].includes(m.kind) : S.only === 'in' ? ['opening', 'received'].includes(m.kind) : true))
     return html`${PageHead({ label: 'Franchise', title: 'Stock', sub: 'What each franchisee holds. Corrections, damage and returns are listed below so you can question them.',
-        actions: html`<button class="btn primary" data-act="openSend">${Icon('truck', 18)} Dispatch stock</button>` })}
+        actions: html`<div class="row"><button class="btn" data-act="refresh">Refresh</button><button class="btn primary" data-act="openSend">${Icon('truck', 18)} Dispatch stock</button></div>` })}
       ${frs.length === 0 ? Empty('No franchisees yet.') : html`<div class="table-wrap"><table>
         <thead><tr><th>Franchisee</th>${prods.map((p) => html`<th class="num" title="${p.name}">${p.code}</th>`)}<th class="num">Total</th></tr></thead>
         <tbody>${frs.map((f) => {
@@ -50,6 +50,7 @@ export default {
   },
   actions: {
     only(el) { this.set({ only: el.dataset.k }) },
+    async refresh() { await this.actions.load.call(this) },
     openSend() { this.set({ send: true, fid: '', rows: [{ product_id: '', qty: '' }], ref: '', serr: '' }) },
     closeSend() { this.set({ send: false }) },
     addRow() { this.set({ rows: [...this.S.rows, { product_id: '', qty: '' }] }) },
@@ -71,9 +72,9 @@ export default {
       const { error } = await supabase.from('fr_stock_moves').insert(ok.map((r) => ({ franchise_id: S.fid, product_id: r.product_id, qty: Number(r.qty), kind: 'received', ref_no: S.ref.trim() || null, note: 'Dispatched by Head Office' })))
       this.set({ busy: false })
       if (error) return this.set({ serr: errText(error) })
-      toast('Stock added to the franchisee')
-      this.set({ send: false })
       await this.actions.load.call(this)
+      this.set({ send: false })
+      toast('Stock added to the franchisee')
     },
   },
 }
