@@ -1,85 +1,84 @@
-/* Head Office: the presentation appointments franchisees have booked and how they went. */
-import { html, raw, supabase, errText } from '../../../core.js'
+/* Head Office: schedule and complete B2B, B2C and B2G meetings. */
+import { html, raw, supabase, errText, toast } from '../../../core.js'
 import { Loading, Empty, Icon, PageHead, Stat } from '../../../ui.js'
 import { Sheet } from '../../../kit.js'
-import { signedUrl, mapLink } from '../../../expenses.js'
-import { VENUES, OUTCOMES, fmtWhen, monthStart } from '../../../fr.js'
-import { PresPills } from '../../fr/meetings.js'
+import { fmtWhen } from '../../../fr.js'
 
-function detail(S, ctx) {
-  const { frs, byId, districts } = ctx.data, p = S.open
-  const fname = (id) => (frs.find((f) => f.id === id) || {}).business_name || '—'
-  const dName = (id) => (districts.find((d) => d.id === id) || {}).name
-  return Sheet({ title: p.venue_name, close: 'closeOpen', body: html`
-    ${PresPills(p)}
-    <div class="summary" style="margin:12px 0">
-      <div class="summary-row"><span>Franchisee</span><span>${fname(p.franchise_id)}</span></div>
-      <div class="summary-row"><span>When</span><span>${fmtWhen(p.scheduled_at)}</span></div>
-      <div class="summary-row"><span>Where</span><span>${[p.lsgd_name, dName(p.district_id), p.address].filter(Boolean).join(', ') || '—'}</span></div>
-      <div class="summary-row"><span>Contact</span><span>${[p.contact_person, p.phone].filter(Boolean).join(' · ') || '—'}</span></div>
-      <div class="summary-row"><span>Presenting</span><span>${(p.product_ids || []).map((i) => byId[i] && byId[i].name).filter(Boolean).join(', ') || '—'}</span></div>
-      ${p.purpose ? html`<div class="summary-row"><span>Purpose</span><span>${p.purpose}</span></div>` : ''}
-      ${p.expected_attendees != null ? html`<div class="summary-row"><span>Expected</span><span>${p.expected_attendees}</span></div>` : ''}
-      ${p.status === 'done' ? html`<div class="summary-row"><span>Attended</span><span>${p.actual_attendees}</span></div>
-        <div class="summary-row"><span>Outcome</span><span>${OUTCOMES[p.outcome]}</span></div>
-        ${p.notes ? html`<div class="summary-row"><span>Notes</span><span>${p.notes}</span></div>` : ''}
-        <div class="summary-row"><span>Marked done</span><span>${fmtWhen(p.done_at)}</span></div>` : ''}
-      ${p.status === 'cancelled' ? html`<div class="summary-row"><span>Cancelled because</span><span>${p.cancel_reason}</span></div>` : ''}
-      ${p.reschedule_count > 0 ? html`<div class="summary-row"><span>Date changed</span><span>${p.reschedule_count} time${p.reschedule_count === 1 ? '' : 's'}</span></div>` : ''}
-    </div>
-    ${p.done_lat != null ? html`<a class="btn sm" href="${mapLink(p.done_lat, p.done_lng)}" target="_blank" rel="noreferrer">${Icon('pin', 16)} Where it was marked done</a>` : ''}
-    ${S.photo ? html`<a href="${S.photo}" target="_blank" rel="noreferrer"><img src="${S.photo}" alt="Presentation" style="max-width:100%;border-radius:10px;margin-top:12px"></a>` : ''}` })
+const TYPES = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
+
+function localDateTime() {
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0')
+  return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` }
+}
+
+function scheduleSheet(S) {
+  return Sheet({ title: 'Schedule a meeting', close: 'closeSchedule', body: html`
+    <label>Scheduled date<input type="date" data-bind="form.date" value="${S.form.date}" required></label>
+    <label>Scheduled time<input type="time" data-bind="form.time" value="${S.form.time}" required></label>
+    <label>Meeting type<select data-bind="form.meeting_type">${Object.entries(TYPES).map(([k, v]) => html`<option value="${k}" ${S.form.meeting_type === k ? raw('selected') : ''}>${v}</option>`)}</select></label>
+    <label>Description<textarea rows="4" data-bind="form.description" placeholder="Meeting agenda or details" required>${S.form.description}</textarea></label>
+    ${S.formErr ? html`<p class="error">${S.formErr}</p>` : ''}
+    <button class="btn primary block" data-act="saveSchedule" ${S.busy ? raw('disabled') : ''}>${S.busy ? 'Saving…' : 'Create schedule'}</button>` })
 }
 
 export default {
-  state: { rows: null, err: '', fid: '', vt: '', st: '', open: null, photo: '' },
-  async init() {
-    const { data, error } = await supabase.from('fr_presentations').select('*').order('scheduled_at', { ascending: false })
-    if (error) return this.set({ err: errText(error) })
-    this.set({ rows: data })
-  },
-  view(S, ctx) {
-    const { frs, districts } = ctx.data
+  state: { rows: null, err: '', status: '', showSchedule: false, busy: false, formErr: '', form: { ...localDateTime(), meeting_type: 'B2B', description: '' } },
+  async init() { await this.actions.load.call(this) },
+  view(S) {
     if (S.err) return html`<p class="error">${S.err}</p>`
-    if (!S.rows) return Loading('Loading presentations…')
-    const fname = (id) => (frs.find((f) => f.id === id) || {}).business_name || '—'
-    const dName = (id) => (districts.find((d) => d.id === id) || {}).name
-    const list = S.rows.filter((p) => (!S.fid || p.franchise_id === S.fid) && (!S.vt || p.venue_type === S.vt)
-      && (!S.st || (S.st === 'late' ? p.status === 'scheduled' && new Date(p.scheduled_at) < new Date(Date.now() - 24 * 36e5) : p.status === S.st)))
-    const scoped = S.rows.filter((p) => !S.fid || p.franchise_id === S.fid)
-    const done = scoped.filter((p) => p.status === 'done'), month = monthStart()
-    const att = done.reduce((a, p) => a + (p.actual_attendees || 0), 0)
-    const orders = done.filter((p) => p.outcome === 'order_received').length
-    const upcoming = scoped.filter((p) => p.status === 'scheduled' && new Date(p.scheduled_at) >= new Date())
-    return html`${PageHead({ label: 'Franchise', title: 'Presentations', sub: 'Appointments franchisees have booked, where they are held, and how they went.' })}
+    if (!S.rows) return Loading('Loading meetings…')
+    const pending = S.rows.filter((m) => m.status === 'scheduled')
+    const complete = S.rows.filter((m) => m.status === 'completed')
+    const visible = S.rows.filter((m) => !S.status || m.status === S.status)
+    return html`${PageHead({ label: 'Set up', title: 'Meetings', sub: 'Schedule B2B, B2C and B2G meetings, then mark them complete when they are over.', actions: html`<button class="btn primary" data-act="openSchedule">${Icon('plus', 18)} Create schedule</button>` })}
       <div class="stats">
-        ${Stat({ lead: true, label: 'Coming up', value: upcoming.length, sub: 'booked from today' })}
-        ${Stat({ label: 'Held this month', value: done.filter((p) => p.scheduled_at >= month).length, sub: `${done.length} in total` })}
-        ${Stat({ label: 'People reached', value: att, sub: done.length ? `${Math.round(att / done.length)} per presentation` : '' })}
-        ${Stat({ label: 'Led to an order', value: orders, tone: 'ok', sub: done.length ? `${Math.round((100 * orders) / done.length)}% of those held` : '' })}
+        ${Stat({ lead: true, label: 'Scheduled', value: pending.length, sub: 'awaiting completion' })}
+        ${Stat({ label: 'Completed', value: complete.length, sub: 'meetings held' })}
+        ${Stat({ label: 'Total meetings', value: S.rows.length, sub: 'all schedules' })}
       </div>
-      <div class="toolbar">
-        <select data-bind="fid" data-live aria-label="Franchisee"><option value="">All franchisees</option>${frs.map((f) => html`<option value="${f.id}" ${S.fid === f.id ? raw('selected') : ''}>${f.business_name}</option>`)}</select>
-        <select data-bind="vt" data-live aria-label="Where"><option value="">Anywhere</option>${Object.entries(VENUES).map(([k, v]) => html`<option value="${k}" ${S.vt === k ? raw('selected') : ''}>${v}</option>`)}</select>
-        <select data-bind="st" data-live aria-label="Status"><option value="">Any status</option>
-          ${[['scheduled', 'Booked'], ['done', 'Held'], ['cancelled', 'Cancelled'], ['late', 'No outcome after a day']].map(([k, l]) => html`<option value="${k}" ${S.st === k ? raw('selected') : ''}>${l}</option>`)}</select>
-      </div>
-      ${list.length === 0 ? Empty('No presentations match.') : html`<div class="table-wrap"><table>
-        <thead><tr><th>When</th><th>Franchisee</th><th>Where</th><th>Contact</th><th class="num">People</th><th>Result</th></tr></thead>
-        <tbody>${list.map((p) => html`<tr data-act="open" data-id="${p.id}" style="cursor:pointer">
-          <td>${fmtWhen(p.scheduled_at)}</td><td>${fname(p.franchise_id)}</td>
-          <td style="white-space:normal;max-width:260px"><b>${p.venue_name}</b><div class="muted small">${[p.lsgd_name, dName(p.district_id), p.address].filter(Boolean).join(', ')}</div></td>
-          <td>${p.contact_person || '—'}${p.phone ? html`<div class="muted small">${p.phone}</div>` : ''}</td>
-          <td class="num">${p.actual_attendees ?? p.expected_attendees ?? '—'}</td>
-          <td style="white-space:normal">${PresPills(p)}</td></tr>`)}</tbody></table></div>`}
-      ${S.open ? detail(S, ctx) : ''}`
+      <div class="toolbar"><select data-bind="status" data-live aria-label="Meeting status">
+        <option value="">All meetings</option><option value="scheduled" ${S.status === 'scheduled' ? raw('selected') : ''}>Scheduled</option><option value="completed" ${S.status === 'completed' ? raw('selected') : ''}>Completed</option>
+      </select></div>
+      ${visible.length === 0 ? Empty('No meetings scheduled yet.', { action: html`<button class="btn" data-act="openSchedule">Create a schedule</button>` }) : html`<div class="table-wrap"><table>
+        <thead><tr><th>Scheduled date & time</th><th>Type</th><th>Description</th><th>Status</th><th></th></tr></thead>
+        <tbody>${visible.map((m) => html`<tr>
+          <td>${fmtWhen(m.scheduled_at)}</td><td><b>${TYPES[m.meeting_type] || m.meeting_type}</b></td>
+          <td style="white-space:normal;min-width:220px">${m.description}</td>
+          <td>${m.status === 'completed' ? html`<span class="pill ok">Completed</span>` : html`<span class="pill warn">Scheduled</span>`}</td>
+          <td>${m.status === 'scheduled' ? html`<button class="btn sm" data-act="complete" data-id="${m.id}">Complete</button>` : ''}</td>
+        </tr>`)}</tbody></table></div>`}
+      ${S.showSchedule ? scheduleSheet(S) : ''}`
   },
   actions: {
-    open(el) {
-      const p = this.S.rows.find((r) => r.id === el.dataset.id)
-      this.set({ open: p, photo: '' })
-      if (p.done_photo) signedUrl(p.done_photo).then((u) => this.set({ photo: u }))
+    openSchedule() {
+      this.set({ showSchedule: true, formErr: '', form: { ...localDateTime(), meeting_type: 'B2B', description: '' } })
     },
-    closeOpen() { this.set({ open: null }) },
+    closeSchedule() { this.set({ showSchedule: false, formErr: '' }) },
+    async saveSchedule() {
+      const f = this.S.form
+      if (!f.date || !f.time) return this.set({ formErr: 'Choose the meeting date and time.' })
+      if (f.description.trim().length < 2) return this.set({ formErr: 'Enter a description for the meeting.' })
+      const scheduledAt = new Date(`${f.date}T${f.time}`)
+      if (Number.isNaN(scheduledAt.getTime())) return this.set({ formErr: 'Choose a valid date and time.' })
+      this.set({ busy: true, formErr: '' })
+      const { error } = await supabase.from('fr_meetings').insert({
+        scheduled_at: scheduledAt.toISOString(), meeting_type: f.meeting_type, description: f.description.trim(),
+      })
+      if (error) return this.set({ busy: false, formErr: errText(error) })
+      this.set({ showSchedule: false, busy: false })
+      toast('Meeting scheduled')
+      await this.actions.load.call(this)
+    },
+    async complete(el) {
+      const { error } = await supabase.from('fr_meetings').update({ status: 'completed' }).eq('id', el.dataset.id)
+      if (error) return toast(errText(error), 'bad')
+      toast('Meeting marked complete')
+      await this.actions.load.call(this)
+    },
+    async load() {
+      const { data, error } = await supabase.from('fr_meetings').select('*').order('scheduled_at', { ascending: false })
+      if (error) return this.set({ err: errText(error) })
+      this.set({ rows: data, err: '' })
+    },
   },
 }

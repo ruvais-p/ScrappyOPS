@@ -125,11 +125,11 @@ class Franchise(models.Model):
         ]
 
 
-ROLES = ("driver", "hq", "warehouse", "supervisor")
+ROLES = ("driver", "hq", "warehouse", "supervisor", "super_admin")
 
 
 class Profile(models.Model):
-    """id is the login's id. Role: driver (collector), warehouse (warehouse manager), supervisor, hq."""
+    """Login role: driver, warehouse, supervisor, HQ, or read-only Super Admin."""
     user = models.OneToOneField(User, primary_key=True, on_delete=models.CASCADE, db_column="id", related_name="profile")
     full_name = models.TextField()
     phone = models.TextField(null=True, blank=True)
@@ -137,6 +137,7 @@ class Profile(models.Model):
     territory = models.TextField(null=True, blank=True)
     vehicle_no = models.TextField(null=True, blank=True)
     active = models.BooleanField(default=True)
+    is_super_admin = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     franchise = models.ForeignKey(Franchise, null=True, blank=True, on_delete=models.PROTECT, related_name="people")
 
@@ -145,7 +146,7 @@ class Profile(models.Model):
         indexes = [models.Index(fields=["franchise"], name="profiles_franchise_idx")]
         constraints = [
             models.CheckConstraint(condition=Q(role__in=ROLES), name="profiles_role_check"),
-            models.CheckConstraint(condition=Q(role="hq") | Q(franchise__isnull=False), name="profiles_franchise_check"),
+            models.CheckConstraint(condition=Q(role__in=("hq", "super_admin")) | Q(franchise__isnull=False), name="profiles_franchise_check"),
         ]
 
 

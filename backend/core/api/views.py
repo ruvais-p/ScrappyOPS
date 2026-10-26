@@ -16,6 +16,7 @@ from core import auth
 from core.models import (AuthSession, Bill, BillItem, Franchise, HqAudit, ImmutableError, Lead, Load, Profile, ScrapItem,
                          User)
 from core.services import hq as hq_service            # noqa: F401  (registers the HQ actions)
+from core.services import super_admin as super_admin_service  # noqa: F401
 from core.services import lead_import                 # noqa: F401
 from core.services import dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse and stock-to-HQ actions)
 from core.services.common import ApiError, Ctx, UUID_RE, btrim

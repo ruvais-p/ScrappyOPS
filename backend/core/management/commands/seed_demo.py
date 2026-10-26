@@ -6,7 +6,7 @@ from core.models import Franchise, Profile, User
 
 
 class Command(BaseCommand):
-    help = "DEVELOPMENT ONLY: make one login for every role (HQ, supervisor, warehouse manager, collector) with a known password."
+    help = "DEVELOPMENT ONLY: make demo logins for every role with a known password."
 
     def add_arguments(self, parser):
         parser.add_argument("--password", default="Scrappy#2026")
@@ -18,11 +18,13 @@ class Command(BaseCommand):
         from django.core.management import call_command
         call_command("seed_defaults")
         fr = Franchise.objects.get(code="KKD")
-        people = [("hq@scrappy.test", "HQ Admin", "hq", None), ("supervisor@scrappy.test", "Sumi Supervisor", "supervisor", fr),
+        people = [("hq@scrappy.test", "HQ Admin", "hq", None), ("superadmin@scrappy.test", "Scrappy Super Admin", "super_admin", None),
+                  ("supervisor@scrappy.test", "Sumi Supervisor", "supervisor", fr),
                   ("warehouse@scrappy.test", "Sumesh Warehouse", "warehouse", fr), ("driver@scrappy.test", "Basim Collector", "driver", fr)]
         for email, name, role, f in people:
             u = User.objects.filter(email=email).first() or User.objects.create_user(email, o["password"])
             Profile.objects.get_or_create(user=u, defaults={"full_name": name, "role": role, "franchise": f,
+                                                            "is_super_admin": role == "super_admin",
                                                             "vehicle_no": "KL-07-AB-1234" if role == "driver" else None})
             self.stdout.write(f"{role:11} {email}")
         self.stdout.write(self.style.SUCCESS(f"Demo logins ready. Password: {o['password']}"))

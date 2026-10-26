@@ -6,7 +6,10 @@ import { fmtINR, fmtDate, istDate, addDays } from '../../lib.js'
 import { Loading } from '../../ui.js'
 import { Sheet, errLine } from '../../kit.js'
 import { takePhoto, uploadPhoto, signedUrl } from '../../expenses.js'
-import { CUSTOMER_TYPES, LEAD_STATUS, DELIVERY, INSTALL, PAYMENT, SALE_FLAG } from '../../fr.js'
+import { LEAD_STATUS, DELIVERY, INSTALL, PAYMENT, SALE_FLAG } from '../../fr.js'
+
+const BILL_TYPES = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
+const billTypeForLead = (type) => ({ private: 'B2C', lsgd: 'B2G', institution: 'B2B', business: 'B2B' })[type] || 'B2C'
 
 export const LeadPill = (status) => html`<span class="pill ${(LEAD_STATUS[status] && LEAD_STATUS[status].tone) || ''}">${(LEAD_STATUS[status] && LEAD_STATUS[status].label) || status}</span>`
 
@@ -26,11 +29,11 @@ export const saleForm = {
     const first = lead && lead.product_id ? byId[lead.product_id] : null
     return {
       f: {
-        customer_name: (lead && lead.customer_name) || '', customer_type: (lead && lead.customer_type) || 'private', phone: (lead && lead.phone) || '',
-        district: (lead && lead.district_id) || '', place: (lead && lead.place) || '', sale_date: istDate(), invoice_no: '', received: '',
+        customer_name: (lead && lead.customer_name) || '', customer_type: billTypeForLead(lead && lead.customer_type), phone: (lead && lead.phone) || '',
+        district: (lead && lead.district_id) || '', place: (lead && lead.place) || '', sale_date: istDate(), received: '',
         franchise_id: ctx.props.franchiseId || '',
       },
-      items: [{ product_id: first ? first.id : '', hsn_sac: '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '', gst_percent: 0 }],
+      items: [{ product_id: first ? first.id : '', hsn_sac: first && first.hsn_sac || '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '', gst_percent: first ? first.gst_percent ?? 0 : 0 }],
       busy: false, err: '', stockByFr: ctx.props.stockByFr || {},
     }
   },
@@ -47,7 +50,7 @@ export const saleForm = {
         ${!f.franchise_id ? html`<p class="muted small">Choose a franchisee to load its current stock before selecting products.</p>` : ''}` : ''}
       <label>Customer name<input data-bind="f.customer_name" value="${f.customer_name}"></label>
       <div class="grid2">
-        <label>Customer type<select data-bind="f.customer_type">${Object.entries(CUSTOMER_TYPES).map(([k, v]) => opt(k, f.customer_type, v))}</select></label>
+        <label>Customer type<select data-bind="f.customer_type">${Object.entries(BILL_TYPES).map(([k, v]) => opt(k, f.customer_type, v))}</select></label>
         <label>Mobile<input type="tel" inputmode="numeric" data-bind="f.phone" value="${f.phone}" placeholder="10 digits"></label>
       </div>
       <div class="grid2">
@@ -80,7 +83,6 @@ export const saleForm = {
       <div class="summary" style="margin:14px 0"><div class="summary-row"><span>Total</span><span><b>${fmtINR(total)}</b></span></div></div>
       <div class="grid2">
         <label>Money received now (₹)<input type="number" min="0" inputmode="decimal" data-bind="f.received" value="${f.received}" placeholder="0"></label>
-        <label>Invoice no. (optional)<input data-bind="f.invoice_no" value="${f.invoice_no}" placeholder="Auto-generated if blank"></label>
       </div>
       <label>Sale date<input type="date" data-bind="f.sale_date" data-live value="${f.sale_date}" min="${addDays(istDate(), -7)}" max="${istDate()}"></label>
       ${f.sale_date < istDate() ? html`<p class="muted small">A sale dated before today is marked "entered for an earlier date".</p>` : ''}
@@ -99,6 +101,8 @@ export const saleForm = {
     pickProduct(el) {
       const q = this.ctx.data.byId[el.value], i = Number(el.dataset.i)
       this.S.items[i].unit_price = q ? q.list_price ?? '' : ''
+      this.S.items[i].hsn_sac = q ? q.hsn_sac || '' : ''
+      this.S.items[i].gst_percent = q ? q.gst_percent ?? 0 : 0
       this.render()
     },
     addItem() { this.set({ items: [...this.S.items, { product_id: '', hsn_sac: '', qty: 1, unit_price: '', gst_percent: 0 }] }) },
@@ -121,7 +125,7 @@ export const saleForm = {
       const { error } = await supabase.rpc('fr_record_sale', {
         p_lead: lead ? lead.id : null, p_customer_name: f.customer_name, p_customer_type: f.customer_type, p_phone: f.phone || null,
         p_franchise: ho ? f.franchise_id : null,
-        p_district: f.district ? Number(f.district) : null, p_place: f.place || null, p_sale_date: f.sale_date, p_invoice_no: f.invoice_no || null,
+        p_district: f.district ? Number(f.district) : null, p_place: f.place || null, p_sale_date: f.sale_date, p_invoice_no: null,
         p_amount_received: Number(f.received || 0),
         p_items: items.map((x) => ({ product_id: x.product_id, hsn_sac: x.hsn_sac.trim(), qty: Number(x.qty), unit_price: Number(x.unit_price), gst_percent: Number(x.gst_percent) || 0 })),
       })

@@ -29,7 +29,7 @@ LOAD_VISIBLE = "(select id from loads where driver_id = %(s_uid)s::uuid or %(s_r
 ANY_LOGIN = "true"
 
 TABLES = {
-    "profiles": (cols("id:u full_name:t phone:t role:t territory:t vehicle_no:t active:b created_at:ts franchise_id:i"),
+    "profiles": (cols("id:u full_name:t phone:t role:t territory:t vehicle_no:t active:b is_super_admin:b created_at:ts franchise_id:i"),
                  "(id = %(s_uid)s::uuid or role = 'hq' or %(s_role)s = 'hq' or (%(s_role)s in ('warehouse','supervisor') and franchise_id = %(s_fr)s::integer))"),
     "franchises": (cols("id:i code:t name:t district:t constituency:t active:b created_at:ts"),
                    "(%(s_role)s = 'hq' or id = %(s_fr)s::integer)"),

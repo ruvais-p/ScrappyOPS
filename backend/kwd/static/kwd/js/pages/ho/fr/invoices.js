@@ -9,7 +9,7 @@ import { printSaleInvoice, saleForm } from '../../fr/parts.js'
 const PAYMENT = { pending: 'Unpaid', unpaid: 'Unpaid', partial: 'Part paid', paid: 'Paid' }
 const DELIVERY = { pending: 'To deliver', dispatched: 'Dispatched', delivered: 'Delivered' }
 const INSTALL = { pending: 'To install', scheduled: 'Installation booked', installed: 'Installed' }
-const CUSTOMER = { private: 'Private', lsgd: 'LSGD', institution: 'Institution', business: 'Business' }
+const CUSTOMER = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
 
 const METHOD = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank transfer', cheque: 'Cheque', card: 'Card', other: 'Other' }
 

@@ -133,6 +133,7 @@ class Scope:
             "fr_franchises": lambda: self.fr_can_see(a + ".id"),
             "fr_company_settings": lambda: self.role_in(HO, FR),
             "fr_payment_receipts": lambda: self.is_ho(),
+            "fr_meetings": lambda: self.is_ho(),
             "fr_lead_events": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_leads": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_presentations": lambda: self.fr_can_see(a + ".franchise_id"),

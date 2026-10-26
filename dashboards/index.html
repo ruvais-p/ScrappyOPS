@@ -179,12 +179,12 @@ form{display:flex;flex-direction:column;gap:16px}
 
 <noscript><p style="color:#fff;padding:24px">Please turn on JavaScript to use Scrappy.</p></noscript>
 <script>
-/* Scrappy: one front door. Logs the person in once, finds their role, and opens their own dashboard.
-   The three dashboards (collector, warehouse, HQ) live in folders next to this page and share this login. */
+/* Scrappy: one front door. Logs the person in once, finds their role, and opens their own dashboard. */
 const SUPABASE_URL = 'https://suluhhbomiuwwocrfpxg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_45-7fJZdo_jovQfhN0dhtw_FNmo1Fw1';
-const KEYS = { collector: 'scrappy_session', warehouse: 'scrappy_wh_session', hq: 'scrappy_hq_session' };
-const DEST = { driver: 'collector', warehouse: 'warehouse', supervisor: 'warehouse', hq: 'hq' };
+const KEYS = { collector: 'scrappy_session', warehouse: 'scrappy_wh_session', hq: 'scrappy_hq_session', super_admin: 'scrappy_super_admin_session' };
+const DEST = { driver: 'collector', warehouse: 'warehouse', supervisor: 'warehouse', hq: 'hq', super_admin: 'super_admin' };
+const DEST_PATH = { collector: '/collector/', warehouse: '/warehouse/', hq: '/hq/', super_admin: '/super-admin/' };
 const $ = s => document.querySelector(s);
 const ls = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }, del: k => { try { localStorage.removeItem(k); } catch (e) {} } };
 const clearAll = () => Object.values(KEYS).forEach(k => ls.del(k));
@@ -223,17 +223,17 @@ $('#login-form').addEventListener('submit', async e => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(/invalid/i.test(data.error_description || data.msg || data.message || '') ? 'Wrong email or password.' : (data.error_description || data.msg || data.message || 'Login failed. Try again.'));
     const session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in || 3600) * 1000, user_id: data.user && data.user.id };
-    const pr = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role,active&id=eq.${session.user_id}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } });
+    const pr = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=role,active,is_super_admin&id=eq.${session.user_id}`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } });
     const rows = await pr.json().catch(() => []);
     const p = Array.isArray(rows) ? rows[0] : null;
-    if (!p || !p.active || !DEST[p.role]) {
+    if (!p || !p.active || !DEST[p.role] || (p.role === 'super_admin' && !p.is_super_admin)) {
       fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
       throw new Error('This login is not set up yet. Ask HQ.');
     }
     clearAll();
     const dest = DEST[p.role];
     ls.set(KEYS[dest], JSON.stringify(session));
-    location.replace(dest + '/');
+    location.replace(DEST_PATH[dest] || '/kwd/');
   } catch (e2) {
     err.textContent = e2.message || 'Login failed. Try again.'; shake();
     btnIdle();

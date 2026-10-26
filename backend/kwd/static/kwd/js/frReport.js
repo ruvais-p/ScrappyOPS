@@ -7,6 +7,8 @@ import {
   CUSTOMER_TYPES, LEAD_STATUS, DELIVERY, INSTALL, PAYMENT, VENUES, OUTCOMES, MOVE_KIND, SALE_FLAG, achievement, monthStart, monthName,
 } from './fr.js'
 
+const BILL_TYPES = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
+
 const OX = 'FF8B1E24', LINE = 'FFE4E1DC', BAND = 'FFFAFAF9'
 const INR = '"₹"#,##0.00', INT = '#,##0'
 const ist = (ts) => (ts ? new Date(new Date(ts).getTime() + 5.5 * 36e5) : null)
@@ -89,7 +91,7 @@ export async function downloadFranchiseReport({ franchiseIds = null, title = 'Al
   sales.forEach((s) => {
     const its = items.filter((i) => i.sale_id === s.id)
     ;(its.length ? its : [null]).forEach((i) => lines.push([
-      fname(s.franchise_id), day(s.sale_date), s.customer_name, CUSTOMER_TYPES[s.customer_type], s.phone, dist[s.district_id] || '', s.place, s.invoice_no,
+      fname(s.franchise_id), day(s.sale_date), s.customer_name, BILL_TYPES[s.customer_type], s.phone, dist[s.district_id] || '', s.place, s.invoice_no,
       i ? prod[i.product_id]?.name : '', i?.qty ?? null, n(i?.unit_price), n(i?.line_total), n(s.total), n(s.amount_received), PAYMENT[s.payment_status],
       DELIVERY[s.delivery_status], day(s.delivered_on), s.needs_install ? INSTALL[s.installation_status] : 'Not needed', day(s.installed_on),
       s.status === 'cancelled' ? 'Cancelled' : 'Active', (s.flags || []).map((f) => SALE_FLAG[f] || f).join('; '), s.ho_flag ? s.ho_flag_reason : '',

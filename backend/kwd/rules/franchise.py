@@ -79,6 +79,38 @@ class FrCompanySettings(Rules):
         return new
 
 
+class FrMeetings(Rules):
+    api = "fr_meetings"
+    audit = ("INSERT", "UPDATE")
+    defaults = {"status": "scheduled", "created_at": lambda c: now()}
+
+    def insert_check(self, ctx, S, P, new):
+        return ctx.role == HO
+
+    def update_using(self, ctx, S, a):
+        return S.is_ho()
+
+    def update_check(self, ctx, S, P, new):
+        return ctx.role == HO
+
+    def before_insert(self, ctx, new):
+        if new.get("meeting_type") not in ("B2B", "B2C", "B2G"):
+            raise ApiError("Choose B2B, B2C or B2G as the meeting type")
+        if len(trim(new.get("description"))) < 2:
+            raise ApiError("Enter a meeting description")
+        new.update(status="scheduled", created_by=ctx.uid, completed_by=None, completed_at=None)
+        return new
+
+    def before_update(self, ctx, old, new, keys):
+        if old["status"] != "scheduled":
+            raise ApiError("This meeting is already complete")
+        if new.get("status") != "completed":
+            raise ApiError("Use the Complete action to finish this meeting")
+        new.update(scheduled_at=old["scheduled_at"], meeting_type=old["meeting_type"], description=old["description"],
+                   created_by=old["created_by"], created_at=old["created_at"], status="completed", completed_by=ctx.uid, completed_at=now())
+        return new
+
+
 class FrTargets(Rules):
     api = "fr_targets"
     audit = ("INSERT", "UPDATE", "DELETE")
@@ -260,7 +292,7 @@ class FrSales(Rules):
                 raise ApiError("Money received cannot be reduced")
             if amount > old["total"]:
                 raise ApiError(f"Money received cannot be more than the sale total ({old['total']})")
-            new["amount_received"], new["invoice_no"] = amount, v["invoice_no"]
+            new["amount_received"], new["invoice_no"] = amount, old["invoice_no"]
             ds = v["delivery_status"]
             if RK.index(ds) < RK.index(old["delivery_status"]):
                 raise ApiError("Delivery cannot go backwards")
@@ -368,7 +400,7 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
         raise ApiError("Add at least one product")
     if len(trim(p_customer_name)) < 2:
         raise ApiError("Enter the customer name")
-    if p_customer_type not in ("private", "lsgd", "institution", "business"):
+    if p_customer_type not in ("B2B", "B2C", "B2G"):
         raise ApiError("Choose the customer type")
     today = ist_today()
     sale_date = date.fromisoformat(str(p_sale_date)[:10]) if p_sale_date else today
@@ -419,7 +451,14 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
     received = Decimal(str(p_amount_received or 0))
     if received > total:
         raise ApiError("Money received cannot be more than the sale total")
-    invoice_no = trim(p_invoice_no) or f"FR-{sale_date:%Y}-{str(s['id']).replace('-', '')[:12].upper()}"
+    business_start = sale_date.year if sale_date.month >= 4 else sale_date.year - 1
+    business_year = f"{business_start % 100:02d}{(business_start + 1) % 100:02d}"
+    counter = fetch_one(
+        "insert into kwd_fr_invoice_counters (business_year, last_number) values (%(fy)s, 1) "
+        "on conflict (business_year) do update set last_number = kwd_fr_invoice_counters.last_number + 1 returning last_number",
+        {"fy": business_year},
+    )["last_number"]
+    invoice_no = f"{p_customer_type}/{business_year}/{sale_date:%m%d}/{counter:03d}"
     row = fetch_one("update kwd_fr_sales set invoice_no = %(inv)s, total = %(t)s, amount_received = %(r)s, needs_install = %(i)s, installation_status = %(is)s, flags = %(fl)s where id = %(id)s returning *",
                     {"inv": invoice_no, "t": total, "r": received, "i": install, "is": "pending" if install else "not_needed", "fl": sorted(set(fl)), "id": s["id"]})
     if p_lead:
