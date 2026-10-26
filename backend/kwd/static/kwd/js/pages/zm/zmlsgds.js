@@ -76,7 +76,8 @@ export default {
     loadTeam(this.ctx.profile).then((t) => this.set(t))
     await this.actions.reload.call(this)
   },
-  view(S) {
+  view(S, ctx) {
+    const isHO = ctx.kind === 'ho'
     const s = S.q.trim().toLowerCase()
     const fy = financialYear()
     const list = (S.rows || [])
@@ -86,7 +87,7 @@ export default {
       .map((l) => ({ ...l, opp: l.opportunities.find((o) => o.financial_year === fy), last: l.visits.map((v) => v.check_in_at).sort().at(-1) }))
     const noLoc = (S.rows || []).filter((l) => l.office_lat == null).length
     const noTso = (S.rows || []).filter((l) => !l.assigned_tso).length
-    return html`${PageHead({ label: 'LSGDs in your districts', title: 'LSGDs', sub: S.rows ? `${S.rows.length} LSGDs` : null,
+    return html`${PageHead({ label: isHO ? 'Network records' : 'LSGDs in your districts', title: isHO ? 'Network LSGDs' : 'LSGDs', sub: S.rows ? `${S.rows.length} LSGDs` : null,
         actions: html`<button class="btn" data-act="openImport">${Icon('upload', 18)} Import CSV</button><button class="btn primary" data-act="add">${Icon('plus', 18)} Add LSGD</button>` })}
       ${noLoc > 0 || noTso > 0 ? html`<p class="notice warn">${noLoc > 0 ? `${noLoc} without an office location (their visits can't be location-checked). ` : ''}${noTso > 0 ? `${noTso} with no TSO assigned.` : ''}</p>` : ''}
       <div class="toolbar">
@@ -187,7 +188,7 @@ export default {
         const d = this.S.districts.find((x) => x.name.toLowerCase() === (r[ix.district] || '').trim().toLowerCase())
         const lat = ix.lat >= 0 && r[ix.lat] ? Number(r[ix.lat]) : null
         const lng = ix.lng >= 0 && r[ix.lng] ? Number(r[ix.lng]) : null
-        const why = !name ? 'no name' : !type ? `unknown type "${r[ix.type] || ''}"` : !d ? `district "${r[ix.district] || ''}" is not yours` :
+        const why = !name ? 'no name' : !type ? `unknown type "${r[ix.type] || ''}"` : !d ? `district "${r[ix.district] || ''}" is not available to your account` :
           (lat != null && (isNaN(lat) || lat < 8 || lat > 13)) || (lng != null && (isNaN(lng) || lng < 74 || lng > 78)) ? 'location outside Kerala' : ''
         if (why) problems.push(`Row ${i + (hasHead ? 2 : 1)}: ${why}`)
         else ok.push({ name, type, district_id: d.id, office_lat: lat, office_lng: lng })
@@ -197,12 +198,9 @@ export default {
     async runImport() {
       const rows = this.S.csvRows
       this.set({ busy: true, ferr: '' })
-      let added = 0
-      for (let i = 0; i < rows.length; i += 200) {
-        const { data, error } = await supabase.from('lsgds').upsert(rows.slice(i, i + 200), { onConflict: 'name,district_id', ignoreDuplicates: true }).select('id')
-        if (error) return this.set({ busy: false, ferr: errText(error) })
-        added += data.length
-      }
+      const { data, error } = await supabase.from('lsgds').upsert(rows, { onConflict: 'name,district_id', ignoreDuplicates: true }).select('id')
+      if (error) return this.set({ busy: false, ferr: errText(error) })
+      const added = data.length
       this.set({ busy: false, result: `${added} new LSGD${added === 1 ? '' : 's'} added. ${rows.length - added} already existed and were left as they were.` })
     },
   },

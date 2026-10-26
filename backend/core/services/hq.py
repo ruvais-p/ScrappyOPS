@@ -213,6 +213,31 @@ def hq_team(ctx, p_franchise=None):
 
 
 @rpc()
+def hq_inventory(ctx, p_franchise=None):
+    """Current stock by material and franchise warehouse, including the warehouse staff assigned there."""
+    _need_hq(ctx)
+    return fetch("""
+      select f.id as franchise_id, f.code as franchise_code, f.name as franchise_name,
+             coalesce(w.warehouse_names, '') as warehouse_names,
+             cr.item_id, cr.item_name, cr.rate_per_kg,
+             coalesce((select sum(lw.warehouse_kg)
+                       from load_weighings lw join loads l on l.id = lw.load_id
+                       where lw.item_id = cr.item_id and lw.franchise_id = f.id
+                         and lw.superseded_at is null and l.status in ('reconciled','flagged')), 0)
+             - coalesce((select sum(r.kg) from hq_releases r
+                         where r.item_id = cr.item_id and r.franchise_id = f.id), 0) as stock_now_kg
+      from franchises f
+      cross join current_rates cr
+      left join lateral (
+        select string_agg(p.full_name, ', ' order by p.full_name) as warehouse_names
+        from profiles p where p.franchise_id = f.id and p.role = 'warehouse' and p.active
+      ) w on true
+      where (%(f)s::integer is null or f.id = %(f)s::integer)
+      order by f.code, cr.item_name
+    """, {"f": p_franchise})
+
+
+@rpc()
 def hq_franchises(ctx, p_from, p_to):
     _need_hq(ctx)
     return fetch("""

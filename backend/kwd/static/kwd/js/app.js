@@ -54,6 +54,7 @@ const MANAGER = {
   signoff: def('./pages/ho/signoff.js'),
   fraud: def('./pages/ho/fraud.js'),
   staff: def('./pages/ho/staff.js'),
+  zlsgds: def('./pages/zm/zmlsgds.js'),
 }
 
 function startShell(root, { profile, kind, onSwitch }) {

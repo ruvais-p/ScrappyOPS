@@ -126,14 +126,19 @@ class Rules:
         self._audit(ctx, "DELETE", old, None, self._row_id(old))
         return old
 
-    def upsert(self, ctx, values, on_conflict):
+    def upsert(self, ctx, values, on_conflict, ignore_duplicates=False):
+        from kwd.scope import Params, Scope
         cols = [c.strip() for c in (on_conflict or ",".join(pk_of(self.api))).split(",")]
         coerced = self._coerce_values(values)
+        if ignore_duplicates:
+            if not check(ctx, lambda S_, P_: self.insert_check(ctx, S_, P_, coerced)):
+                raise rls_error(self.api)
         if all(c in coerced for c in cols):
             where = " and ".join(f"{c} = %({c})s" for c in cols)
             old = fetch_one(f"select * from {self.table} where {where} for update", {c: coerced[c] for c in cols})
             if old is not None:
-                from kwd.scope import Params, Scope
+                if ignore_duplicates:
+                    return None
                 P = Params(ctx)
                 using = self.update_using(ctx, Scope(ctx, P), "t")
                 ok = fetch_one(f"select ({using}) as ok from {self.table} t where " + " and ".join(f"t.{c} = %({c})s" for c in cols),

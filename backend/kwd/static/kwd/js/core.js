@@ -94,7 +94,7 @@ class Query {
   }
   insert(values) { this.q.op = 'insert'; this.q.values = values; this._write = true; this.q.select = null; return this }
   update(values) { this.q.op = 'update'; this.q.values = values; this._write = true; this.q.select = null; return this }
-  upsert(values, opts = {}) { this.q.op = 'upsert'; this.q.values = values; this.q.onConflict = opts.onConflict; this._write = true; this.q.select = null; return this }
+  upsert(values, opts = {}) { this.q.op = 'upsert'; this.q.values = values; this.q.onConflict = opts.onConflict; this.q.ignoreDuplicates = !!opts.ignoreDuplicates; this._write = true; this.q.select = null; return this }
   delete() { this.q.op = 'delete'; this._write = true; this.q.select = null; return this }
   eq(c, v) { this.q.filters.push(['eq', c, v]); return this }
   neq(c, v) { this.q.filters.push(['neq', c, v]); return this }
