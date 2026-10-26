@@ -62,6 +62,7 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 WHITENOISE_USE_FINDERS = True        # serve the apps' static folders directly; `collectstatic` is optional
 WHITENOISE_AUTOREFRESH = DEBUG
+WHITENOISE_MAX_AGE = 0 if DEBUG else 60 * 60 * 24  # don't keep stale JS while developing
 
 ROOT_URLCONF = "scrappy.urls"
 WSGI_APPLICATION = "scrappy.wsgi.application"

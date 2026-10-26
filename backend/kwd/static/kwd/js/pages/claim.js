@@ -348,7 +348,7 @@ export default {
       const S = this.S, { profile } = this.ctx
       this.set({ sErr: '' })
       try {
-        // bills may be photographed later, so gallery photos are allowed; they are stamped with who added them
+        // Bills may be photographed later; stamp them with who added them.
         const lines = S.sheet === 'da'
           ? [`DA bill · ${profile.full_name} · ${fmtDate(S.d.day)}`, `Added ${now()} IST`]
           : [`Bill · ${profile.full_name} · request ${fmtDate(S.d.day)}`, `Added ${now()} IST`]

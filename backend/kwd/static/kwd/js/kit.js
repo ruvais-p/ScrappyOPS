@@ -19,7 +19,9 @@ document.addEventListener('keydown', (e) => {
 
 /** Camera button / preview. `id` links the hidden file input with the button; `act` is the action that receives the chosen file input. */
 export function PhotoButton({ id, label, photo, live = true, change = 'photo' }) {
-  const input = html`<input id="${id}" type="file" accept="image/*" ${live ? raw('capture="environment"') : ''} hidden data-change="${change}">`
+  // Ask supported browsers to capture directly from the camera instead of opening
+  // the photo library. `environment` selects the rear camera on phones.
+  const input = html`<input id="${id}" type="file" accept="image/*" capture="environment" hidden data-change="${change}">`
   return photo
     ? html`${input}<div class="stack"><img class="photo" src="${photo.url}" alt="${label}" style="max-height:220px;object-fit:cover"><button class="btn block" data-act="pickPhoto" data-for="${id}">${Icon('camera', 18)} Retake</button></div>`
     : html`${input}<button class="btn block photo-btn" data-act="pickPhoto" data-for="${id}">${Icon('camera', 20)} ${label}</button>`

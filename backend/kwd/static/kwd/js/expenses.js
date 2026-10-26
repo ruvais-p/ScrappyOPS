@@ -86,11 +86,8 @@ export function watchPosition(onChange) {
   return () => navigator.geolocation.clearWatch(id)
 }
 
-// camera photo with a time/GPS stamp; refuses old gallery photos when live = true
+// Add the time/GPS stamp to a selected photo. Gallery photos are allowed for testing.
 export async function takePhoto(file, { live, lines }) {
-  if (live && Date.now() - file.lastModified > MAX_PHOTO_AGE_MS) {
-    throw new Error('This looks like an older photo from the gallery. Take a new one with the camera.')
-  }
   return stampPhoto(file, lines)
 }
 

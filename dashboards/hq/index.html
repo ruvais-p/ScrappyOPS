@@ -330,6 +330,7 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
       <a href="#leads" data-view="leads">Leads <span class="count" id="nav-leads"></span></a>
       <a href="#pickups" data-view="pickups">Pickups and bills</a>
       <a href="#loads" data-view="loads">Loads and weighing <span class="count" id="nav-loads"></span></a>
+      <a href="#inventory" data-view="inventory">Inventory</a>
       <a href="#stock" data-view="stock">Stock and requests</a>
       <a href="#cash" data-view="cash">Cash <span class="count" id="nav-cash"></span></a>
       <a href="#team" data-view="team">Team</a>
@@ -453,7 +454,7 @@ const S = {
   lf: { status: '', driver: '', q: '' }, leads: [], leadTab: 'list', leadAct: null, imports: [], upload: null,
   bf: { status: '', driver: '', q: '' }, bills: [], billSel: null, billItems: {},
   loads: [], loadFilter: 'attention', loadSel: null, loadDetail: {}, score: [],
-  stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
+  inventory: [], stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
   routes: [], txns: [], cashSel: null, resolutions: [], disputes: [], fd: '', disputeAct: null,
   rates: [], ratehist: [], buy: [], editPerson: null, audit: [],
   feed: [], prevOv: null, wsOpen: false,
@@ -491,6 +492,7 @@ const LOAD = {
     S.bills = await rpc('hq_bills', { ...rangeArgs(), p_status: S.bf.status || null, p_driver: S.bf.driver || null, p_search: S.bf.q || null, p_limit: 300, p_franchise: S.fr || null });
   },
   loads: async () => { [S.loads, S.score] = await Promise.all([rpc('hq_loads', rangeArgs()), rpc('hq_driver_scorecard', rangeArgs())]); },
+  inventory: async () => { S.inventory = await rpc('hq_inventory', { p_franchise: S.fr || null }); },
   stock: async () => {
     [S.stock, S.reqs, S.rels] = await Promise.all([rpc('wh_stock_report', rangeArgs()), rest('hq_requirement_progress?select=*&order=id.desc&limit=300' + frq()),
       rest('hq_releases?select=id,code,requirement_id,item_id,kg,vehicle_no,note,released_by,released_at,franchise_id&order=released_at.desc&limit=200' + frq())]);
@@ -503,7 +505,15 @@ const LOAD = {
   },
   team: async () => { S.score = await rpc('hq_driver_scorecard', rangeArgs()); },
   rates: async () => { [S.rates, S.ratehist, S.buy] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100'), rpc('hq_buy_rates')]); },
-  activity: async () => { S.audit = await rest('hq_audit?select=id,at,by_id,action,ref,detail,franchise_id&order=id.desc&limit=200' + frq()); }
+  activity: async () => {
+    const q = 'hq_audit?select=id,at,by_id,action,ref,detail,franchise_id&order=id.desc&limit=200';
+    if (!S.fr) { S.audit = await rest(q); return; }
+    // Global HQ decisions (such as rates and material changes) have no franchise_id.
+    // Include them alongside entries scoped to the selected franchise.
+    const [scoped, global] = await Promise.all([rest(q + frq()), rest(q + '&franchise_id=is.null')]);
+    S.audit = [...new Map([...scoped, ...global].map(a => [a.id, a])).values()]
+      .sort((a, b) => b.id - a.id).slice(0, 200);
+  }
 };
 async function refresh() {
   await Promise.all([loadBase(), LOAD[curView()]()]);
@@ -934,6 +944,40 @@ function vStock() {
     ${S.rels.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>RELEASE</th><th>DATE</th><th>FOR</th><th>MATERIAL</th><th class="r">KG</th><th>VEHICLE</th><th>RELEASED BY</th></tr></thead><tbody>${S.rels.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${dlabel(dayOf(x.released_at))}</td><td>${esc((S.reqs.find(r => r.id === x.requirement_id) || {}).code || '—')}</td><td>${esc(itemName(x.item_id))}</td><td class="r b">${kg(x.kg)}</td><td>${esc(x.vehicle_no)}</td><td>${esc(personName(x.released_by))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nothing released yet.</div>'}</section>`;
 }
 
+/* ---------- inventory ---------- */
+function vInventory() {
+  const R = S.inventory;
+  const yards = new Map();
+  const materials = new Map();
+  for (const r of R) {
+    const kgNow = num(r.stock_now_kg), value = kgNow * num(r.rate_per_kg);
+    let y = yards.get(r.franchise_id);
+    if (!y) {
+      y = { code: r.franchise_code, name: r.franchise_name, warehouses: r.warehouse_names, kg: 0, value: 0, rows: [] };
+      yards.set(r.franchise_id, y);
+    }
+    y.kg += kgNow; y.value += value; y.rows.push(r);
+    let m = materials.get(r.item_id);
+    if (!m) { m = { name: r.item_name, kg: 0, value: 0 }; materials.set(r.item_id, m); }
+    m.kg += kgNow; m.value += value;
+  }
+  const totalKg = [...yards.values()].reduce((a, y) => a + y.kg, 0);
+  const totalValue = [...yards.values()].reduce((a, y) => a + y.value, 0);
+  return `
+  <div class="head"><div><div class="eyebrow">Inventory</div><h1>Stock across the network</h1>
+    <div class="muted">Current weighed stock, less releases to HQ. Values use the current material rates.</div></div></div>
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Total inventory</span><span class="v">${kg(totalKg)} kg</span><span class="s">${yards.size} franchise warehouse${yards.size === 1 ? '' : 's'}</span></div>
+    <div class="kpi"><span class="l">Estimated value</span><span class="v">${rs(totalValue)}</span><span class="s">At current rates</span></div>
+    <div class="kpi"><span class="l">Materials tracked</span><span class="v">${materials.size}</span><span class="s">Across selected scope</span></div>
+  </div>
+  <section class="card"><div class="card-h"><h2>Inventory by franchise / warehouse</h2><span class="muted small">Select a franchise above to narrow the list</span></div>
+    <div class="scroll"><table style="min-width:680px"><thead><tr><th>FRANCHISE / WAREHOUSE</th><th>WAREHOUSE STAFF</th><th class="r">STOCK</th><th class="r">EST. VALUE</th><th>DETAIL</th></tr></thead>
+      <tbody>${[...yards.values()].map(y => `<tr><td class="b">${esc(y.code)} · ${esc(y.name)}</td><td>${y.warehouses ? esc(y.warehouses) : '<span class="muted">Not assigned</span>'}</td><td class="r b">${kg(y.kg)} kg</td><td class="r">${rs(y.value)}</td><td><details><summary class="linkbtn">Materials</summary><div class="scroll" style="margin-top:8px"><table style="min-width:360px"><thead><tr><th>MATERIAL</th><th class="r">KG</th><th class="r">VALUE</th></tr></thead><tbody>${y.rows.map(m => `<tr><td>${esc(m.item_name)}</td><td class="r">${kg(m.stock_now_kg)}</td><td class="r">${rs(num(m.stock_now_kg) * num(m.rate_per_kg))}</td></tr>`).join('')}</tbody></table></div></details></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No franchise inventory found.</td></tr>'}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>Total by material</h2><span class="muted small">All warehouses in the selected scope</span></div>
+    <div class="scroll"><table style="min-width:420px"><thead><tr><th>MATERIAL</th><th class="r">TOTAL STOCK</th><th class="r">EST. VALUE</th></tr></thead><tbody>${[...materials.values()].sort((a, b) => a.name.localeCompare(b.name)).map(m => `<tr><td class="b">${esc(m.name)}</td><td class="r">${kg(m.kg)} kg</td><td class="r">${rs(m.value)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">No inventory found.</td></tr>'}</tbody></table></div></section>`;
+}
+
 /* ---------- cash ---------- */
 function vCash() {
   const o = S.ov, RR = S.routes.filter(r => (r.route_date >= S.from && r.route_date <= S.to) && (!S.fd || r.driver_id === S.fd));
@@ -1068,6 +1112,7 @@ function auditText(a) {
     case 'leads_unassigned': return `Took back ${esc(a.ref)} from drivers${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
     case 'lead_cancelled': return `Cancelled lead <b>${esc(a.ref)}</b>. Reason: ${esc(d.reason)}`;
     case 'rate_set': return `Changed the <b>${esc(a.ref)}</b> rate from ₹${esc(d.old)} to ₹${esc(d.new)} per kg.`;
+    case 'buy_rate_set': return `Changed the HQ purchase rate for <b>${esc(a.ref)}</b> from ₹${esc(d.old)} to ₹${esc(d.new)} per kg.`;
     case 'profile_updated': return `Updated <b>${esc(a.ref)}</b>${d.was_active !== d.now_active ? (d.now_active ? ' (switched on)' : ' (switched off)') : ''}.`;
     case 'franchise_added': return `Added franchise <b>${esc(a.ref)}</b> (${esc(d.name)}).`;
     case 'franchise_updated': return `Updated franchise <b>${esc(a.ref)}</b>${d.was_active !== d.now_active ? (d.now_active ? ' (switched on)' : ' (switched off)') : ''}${d.old_code && d.old_code !== a.ref ? ', code was ' + esc(d.old_code) : ''}.`;
@@ -1089,7 +1134,7 @@ function vActivity() {
 }
 
 /* ---------- routing and render ---------- */
-const VIEWS = { overview: vOverview, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
+const VIEWS = { overview: vOverview, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, inventory: vInventory, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
 function navCounts() {
   const o = S.ov; if (!o) return;
   const set = (id, n, hot) => { const e = $(id); e.textContent = n || ''; e.classList.toggle('hot', !!hot && n > 0); };

@@ -13,10 +13,12 @@ Open it at `/kwd/` after signing in at `/login/` (one login page for every Scrap
 |---|---|---|
 | `tso` | `/kwd/` | Today, LSGDs, log a visit (6 steps), follow-ups, my work (TA/DA requests, visits, Excel) |
 | `zonal_manager` | `/kwd/` | Overview, visit review, TA/DA verification, planning, LSGDs, call-backs, plus their own field day |
-| `head_office` | `/kwd/` | A choice: **Staff monitoring** (sign-off, TA/DA approval + monthly settlement, fraud check, staff logins, rates) or **Franchise** (leads, sales, stock, meetings, franchisees, targets and prices) |
+| `head_office` | `/kwd/` | A choice: **Staff monitoring** (network LSGDs, sign-off, TA/DA approval + monthly settlement, fraud check, staff logins, rates) or **Franchise** (leads, sales, stock, meetings, franchisees, targets and prices) |
 | `franchisee` | `/kwd/` | Home, leads, sales, stock, meetings, targets |
 
 The scrap app's roles (`driver`, `warehouse`, `supervisor`, `hq`) open `/collector/`, `/warehouse/`, `/hq/` as before.
+
+In the KWD staff-monitoring area, Head Office can manage network LSGDs and Zonal Managers can manage LSGDs in their districts. CSV imports preview and skip invalid rows; the valid rows are submitted together in one transaction. Duplicate name-and-district rows are ignored without changing the existing LSGD or its TSO assignment.
 
 ## Sign-in: one login, the role picks the dashboard (`portal/`)
 

@@ -283,7 +283,9 @@ def run_query(ctx, q):
         vals = q.get("values")
         for v in (vals if isinstance(vals, list) else [vals]):
             if op == "upsert":
-                affected.append(rules.upsert(ctx, v, q.get("onConflict")))
+                row = rules.upsert(ctx, v, q.get("onConflict"), bool(q.get("ignoreDuplicates")))
+                if row is not None:
+                    affected.append(row)
             else:
                 affected.append(rules.insert(ctx, v))
     elif op in ("update", "delete"):
