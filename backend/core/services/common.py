@@ -5,6 +5,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
 from django.db import connection
+from django.utils import timezone
 
 from core.models import AuthSession, HqAudit, Profile
 
@@ -38,7 +39,7 @@ class Ctx:
             if not self.session_id:
                 self._valid = True
             else:
-                self._valid = AuthSession.objects.filter(id=self.session_id, user_id=self.uid).exists()
+                self._valid = AuthSession.objects.filter(id=self.session_id, user_id=self.uid, expires_at__gt=timezone.now()).exists()
         return self._valid
 
     @property

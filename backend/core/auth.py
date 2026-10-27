@@ -61,8 +61,11 @@ def _bad_login():
 
 
 def login(email, password, ip=""):
-    email = (email or "").strip().lower()
-    keys = (f"loginfail:account:{email[:254]}:{ip[:64]}", f"loginfail:ip:{ip[:64]}")
+    if not isinstance(email, str) or not isinstance(password, str):
+        raise _bad_login()
+    email = email.strip().lower()
+    # Limit attempts against an account across addresses as well as attempts from one address.
+    keys = (f"loginfail:account:{email[:254]}", f"loginfail:ip:{ip[:64]}")
     try:
         locked = any(cache.get(key, 0) >= settings.LOGIN_MAX_FAILURES for key in keys)
     except Exception as exc:
@@ -137,11 +140,15 @@ def logout_session(session_id):
 def decode_access_token(token):
     """Returns the claims, or raises AuthError(401)."""
     try:
-        return jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"], audience="authenticated",
-                          options={"require": ["exp", "sub"]}, leeway=5)
+        claims = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"], audience="authenticated", issuer=_issuer(),
+                            options={"require": ["exp", "sub", "iat", "session_id", "iss"]}, leeway=5)
+        from uuid import UUID
+        UUID(str(claims["sub"]))
+        UUID(str(claims["session_id"]))
+        return claims
     except jwt.ExpiredSignatureError:
         raise AuthError({"code": "PGRST303", "message": "JWT expired", "hint": None, "details": None}, 401)
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, ValueError, TypeError, AttributeError):
         raise AuthError({"code": "PGRST301", "message": "Invalid JWT", "hint": None, "details": None}, 401)
 
 

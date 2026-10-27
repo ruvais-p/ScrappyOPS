@@ -78,6 +78,8 @@ def token(request):
     grant = request.GET.get("grant_type", "")
     try:
         data = body_json(request)
+        if not isinstance(data, dict):
+            raise ApiError("The request body must be a JSON object.")
         if grant == "password":
             out = auth.login(data.get("email"), data.get("password"), _client_ip(request))
         elif grant == "refresh_token":
@@ -168,7 +170,8 @@ def rest_table(request, table):
         return jr(e.body, e.status)
     try:
         if request.method == "GET":
-            return jr(query_table(ctx, table, {k: v for k, v in request.GET.items()}))
+            with transaction.atomic():
+                return jr(query_table(ctx, table, {k: v for k, v in request.GET.items()}))
         if request.method == "POST" and table == "lead_import":
             from core.services.lead_import import import_rows
             from core.models import LeadImport
@@ -222,6 +225,8 @@ def bill_pdf(request):
         return jr({"error": "Please log in again."}, 401)
     if not ctx.session_valid():
         return jr({"error": "Please log in again."}, 401)
+    if ctx.role not in ("driver", "hq", "warehouse", "supervisor"):
+        return jr({"error": "This bill is not yours."}, 403)
     try:
         data = body_json(request)
         bill_id = int(data.get("bill_id"))
@@ -233,7 +238,8 @@ def bill_pdf(request):
         bill = Bill.objects.select_related("load").filter(pk=bill_id).first()
         if bill is None:
             return jr({"error": "Bill not found"}, 404)
-        if str(bill.load.driver_id) != str(ctx.uid) and ctx.role not in ("hq", "warehouse"):
+        if (str(bill.load.driver_id) != str(ctx.uid) and ctx.role != "hq"
+                and not (ctx.role in ("warehouse", "supervisor") and bill.load.franchise_id == ctx.franchise_id)):
             return jr({"error": "This bill is not yours."}, 403)
         if bill.status == "draft":
             return jr({"error": "Lock the bill before making the PDF."}, 400)
@@ -267,6 +273,8 @@ def hq_logins(request):
         return jr({"error": "Only HQ can create logins."}, 403)
     try:
         body = body_json(request)
+        if not isinstance(body, dict):
+            raise ApiError("The request body must be a JSON object.")
     except ApiError:
         return jr({"error": "Something went wrong. Try again."}, 400)
     action = body.get("action", "create")
@@ -279,8 +287,11 @@ def hq_logins(request):
             prof = Profile.objects.filter(pk=target).first()
             if prof is None:
                 return jr({"error": "Person not found."}, 404)
-            if prof.role == "hq":
-                return jr({"error": "HQ passwords cannot be reset from here."}, 403)
+            if prof.role in ("hq", "super_admin") or prof.is_super_admin:
+                return jr({"error": "This privileged login cannot be reset from here."}, 403)
+            from core.services.common import fetch_one
+            if fetch_one("select id from kwd_profiles where id = %(u)s", {"u": prof.pk}):
+                return jr({"error": "This login belongs to the field app."}, 403)
             user = User.objects.get(pk=target)
             password, generated = str(body.get("password") or ""), False
             if password == "":
@@ -313,6 +324,8 @@ def hq_logins(request):
         email_re = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
         results = []
         for p in people:
+            if not isinstance(p, dict):
+                results.append({"ok": False, "error": "Each person must be an object."}); continue
             role, full_name, email = clean(p.get("role"), 20), clean(p.get("full_name")), clean(p.get("email"), 120).lower()
             row = {"role": role, "full_name": full_name, "email": email}
             if role not in ("driver", "warehouse", "supervisor"):

@@ -33,6 +33,8 @@ def login(request):
             data = json.loads(request.body or b"{}")
         except ValueError:
             return _json({"error": "Send the email and password."}, 400)
+        if not isinstance(data, dict):
+            return _json({"error": "Send the email and password."}, 400)
         try:
             out = auth.login(data.get("email"), data.get("password"), _client_ip(request))
         except auth.AuthError as e:

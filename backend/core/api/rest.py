@@ -30,7 +30,7 @@ ANY_LOGIN = "true"
 
 TABLES = {
     "profiles": (cols("id:u full_name:t phone:t role:t territory:t vehicle_no:t active:b is_super_admin:b created_at:ts franchise_id:i"),
-                 "(id = %(s_uid)s::uuid or role = 'hq' or %(s_role)s = 'hq' or (%(s_role)s in ('warehouse','supervisor') and franchise_id = %(s_fr)s::integer))"),
+                 "(id = %(s_uid)s::uuid or %(s_role)s = 'hq' or (%(s_role)s in ('warehouse','supervisor') and (role = 'hq' or franchise_id = %(s_fr)s::integer)))"),
     "franchises": (cols("id:i code:t name:t district:t constituency:t active:b created_at:ts"),
                    "(%(s_role)s = 'hq' or id = %(s_fr)s::integer)"),
     "scrap_items": (cols("id:i name:t active:b"), ANY_LOGIN),
@@ -79,6 +79,8 @@ def _bad(msg, code="PGRST100"):
 
 def query_table(ctx, table, params):
     """params: a dict of query-string values (name -> text). Returns a list of row dicts."""
+    if not ctx.session_valid() or ctx.role is None:
+        raise ApiError("Please log in again.", status=401, code="PGRST301")
     if table not in TABLES:
         raise ApiError(f"Could not find the table 'public.{table}' in the schema cache", status=404, code="PGRST205")
     columns, scope = TABLES[table]

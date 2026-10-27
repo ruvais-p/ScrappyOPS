@@ -1,6 +1,7 @@
 """Who is calling, and which rows they may read: the old database's row-level security rules, written as SQL pieces.
 Every read of a table (and every table joined into a read) is cut down to what the caller may see."""
 from core.models import AuthSession
+from django.utils import timezone
 from core.services.common import fetch, fetch_one, ApiError, SESSION_MSG
 
 HO, ZM, TSO, FR = "head_office", "zonal_manager", "tso", "franchisee"
@@ -20,7 +21,8 @@ class KCtx:
 
     def session_valid(self):
         if self._valid is None:
-            self._valid = True if not self.session_id else AuthSession.objects.filter(id=self.session_id, user_id=self.uid).exists()
+            self._valid = True if not self.session_id else AuthSession.objects.filter(
+                id=self.session_id, user_id=self.uid, expires_at__gt=timezone.now()).exists()
         return self._valid
 
     @property

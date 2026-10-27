@@ -1,4 +1,4 @@
-from core.models import User
+from core.models import Profile, User
 from core.services.common import fetch_one
 from kwd.functions import resolve_map_link
 from kwd.tests.base import KwdCase, PW, Person, PNG, QueryError
@@ -12,6 +12,17 @@ class AdminUsersTests(KwdCase):
     def test_only_head_office_manages_staff(self):
         self.zm.fails("Only Head Office", self.zm.fn, "admin-users", action="create", email="x@k.test", password="longenough1", full_name="X")
         self.tso.fails("Only Head Office", self.tso.fn, "admin-users", action="reset_password", id=self.tso2_id, password="longenough1")
+
+    def test_field_admin_cannot_change_other_portal_logins(self):
+        outsider = User.objects.create_user("superadmin@t.test", "OriginalPass123")
+        Profile.objects.create(user=outsider, full_name="Super Admin", role="super_admin", is_super_admin=True)
+        self.ho.fails("Staff member not found", self.ho.fn, "admin-users", action="reset_password",
+                      id=str(outsider.pk), password="ChangedPass123")
+        self.ho.fails("Staff member not found", self.ho.fn, "admin-users", action="update",
+                      id=str(outsider.pk), profile={"is_active": False})
+        outsider.refresh_from_db()
+        self.assertTrue(outsider.check_password("OriginalPass123"))
+        self.assertTrue(outsider.is_active)
 
     def test_create_update_deactivate_and_reset(self):
         self.ho.fails("at least 8 characters", self.ho.fn, "admin-users", action="create", email="n@k.test", password="short", full_name="N")
