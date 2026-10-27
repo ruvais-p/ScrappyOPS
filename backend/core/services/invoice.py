@@ -286,12 +286,12 @@ def build_pdf(d):
     AMBER, AMBER_D, AMBER_T = _hex(0x8f5b0e), _hex(0x4d3007), _hex(0xfbf1dc)
     text, right, wrap, box, shape = pg.text, pg.right, pg.wrap, pg.box, pg.svg_path
 
-    badge = None
+    logo = None
     try:
-        if settings.BILL_BADGE_FILE.exists():
-            badge = ImageReader(str(settings.BILL_BADGE_FILE))
+        if settings.BILL_LOGO_FILE.exists():
+            logo = ImageReader(str(settings.BILL_LOGO_FILE))
     except Exception:
-        badge = None            # a missing picture never blocks a bill: a text badge is drawn instead
+        logo = None             # a missing picture never blocks a bill: a text badge is drawn instead
 
     paid = bill.status == "paid"
     items = d["items"]
@@ -310,10 +310,11 @@ def build_pdf(d):
     shape(P_DOWN, W - 330, H - HH + 64, 0.5, color=WHITE, opacity=0.07)
     pg.ellipse(W - 250, H - 38, 20, 20, WHITE, 0.07)
     bw_ = 138
-    if badge:
-        iw, ih = badge.getSize()
+    if logo:
+        iw, ih = logo.getSize()
         bh = bw_ * ih / iw
-        cv.drawImage(badge, M, H - 34 - bh, width=bw_, height=bh, mask="auto")
+        box(M - 6, H - 26, bw_ + 12, bh + 16, 6, color=WHITE)
+        cv.drawImage(logo, M, H - 34 - bh, width=bw_, height=bh, mask="auto")
     else:
         bh = 80
         pg.ellipse(M + bw_ / 2, H - 34 - bh / 2, bw_ / 2, bh / 2, WHITE)
@@ -473,6 +474,14 @@ def build_pdf(d):
     text("made simple.", M + stringWidth("Waste management, ", BOLD, 12.5), 40, 12.5, BOLD, OX200)
     now = datetime.now(IST)
     text(f"Scrappy Innovations Pvt. Ltd.  ·  Kerala  ·  {bill.bill_no}  ·  Generated {when(now)}", M, 24, 7.5, REG, _hex(0xc9c5bf))
+    signatory_label = "Authorized Signatory"
+    signatory_xr = R - 70
+    cv.saveState()
+    cv.setStrokeColor(_hex(0xc9c5bf))
+    cv.setLineWidth(0.7)
+    cv.line(signatory_xr - 116, 20, signatory_xr, 20)
+    cv.restoreState()
+    right(signatory_label, signatory_xr, 10, 7.5, REG, _hex(0xc9c5bf))
     shape(P_DOWN, R - 62, 46, 0.17, color=OX)
     pg.ellipse(R - 31, 36.5, 8.6, 8.6, OX)
     shape(P_UP, R - 20, 46, 0.17, color=OX)

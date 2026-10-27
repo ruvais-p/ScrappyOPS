@@ -4,7 +4,7 @@ import { Loading, Empty, Icon, PageHead, Stat, SectionHead } from '../../../ui.j
 import { fmtDate, fmtINR } from '../../../lib.js'
 import { itemsText } from '../../../fr.js'
 import { Sheet } from '../../../kit.js'
-import { printSaleInvoice, saleForm } from '../../fr/parts.js'
+import { printSaleInvoice, saleForm } from '../../fr/parts.js?v=20261027-1'
 
 const PAYMENT = { pending: 'Unpaid', unpaid: 'Unpaid', partial: 'Part paid', paid: 'Paid' }
 const DELIVERY = { pending: 'To deliver', dispatched: 'Dispatched', delivered: 'Delivered' }
