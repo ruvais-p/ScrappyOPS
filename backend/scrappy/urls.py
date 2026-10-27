@@ -19,6 +19,7 @@ urlpatterns = [
     # one front door: the login page, sign-out, and the staff app (Scrappy Field). portal.gate decides who may open which page.
     path("login/", portal.login),
     path("logout/", portal.logout),
+    path("super-admin/", portal.super_admin_app),
     path("kwd/", portal.kwd_app),
     path("kwd/api/", include("kwd.urls")),
     # optional: serve the website files from this same server

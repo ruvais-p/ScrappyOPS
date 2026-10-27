@@ -347,6 +347,8 @@ def hq_add_person(ctx, p_email, p_full_name, p_role, p_franchise, p_phone=None, 
         raise ApiError("No login with this email yet. Create it first with Create logins.")
     if Profile.objects.filter(pk=user.pk).exists():
         raise ApiError("This login is already set up.")
+    if fetch_one("select id from kwd_profiles where id = %(u)s", {"u": user.pk}):
+        raise ApiError("This login belongs to the field app and cannot be assigned here.")
     Profile.objects.create(user=user, full_name=btrim(p_full_name), role=p_role, franchise_id=p_franchise, phone=nullify(p_phone),
                            territory=nullify(p_territory), vehicle_no=nullify(p_vehicle_no), active=True)
     hq_log(ctx, "person_added", btrim(p_full_name), {"role": p_role, "email": btrim(p_email).lower()}, p_franchise)
@@ -359,6 +361,8 @@ def hq_update_profile(ctx, p_id, p_full_name, p_phone=None, p_territory=None, p_
     old = Profile.objects.select_for_update().filter(pk=p_id).first()
     if old is None:
         raise ApiError("Person not found.")
+    if old.role == "super_admin" or old.is_super_admin:
+        raise ApiError("Super Admin accounts cannot be edited here.", status=403)
     if blank(p_full_name):
         raise ApiError("Enter a name.")
     if str(p_id) == str(ctx.uid) and not p_active:

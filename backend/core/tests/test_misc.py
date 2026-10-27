@@ -6,6 +6,7 @@ from django.test import override_settings
 
 from core.models import (Bill, HqAudit, HqRelease, ImmutableError, LoadWeighing, Profile, Rate, ScrapItem, User)
 from core.tests.base import Api, PW, ScrappyTestCase, today_dmy
+from core.services.common import fetch
 
 IST = ZoneInfo("Asia/Kolkata")
 ISO = lambda: datetime.now(IST).strftime("%Y-%m-%d")
@@ -55,6 +56,7 @@ class IsolationTests(World):
         names = sorted(p["full_name"] for p in self.wh.rows("profiles?select=full_name"))
         self.assertEqual(names, sorted(["Sumi Supervisor", "Sumesh Warehouse", "Second Warehouse", "Basim Collector", "Rahul Collector", "HQ Admin"]))
         self.assertEqual([p["full_name"] for p in self.drv.rows("profiles?select=full_name&id=eq." + self.drv2.uid)], [])
+        self.assertEqual([p["full_name"] for p in self.drv.rows("profiles?select=full_name&id=eq." + self.hq.uid)], [])
         self.assertEqual(len(self.hq.rows("profiles?select=id")), 9)
         # reports follow the same rule, even when a franchise is asked for by name
         mine = self.twh.ok("wh_pickups", p_from=ISO(), p_to=ISO(), p_load_id=None, p_franchise=self.kkd.pk)
@@ -249,6 +251,8 @@ class PdfAndLoginTests(World):
         # who may make it
         other = Api(self.client, "drv2@t.test")
         self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": bill}), content_type="application/json", **other.h).status_code, 403)
+        self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": bill}), content_type="application/json", **self.twh.h).status_code, 403)
+        self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": bill}), content_type="application/json", **self.wh.h).status_code, 200)
         self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": bill}), content_type="application/json", **self.hq.h).status_code, 200)
         self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": bill}), content_type="application/json").status_code, 401)
         self.assertEqual(self.client.post("/functions/v1/bill-pdf", data=json.dumps({"bill_id": 0}), content_type="application/json", **self.drv.h).status_code, 400)
@@ -300,4 +304,15 @@ class PdfAndLoginTests(World):
         self.assertEqual(bad.status_code, 400)
         Api(self.client, "new@scrappy.test", rr["password"])
         self.assertEqual(post(self.hq, {"action": "reset_password", "user_id": self.hq.uid}).status_code, 403)    # HQ passwords are not reset here
+        super_user = self.person("super@t.test", "Super", "super_admin", franchise=None, is_super_admin=True)
+        self.assertEqual(post(self.hq, {"action": "reset_password", "user_id": str(super_user.pk)}).status_code, 403)
+        self.hq.fail("hq_update_profile", "Super Admin accounts", p_id=str(super_user.pk), p_full_name="Changed")
         self.assertTrue(HqAudit.objects.filter(action="password_reset").exists())
+
+    def test_hq_cannot_claim_field_staff_login(self):
+        staff = User.objects.create_user("field@t.test", PW)
+        fetch("insert into kwd_profiles (id, full_name, email, role, is_active) values (%(u)s, 'Field User', 'field@t.test', 'tso', true) returning id",
+              {"u": staff.pk})
+        self.hq.fail("hq_add_person", "belongs to the field app", p_email="field@t.test", p_full_name="Field User",
+                     p_role="driver", p_franchise=self.kkd.pk)
+        self.assertFalse(Profile.objects.filter(pk=staff.pk).exists())

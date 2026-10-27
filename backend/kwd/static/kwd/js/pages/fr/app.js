@@ -19,15 +19,16 @@ const PAGES = {
 
 export async function start(root, { profile }) {
   patch(root, `<div class="center">${Loading('Loading your business…')}</div>`)
-  const [frRes, { products, byId }, districts] = await Promise.all([
+  const [frRes, { products, byId }, districts, company] = await Promise.all([
     supabase.from('fr_franchises').select('*').maybeSingle(), loadProducts(), loadDistricts(),
+    supabase.from('fr_company_settings').select('*').eq('id', 1).maybeSingle(),
   ])
   if (frRes.error || !frRes.data) return patch(root, Blocked(frRes.error ? errText(frRes.error) : 'Your franchise account is not set up yet. Please contact Head Office.'))
   const fr = frRes.data
   if (!fr.is_active) return patch(root, Blocked('Your franchise account is switched off. Please contact Head Office.'))
 
   const state = { route: { page: 'home' }, counts: {}, screen: null, token: 0 }
-  const data = { fr, products, byId, stock: {}, districts, refresh }
+  const data = { fr, products, byId, stock: {}, districts, company: company.data, refresh }
 
   root.innerHTML = `<div class="shell mgr"><div class="dc" data-r="top"></div><div class="desk"><div class="dc" data-r="side"></div><main class="content" data-r="page"></main></div><div class="dc" data-r="tabs"></div></div>`
   const el = (n) => root.querySelector(`[data-r="${n}"]`)

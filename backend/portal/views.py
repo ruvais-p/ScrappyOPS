@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from core import auth
 from core.api.views import _client_ip
+from core.api import frontend
 from portal import gate
 
 
@@ -31,6 +32,8 @@ def login(request):
         try:
             data = json.loads(request.body or b"{}")
         except ValueError:
+            return _json({"error": "Send the email and password."}, 400)
+        if not isinstance(data, dict):
             return _json({"error": "Send the email and password."}, 400)
         try:
             out = auth.login(data.get("email"), data.get("password"), _client_ip(request))
@@ -79,5 +82,12 @@ def logout(request):
 def kwd_app(request):
     """The staff app (Scrappy Field). The gate has already checked that this person belongs here."""
     resp = render(request, "kwd/app.html")
+    resp["Cache-Control"] = "no-cache"
+    return resp
+
+
+def super_admin_app(request):
+    """Serve the BI-only HQ dashboard shell to the Super Admin role."""
+    resp = frontend.serve(request, "hq/index.html")
     resp["Cache-Control"] = "no-cache"
     return resp

@@ -99,11 +99,12 @@ The demo password and database password in this local-only compose file are for 
 | Role | Login |
 |---|---|
 | HQ | `hq@scrappy.test` |
+| Super Admin | `superadmin@scrappy.test` |
 | Supervisor | `supervisor@scrappy.test` |
 | Warehouse | `warehouse@scrappy.test` |
 | Collector | `driver@scrappy.test` |
 
-Password for all four accounts: `Scrappy#2026`.
+Password for all demo accounts: `Scrappy#2026`. Sign in as Super Admin at `http://127.0.0.1:8000/login/`; the portal routes that role to `/super-admin/`.
 
 Stop the services with `Ctrl+C`; add `-d` to run them in the background, then use `docker compose -f docker-compose.dev.yml down` to stop them.
 

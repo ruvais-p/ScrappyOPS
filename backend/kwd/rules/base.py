@@ -128,7 +128,11 @@ class Rules:
 
     def upsert(self, ctx, values, on_conflict, ignore_duplicates=False):
         from kwd.scope import Params, Scope
+        if on_conflict is not None and not isinstance(on_conflict, str):
+            raise ApiError("Invalid conflict columns.", code="PGRST100")
         cols = [c.strip() for c in (on_conflict or ",".join(pk_of(self.api))).split(",")]
+        if not cols or len(set(cols)) != len(cols) or any(c not in self.columns or c in self.generated for c in cols):
+            raise ApiError("Invalid conflict columns.", code="PGRST100")
         coerced = self._coerce_values(values)
         if ignore_duplicates:
             if not check(ctx, lambda S_, P_: self.insert_check(ctx, S_, P_, coerced)):

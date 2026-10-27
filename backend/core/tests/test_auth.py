@@ -1,7 +1,12 @@
 import json
 import time
+from datetime import timedelta
+
+import jwt
 
 from django.test import override_settings
+from django.conf import settings
+from django.utils import timezone
 
 from core.models import AuthSession, User
 from core.tests.base import Api, PW, ScrappyTestCase
@@ -29,6 +34,37 @@ class AuthTests(ScrappyTestCase):
                              content_type="application/json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()["error_description"], "Invalid login credentials")
+
+    def test_account_limit_cannot_be_evaded_by_changing_ip(self):
+        self.make_team()
+        with override_settings(LOGIN_MAX_FAILURES=2):
+            for address in ("198.51.100.1", "198.51.100.2"):
+                r = self.client.post("/auth/v1/token?grant_type=password",
+                                     data=json.dumps({"email": "hq@t.test", "password": "wrong"}),
+                                     content_type="application/json", REMOTE_ADDR=address)
+                self.assertEqual(r.status_code, 400)
+            r = self.client.post("/auth/v1/token?grant_type=password",
+                                 data=json.dumps({"email": "hq@t.test", "password": PW}),
+                                 content_type="application/json", REMOTE_ADDR="198.51.100.3")
+            self.assertEqual(r.status_code, 429)
+
+    def test_malformed_login_and_sessionless_token_are_rejected(self):
+        self.make_team()
+        for body in ('[]', '{"email": 12, "password": "guess"}'):
+            r = self.client.post("/auth/v1/token?grant_type=password", data=body, content_type="application/json")
+            self.assertEqual(r.status_code, 400)
+        user = User.objects.get(email="drv@t.test")
+        now = int(time.time())
+        forged = jwt.encode({"iss": settings.PUBLIC_BASE_URL + "/auth/v1", "aud": "authenticated",
+                             "sub": str(user.pk), "iat": now, "exp": now + 60}, settings.JWT_SECRET, algorithm="HS256")
+        r = self.client.get("/rest/v1/scrap_items", HTTP_AUTHORIZATION="Bearer " + forged)
+        self.assertEqual(r.status_code, 401)
+
+    def test_expired_session_cannot_read_public_catalog(self):
+        self.make_team()
+        person = Api(self.client, "drv@t.test")
+        AuthSession.objects.filter(user_id=person.uid).update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(person.get("scrap_items").status_code, 401)
 
     def test_newest_login_wins(self):
         self.make_team()

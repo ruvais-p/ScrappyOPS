@@ -3,7 +3,9 @@ A person can add files only under their own folder; managers and Head Office can
 A "signed" address is a link that works for a short time, like the one the old storage service gave."""
 import hashlib
 import io
+import os
 import re
+import tempfile
 from pathlib import Path
 
 from django.conf import settings
@@ -60,9 +62,20 @@ def save(path, data):
         raise ValueError("Invalid image") from exc
     f = file_of(path)
     f.parent.mkdir(parents=True, exist_ok=True)
-    if f.exists():
-        raise FileExistsError(path)
-    f.write_bytes(data)
+    # Publish the complete image atomically and never replace an existing upload.
+    with tempfile.NamedTemporaryFile(dir=f.parent, prefix=".upload-", delete=False) as tmp:
+        temp_path = Path(tmp.name)
+        try:
+            tmp.write(data)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        except Exception:
+            temp_path.unlink(missing_ok=True)
+            raise
+    try:
+        os.link(temp_path, f)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def sign(path, seconds=3600):

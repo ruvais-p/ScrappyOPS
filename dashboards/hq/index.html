@@ -29,6 +29,10 @@ input,select,textarea{font:inherit}
 :focus-visible{outline:3px solid var(--ox);outline-offset:2px}
 .hidden{display:none!important}
 .login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px 16px;background:var(--ink)}
+.super-admin-mode nav a:not([data-sa-nav]),.super-admin-mode nav .navbtn,.super-admin-mode .fr-pick{display:none!important}
+.super-admin-mode .brand-title{font-size:0}
+.super-admin-mode .brand-title:after{content:'Super Admin';font-size:20px}
+.super-admin-mode .side-foot>span{display:none}
 .login form{background:#fff;width:100%;max-width:380px;padding:28px 24px;display:flex;flex-direction:column;gap:14px}
 .login-logo{width:190px;display:block}
 .login h1{font-size:26px;margin:0}
@@ -147,6 +151,17 @@ tr.pickrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
 .alert.hot .n{color:var(--ox)}
 .chart{width:100%;height:auto;display:block}
 .chart text{font-family:var(--body);font-size:11px;fill:var(--stone)}
+.bi-month-chart{overflow:visible;min-height:210px}
+.bi-month-chart .chart-bar{transition:filter .18s ease}
+.bi-month-chart .chart-bar:hover{filter:brightness(1.08)}
+.bi-month-chart .chart-value{font-size:11px;font-weight:700;fill:var(--ink)}
+.super-admin-mode #app{gap:20px}
+.super-admin-mode .head{align-items:center}
+.super-admin-mode .kpi{min-height:108px;padding:18px 20px;border-radius:16px}
+.super-admin-mode .kpi.dark{background:linear-gradient(135deg,#3A3033,#4C2024)}
+.super-admin-mode .card{border-radius:16px;box-shadow:0 8px 20px -16px rgba(42,36,38,.42)}
+.super-admin-mode .card-h{padding:17px 20px}
+.super-admin-mode .card-h h2{font-size:18px}
 .dz{border:2px dashed var(--line);background:var(--pearl);padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
 .row-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--paper)}
 .fr-pick{display:flex;flex-direction:column;gap:5px}
@@ -310,12 +325,13 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
 <div id="login" class="login hidden">
   <img class="login-logo" src="../logo.webp" alt="Scrappy">
   <form id="login-form" novalidate>
-    <h1 style="font-family:var(--head);letter-spacing:-.03em">HQ login</h1>
+    <h1 id="login-title" style="font-family:var(--head);letter-spacing:-.03em">HQ login</h1>
     <div class="field"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required></div>
     <div class="field"><label for="password">Password</label><div class="pw"><input id="password" type="password" autocomplete="current-password" required><button type="button" data-pw aria-label="Show password">Show</button></div></div>
     <div class="err" id="login-err" role="alert"></div>
     <button class="btn block" type="submit" id="login-btn">Log in</button>
     <span class="muted small">For Scrappy HQ only.</span>
+    <a class="muted small" href="../super-admin/" style="text-align:center">Super Admin sign in</a>
   </form>
 </div>
 
@@ -326,6 +342,12 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
     <div class="who"><b id="who-name"></b><span class="role" id="who-role"></span><span id="who-meta"></span></div>
     <nav aria-label="Main">
       <a href="#overview" data-view="overview">Overview</a>
+      <a href="#business" data-view="business" data-sa-nav id="business-nav" class="hidden">Overview</a>
+      <a href="#sa-scrap" data-view="sa-scrap" data-sa-nav class="hidden">Scrap purchases</a>
+      <a href="#sa-digester" data-view="sa-digester" data-sa-nav class="hidden">Digester sales</a>
+      <a href="#sa-inventory" data-view="sa-inventory" data-sa-nav class="hidden">Inventory</a>
+      <a href="#sa-pipeline" data-view="sa-pipeline" data-sa-nav class="hidden">Sales pipeline</a>
+      <a href="#sa-expenses" data-view="sa-expenses" data-sa-nav class="hidden">TA / DA</a>
       <a href="#franchises" data-view="franchises">Franchises</a>
       <a href="#leads" data-view="leads">Leads <span class="count" id="nav-leads"></span></a>
       <a href="#pickups" data-view="pickups">Pickups and bills</a>
@@ -357,13 +379,15 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
    ========================================================= */
 const SUPABASE_URL = 'https://suluhhbomiuwwocrfpxg.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_45-7fJZdo_jovQfhN0dhtw_FNmo1Fw1';
-const SESSION_KEY = 'scrappy_hq_session';
+const SUPER_ADMIN_MODE = location.pathname.startsWith('/super-admin/') || new URLSearchParams(location.search).get('mode') === 'superadmin';
+const SESSION_KEY = SUPER_ADMIN_MODE ? 'scrappy_super_admin_session' : 'scrappy_hq_session';
 const COLLECTOR_URL = location.origin + '/';
 const WAREHOUSE_URL = location.origin + '/';
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
+if (SUPER_ADMIN_MODE) { document.body.classList.add('super-admin-mode'); $('#login-title').textContent = 'Super Admin login'; }
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = v => Number(v || 0);
 const kg = n => (Math.round(num(n) * 10) / 10).toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -455,6 +479,7 @@ const S = {
   bf: { status: '', driver: '', q: '' }, bills: [], billSel: null, billItems: {},
   loads: [], loadFilter: 'attention', loadSel: null, loadDetail: {}, score: [],
   inventory: [], stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
+  biStream: 'all', biFranchise: '', biData: null, biError: '', biInventoryFranchise: '', biInventoryProduct: '',
   routes: [], txns: [], cashSel: null, resolutions: [], disputes: [], fd: '', disputeAct: null,
   rates: [], ratehist: [], buy: [], editPerson: null, audit: [],
   feed: [], prevOv: null, wsOpen: false,
@@ -472,7 +497,7 @@ const frName = id => (frById(id) || {}).name || '';
 const scopeLabel = () => S.fr ? frName(S.fr) + ' (' + frCode(S.fr) + ')' : 'All franchises';
 const frq = () => S.fr ? '&franchise_id=eq.' + S.fr : '';
 const frTag = code => code ? `<span class="frcode">${esc(code)}</span>` : '';
-const curView = () => VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
+const curView = () => S.profile && S.profile.role === 'super_admin' ? (VIEWS[location.hash.slice(1)] && location.hash.slice(1).startsWith('sa-') || location.hash === '#business' ? location.hash.slice(1) : 'business') : (VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
 
 /* ---------- data: the base is always loaded; each screen loads what it needs ---------- */
 async function loadBase() {
@@ -482,6 +507,24 @@ async function loadBase() {
   S.ov = await rpc('hq_overview', rangeArgs());
 }
 const LOAD = {
+  business: async () => {
+    S.biError = '';
+    const streams = S.biStream === 'all' ? ['scrap','digester'] : [S.biStream];
+    const settled = await Promise.allSettled(streams.map(stream => rpc('super_admin_business_intelligence', {
+      p_from: S.from, p_to: S.to, p_stream: stream,
+      p_franchise: S.biStream === stream ? (S.biFranchise || null) : null,
+    })));
+    const data = { period: { from: S.from, to: S.to, timezone: 'Asia/Kolkata' }, stream: S.biStream,
+      franchises: { scrap: [], digester: [] }, errors: {} };
+    settled.forEach((out, i) => {
+      const stream = streams[i];
+      if (out.status === 'fulfilled') {
+        data[stream] = out.value[stream]; data.franchises[stream] = out.value.franchises[stream] || [];
+        if (stream === 'digester') data.expenses = out.value.expenses;
+      } else data.errors[stream] = out.reason && out.reason.message ? out.reason.message : 'This report is temporarily unavailable.';
+    });
+    S.biData = data;
+  },
   overview: async () => { [S.daily, S.isum, S.fran] = await Promise.all([rpc('hq_daily', rangeArgs()), rpc('hq_item_summary', rangeArgs()), S.fr ? Promise.resolve([]) : rpc('hq_franchises', { p_from: S.from, p_to: S.to })]); },
   franchises: async () => { S.fran = await rpc('hq_franchises', { p_from: S.from, p_to: S.to }); },
   leads: async () => {
@@ -516,8 +559,12 @@ const LOAD = {
   }
 };
 async function refresh() {
-  await Promise.all([loadBase(), LOAD[curView()]()]);
-  diffOv();
+  if (S.profile && S.profile.role === 'super_admin') {
+    await LOAD.business();
+  } else {
+    await Promise.all([loadBase(), LOAD[curView()]()]);
+    diffOv();
+  }
 }
 
 /* ---------- live feed: what changed since the last refresh ---------- */
@@ -1133,8 +1180,136 @@ function vActivity() {
     ${S.audit.length ? `<div class="feed">${S.audit.map(a => `<div class="ev"><span class="dot b"></span><div>${auditText(a)}${a.franchise_id && !S.fr ? frTag(frCode(a.franchise_id)) : ''}<small>${esc(personName(a.by_id))} · ${dtlabel(a.at)}</small></div></div>`).join('')}</div>` : '<div class="empty">Nothing logged yet.</div>'}</section>`;
 }
 
+/* ---------- cross-domain business intelligence ---------- */
+const biCash = n => rs(n);
+function biChart(rows, key, money = false) {
+  if (!rows || !rows.length) return '<div class="empty">No data in this period.</div>';
+  const rawMax = Math.max(0, ...rows.map(r => num(r[key]))), magnitude = rawMax ? 10 ** Math.floor(Math.log10(rawMax)) : 1;
+  const max = Math.max(1, Math.ceil(rawMax / (magnitude / 2)) * (magnitude / 2));
+  const W = 720, H = 232, left = 72, right = 18, top = 24, bottom = 42;
+  const plotW = W - left - right, plotH = H - top - bottom, slot = plotW / rows.length;
+  const bw = Math.min(46, slot * .56), grad = `bi-${key}-gradient`;
+  const grid = [0, .25, .5, .75, 1].map(p => {
+    const y = top + plotH * (1 - p), value = max * p;
+    const label = money ? biCash(value) : Math.round(value).toLocaleString('en-IN');
+    return `<g><line x1="${left}" x2="${W-right}" y1="${y}" y2="${y}" stroke="${p===0?'#CFC8C2':'#EEEAE6'}" stroke-width="${p===0?1.4:1}"/><text x="${left-10}" y="${y+4}" text-anchor="end">${esc(label)}</text></g>`;
+  }).join('');
+  const bars = rows.map((r, i) => {
+    const value = num(r[key]), h = value ? Math.max(3, plotH * value / max) : 0;
+    const x = left + i * slot + (slot - bw) / 2, y = top + plotH - h;
+    const label = money ? biCash(r[key]) : `${num(r[key]).toLocaleString('en-IN')} units`;
+    const date = new Date(`${String(r.month).slice(0,10)}T00:00:00Z`);
+    const tick = Number.isNaN(date.getTime()) ? String(r.month).slice(5,7) : date.toLocaleDateString('en-IN',{month:'short',timeZone:'UTC'});
+    const dataLabel = rows.length <= 7 && value ? `<text class="chart-value" x="${x+bw/2}" y="${Math.max(14,y-8)}" text-anchor="middle">${esc(label)}</text>` : '';
+    return `<g><title>${esc(String(r.month).slice(0,7))}: ${esc(label)}</title><rect class="chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="6" fill="url(#${grad})"/>${dataLabel}<text x="${x+bw/2}" y="${H-13}" text-anchor="middle">${esc(tick)}</text></g>`;
+  }).join('');
+  return `<svg class="chart bi-month-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly ${esc(key)}"><defs><linearGradient id="${grad}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#A83239"/><stop offset="100%" stop-color="#7D1920"/></linearGradient></defs>${grid}${bars}</svg>`;
+}
+function biBars(rows, valueKey, title) {
+  const max = Math.max(1, ...(rows || []).map(x => num(x[valueKey])));
+  return `<section class="card"><div class="card-h"><h2>${esc(title)}</h2></div><div class="pad">${rows && rows.length ? rows.map(x => `<div class="row-kv"><span>${esc(x.status || x.stage)} · ${num(x.count)}${x.units ? ` · ${num(x.units)} units` : ''}</span><b>${valueKey ? (x.pipeline != null ? `${biCash(x.pipeline)} · weighted ${biCash(x[valueKey])}` : biCash(x[valueKey])) : 'Count only'}</b></div><div class="bar"><i style="width:${Math.max(2,num(x[valueKey])/max*100)}%"></i></div>`).join('') : '<span class="muted">No records in this period.</span>'}</div></section>`;
+}
+function biFlow(steps) {
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${steps.map((x,i)=>`${i?'<span aria-hidden="true" style="font-size:20px;color:var(--ox)">→</span>':''}<span style="padding:9px 12px;border:1px solid var(--line);background:var(--pearl);font-weight:700">${esc(x)}</span>`).join('')}</div>`;
+}
+function vBusinessLegacy() {
+  const D = S.biData, streams = [['all','All business streams'],['scrap','Scrap collection'],['digester','Digester franchises']];
+  const from = new Date(S.from + 'T00:00:00Z'), to = new Date(S.to + 'T00:00:00Z');
+  const monthCount = Math.max(1, (to.getUTCFullYear()-from.getUTCFullYear())*12 + to.getUTCMonth()-from.getUTCMonth()+1);
+  let franchiseOptions = '<option value="">All franchises</option>';
+  if (D && S.biStream === 'scrap') franchiseOptions += (D.franchises.scrap || []).map(f => `<option value="${f.id}" ${String(S.biFranchise)===String(f.id)?'selected':''}>${esc(f.code)} · ${esc(f.name)}</option>`).join('');
+  if (D && S.biStream === 'digester') franchiseOptions += (D.franchises.digester || []).map(f => `<option value="${esc(f.id)}" ${S.biFranchise===f.id?'selected':''}>${esc(f.business_name)}</option>`).join('');
+  const filters = `<div class="f"><label for="bi-stream">BUSINESS STREAM</label><select id="bi-stream" data-act="bi-stream">${selectOptions(streams,S.biStream)}</select></div>${S.biStream!=='all'?`<div class="f"><label for="bi-franchise">FRANCHISE</label><select id="bi-franchise" data-act="bi-franchise">${franchiseOptions}</select></div>`:''}`;
+  const period = `${dlabel(S.from)} – ${dlabel(S.to)} · India time`;
+  const head = `<div class="head"><div><div class="eyebrow">Super Admin · Business intelligence</div><h1>Understand the whole business.</h1><div class="muted">${esc(period)} · ${S.biStream==='all'?'All streams':S.biStream==='scrap'?'Scrap collection':'Digester franchises'}${S.biFranchise?' · selected franchise':''}</div></div><div class="inl"><button class="btn ghost sm" data-act="bi-fy" data-year="current">Current financial year</button><button class="btn ghost sm" data-act="bi-fy" data-year="previous">Previous financial year</button></div></div>${filterBar(filters)}`;
+  if (!D) return `${head}<div class="loading">Loading business reports…</div>`;
+  const scrap = D.scrap, dig = D.digester;
+  const scrapSection = scrap ? `<div class="kpis"><div class="kpi dark"><span class="l">Scrap paid purchases</span><span class="v">${biCash(scrap.summary.amount)}</span><span class="s">${num(scrap.summary.bill_count)} paid bills</span></div><div class="kpi"><span class="l">Scrap collected</span><span class="v">${kg(scrap.summary.kg)} kg</span><span class="s">Paid bills in period</span></div><div class="kpi"><span class="l">Weighted purchase rate</span><span class="v">${scrap.summary.weighted_avg_rate==null?'—':`₹${num(scrap.summary.weighted_avg_rate).toFixed(2)}/kg`}</span><span class="s">Purchase amount ÷ kg</span></div></div>
+    <div class="cols"><section class="card grow"><div class="card-h"><h2>Scrap purchases by month</h2><span class="muted small">₹ purchase outlay · not sales revenue</span></div><div class="pad">${biChart(scrap.monthly,'amount',true)}</div></section><section class="card grow"><div class="card-h"><h2>Raw-material inventory</h2><span class="muted small">Current stock · kg</span></div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>MATERIAL</th><th class="r">STOCK</th><th class="r">EST. VALUE</th></tr></thead><tbody>${(scrap.stock||[]).map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.item_name)}</td><td class="r">${kg(x.stock_kg)} kg</td><td class="r">${biCash(num(x.stock_kg)*num(x.rate_per_kg))}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No stock rows.</td></tr>'}</tbody></table></div></section></div>
+    <section class="card"><div class="card-h"><h2>Scrap purchases by material</h2><span class="muted small">Weighted average purchase rate</span></div><div class="scroll"><table><thead><tr><th>MATERIAL</th><th class="r">KG</th><th class="r">PAID</th><th class="r">AVG ₹/KG</th><th class="r">BILLS</th></tr></thead><tbody>${scrap.items.map(x=>`<tr><td>${esc(x.item_name)}</td><td class="r">${kg(x.kg)}</td><td class="r">${biCash(x.amount)}</td><td class="r">${x.avg_rate==null?'—':`₹${num(x.avg_rate).toFixed(2)}`}</td><td class="r">${x.bills}</td></tr>`).join('')}</tbody></table></div><div class="pad muted small">Average purchase rate = paid bill amount ÷ billed kg. This is a weighted average for the selected period.</div></section>
+    <section class="card"><div class="card-h"><h2>Warehouse weighing reconciliation</h2><span class="muted small">Current, non-superseded weighings in selected dates</span></div><div class="pad">${kv('Billed weight',`${kg(scrap.summary.weighing.billed_kg)} kg`)}${kv('Warehouse weight',`${kg(scrap.summary.weighing.warehouse_kg)} kg`)}${kv('Difference',`${kg(num(scrap.summary.weighing.warehouse_kg)-num(scrap.summary.weighing.billed_kg))} kg`)}</div></section>${biBars(scrap.leads,null,'Scrap pickup leads by status')}` : '';
+  const digesterSection = dig ? `<div class="kpis"><div class="kpi dark"><span class="l">Digester invoiced sales</span><span class="v">${biCash(dig.summary.invoiced)}</span><span class="s">${num(dig.summary.invoice_count)} active invoices</span></div><div class="kpi"><span class="l">Customer payments received</span><span class="v">${biCash(dig.summary.received)}</span><span class="s">Receipts dated in selected period</span></div><div class="kpi"><span class="l">Outstanding on period invoices</span><span class="v">${biCash(dig.summary.outstanding)}</span><span class="s">Current balance on invoices issued in period</span></div></div>
+    <div class="cols"><section class="card grow"><div class="card-h"><h2>Digester sales by month</h2><span class="muted small">Invoice line value · active sales</span></div><div class="pad">${biChart(dig.monthly,'sales',true)}</div></section><section class="card grow"><div class="card-h"><h2>Product sales in selected period</h2><span class="muted small">Realized price = sales ÷ quantity</span></div><div class="scroll"><table><thead><tr><th>PRODUCT</th><th class="r">QTY</th><th class="r">SALES</th><th class="r">AVG SELL</th><th class="r">MONTHLY AVG SALES</th><th class="r">LIST PRICE</th></tr></thead><tbody>${dig.products.map(x=>`<tr><td>${esc(x.name)}</td><td class="r">${num(x.qty)} ${esc(x.unit)}</td><td class="r">${biCash(x.sales)}</td><td class="r">${x.realized_price==null?'—':biCash(x.realized_price)}</td><td class="r">${biCash(num(x.sales)/monthCount)}<div class="muted small">${monthCount} calendar month${monthCount===1?'':'s'}</div></td><td class="r">${x.list_price==null?'—':biCash(x.list_price)}</td></tr>`).join('')}</tbody></table></div></section></div>
+    <section class="card"><div class="card-h"><h2>Product sales by financial year</h2><span class="muted small">April–March · FY${(dig.yearly_products||[]).length?' values grouped by sale date':''}</span></div><div class="scroll"><table><thead><tr><th>FINANCIAL YEAR</th><th>PRODUCT</th><th class="r">QTY</th><th class="r">SALES</th><th class="r">AVG SELL</th></tr></thead><tbody>${(dig.yearly_products||[]).map(x=>`<tr><td>FY${x.fy_start}–${String((x.fy_start+1)%100).padStart(2,'0')}</td><td>${esc(x.name)}</td><td class="r">${num(x.qty)} ${esc(x.unit)}</td><td class="r">${biCash(x.sales)}</td><td class="r">${x.realized_price==null?'—':biCash(x.realized_price)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No sales in the selected financial year range.</td></tr>'}</tbody></table></div></section>
+    <section class="card"><div class="card-h"><h2>Digester stock by franchise</h2><span class="muted small">Product units on hand</span></div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>PRODUCT</th><th>UNIT</th><th class="r">ON HAND</th></tr></thead><tbody>${dig.stock.map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.product_name)}</td><td>${esc(x.unit)}</td><td class="r">${num(x.on_hand)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No stock rows.</td></tr>'}</tbody></table></div></section>
+    <section class="card"><div class="card-h"><h2>Franchise sales and fulfilment</h2></div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th class="r">INVOICES</th><th class="r">SALES</th><th class="r">RECEIVED</th><th class="r">DUE</th><th class="r">TO DELIVER</th></tr></thead><tbody>${dig.franchises.map(x=>`<tr><td>${esc(x.business_name)}</td><td class="r">${num(x.invoices)}</td><td class="r">${biCash(x.sales)}</td><td class="r">${biCash(x.received)}</td><td class="r">${biCash(x.outstanding)}</td><td class="r">${num(x.to_deliver)}</td></tr>`).join('')}</tbody></table></div></section><div class="cols">${biBars(dig.leads,null,'Digester franchise leads by status')}${biBars(dig.opportunities,'weighted_pipeline','Public-sector opportunities · weighted value')}</div>
+    <section class="card"><div class="card-h"><h2>Targets by franchise and product</h2><span class="muted small">Configured target and actual sales in selected dates</span></div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>PRODUCT</th><th class="r">TARGET UNITS</th><th class="r">SOLD UNITS</th><th class="r">UNIT ATTAINMENT</th><th class="r">TARGET VALUE</th><th class="r">SALES VALUE</th></tr></thead><tbody>${dig.targets.map(x=>`<tr><td>${esc(x.business_name)}</td><td>${esc(x.product_name)}</td><td class="r">${num(x.target_units)}</td><td class="r">${num(x.sold_units)}</td><td class="r">${num(x.target_units)?`${(100*num(x.sold_units)/num(x.target_units)).toFixed(1)}%`:'—'}</td><td class="r">${biCash(x.target_amount)}</td><td class="r">${biCash(x.sales_value)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No targets in this period.</td></tr>'}</tbody></table></div></section>` : '';
+  const ex = D.expenses;
+  const expenseSection = ex ? `<section class="card"><div class="card-h"><h2>TA / DA by field staff</h2><span class="muted small">No franchise attribution exists for these claims</span></div><div class="scroll"><table><thead><tr><th>FIELD STAFF</th><th>DISTRICT ASSIGNMENTS</th><th>CLAIM STATUS</th><th class="r">CLAIM DAYS</th><th class="r">REQUESTED</th><th class="r">APPROVED</th><th class="r">PAID</th></tr></thead><tbody>${ex.by_staff.map(x=>`<tr><td>${esc(x.full_name)}</td><td>${esc(x.districts||'Unassigned')}</td><td>${esc(x.claim_statuses||'—')}</td><td class="r">${num(x.claim_days)}</td><td class="r">${biCash(x.requested)}</td><td class="r">${biCash(x.approved)}</td><td class="r">${biCash(x.paid)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No field claims in this period.</td></tr>'}</tbody></table></div><div class="pad muted small">Claims remain attributed to staff. Districts list assigned areas and are not used to distribute claim amounts; franchise totals require an explicit staff-to-franchise mapping.</div></section>` : '';
+  const flows = `<div class="cols"><section class="card grow"><div class="card-h"><h2>Scrap acquisition flow</h2></div><div class="pad">${biFlow(['Lead','Scheduled pickup','Paid bill','Warehouse weighing','Raw stock','HQ release'])}<span class="muted small">Material flow and purchase outlay; inventory is measured in kg.</span></div></section><section class="card grow"><div class="card-h"><h2>Digester sales flow</h2></div><div class="pad">${biFlow(['Franchise lead','Invoice','Payment receipt','Delivery','Installation','Stock movement'])}<span class="muted small">Customer sales and fulfilment; inventory is measured in product units.</span></div></section></div>`;
+  const sourceErrors = Object.entries(D.errors||{}).map(([source,message])=>`<div class="notice bad"><b>${source==='scrap'?'Scrap collection':'Digester franchise'} report unavailable:</b> ${esc(message)}. The other business stream is shown independently.</div>`).join('');
+  return `${head}${sourceErrors}<div class="notice info">Purchase outlay, customer sales, receipts, outstanding balances, and pipeline are separate measures. No combined profit is inferred across business streams.</div>${scrapSection}${digesterSection}${expenseSection}${flows}`;
+}
+
+/* Super Admin sections keep each report focused and use charts suited to the measure. */
+function biHeader(title, subtitle) {
+  const period = `${dlabel(S.from)} – ${dlabel(S.to)} · India time`;
+  return `<div class="head"><div><div class="eyebrow">Super Admin · ${esc(period)}</div><h1>${esc(title)}</h1><div class="muted">${esc(subtitle)}</div></div><div class="inl"><button class="btn ghost sm" data-act="bi-fy" data-year="current">Current financial year</button><button class="btn ghost sm" data-act="bi-fy" data-year="previous">Previous financial year</button></div></div>`;
+}
+function biHorizontal(rows, labelKey, valueKey, format = v => num(v).toLocaleString('en-IN'), color = '#8B1E24') {
+  const valid = (rows || []).filter(r => num(r[valueKey]) > 0);
+  if (!valid.length) return '<div class="empty">No data in this period.</div>';
+  const W=720, rowH=34, labelW=190, barW=390, H=valid.length*rowH+12, max=Math.max(1,...valid.map(r=>num(r[valueKey])));
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(valueKey)} by ${esc(labelKey)}">${valid.map((r,i)=>{const y=i*rowH+10,w=Math.max(2,barW*num(r[valueKey])/max);return `<g><title>${esc(r[labelKey])}: ${esc(format(r[valueKey]))}</title><text x="0" y="${y+15}">${esc(String(r[labelKey]).slice(0,24))}</text><rect x="${labelW}" y="${y}" width="${w}" height="20" rx="3" fill="${color}"/><text x="${labelW+w+8}" y="${y+15}">${esc(format(r[valueKey]))}</text></g>`}).join('')}</svg>`;
+}
+function biExpenseChart(rows) {
+  const data=(rows||[]).filter(x=>num(x.requested)||num(x.approved)||num(x.paid));
+  if(!data.length)return '<div class="empty">No TA / DA claims in this period.</div>';
+  const W=720,H=210,left=190,top=20,row=52,scale=390/Math.max(1,...data.flatMap(x=>[num(x.requested),num(x.approved),num(x.paid)]));
+  const colors=['#8B1E24','#3D6F90','#4F7F3B'];
+  return `<svg class="chart" viewBox="0 0 ${W} ${Math.max(H,top+data.length*row+20)}" role="img" aria-label="Requested, approved and paid TA DA by staff">${data.map((x,i)=>{let y=top+i*row;return `<g><text x="0" y="${y+12}">${esc(x.full_name)}</text>${['requested','approved','paid'].map((k,j)=>`<rect x="${left}" y="${y+j*12}" width="${Math.max(1,num(x[k])*scale)}" height="9" rx="2" fill="${colors[j]}"><title>${k}: ${biCash(x[k])}</title></rect>`).join('')}</g>`}).join('')}<g transform="translate(190 ${top+data.length*row})"><text x="0" y="0" fill="#8B1E24">■ Requested</text><text x="110" y="0" fill="#3D6F90">■ Approved</text><text x="215" y="0" fill="#4F7F3B">■ Paid</text></g></svg>`;
+}
+function vBusiness() {
+  const D=S.biData;
+  if(!D)return `${biHeader('Business overview','Cross business activity at a glance.')}<div class="loading">Loading business reports…</div>`;
+  const scrap=D.scrap,dig=D.digester,errors=Object.entries(D.errors||{}).map(([k,v])=>`<div class="notice bad">${esc(k)} report unavailable: ${esc(v)}</div>`).join('');
+  return `${biHeader('Business overview','Scrap purchasing, digester sales, inventory and field expenses.')}${errors}<div class="notice info">Purchase outlay and customer sales are separate measures. The dashboard does not infer combined profit.</div><div class="kpis">${scrap?`<div class="kpi dark"><span class="l">Scrap purchase outlay</span><span class="v">${biCash(scrap.summary.amount)}</span><span class="s">${num(scrap.summary.bill_count)} paid bills · ${kg(scrap.summary.kg)} kg</span></div>`:''}${dig?`<div class="kpi"><span class="l">Digester sales invoiced</span><span class="v">${biCash(dig.summary.invoiced)}</span><span class="s">${num(dig.summary.invoice_count)} active invoices</span></div><div class="kpi"><span class="l">Customer payments received</span><span class="v">${biCash(dig.summary.received)}</span><span class="s">${biCash(dig.summary.outstanding)} outstanding on period invoices</span></div>`:''}</div><div class="cols">${scrap?`<section class="card grow"><div class="card-h"><h2>Monthly scrap purchases</h2><span class="muted small">₹ outlay</span></div><div class="pad">${biChart(scrap.monthly,'amount',true)}</div></section>`:''}${dig?`<section class="card grow"><div class="card-h"><h2>Monthly digester sales</h2><span class="muted small">₹ invoiced</span></div><div class="pad">${biChart(dig.monthly,'sales',true)}</div></section>`:''}</div><div class="cols">${scrap?`<section class="card grow"><div class="card-h"><h2>Scrap collected by material</h2></div><div class="pad">${biHorizontal(scrap.items,'item_name','kg',v=>`${kg(v)} kg`,'#3D6F90')}</div></section>`:''}${dig?`<section class="card grow"><div class="card-h"><h2>Product sales by quantity</h2></div><div class="pad">${biHorizontal(dig.products,'name','qty',v=>`${num(v)} units`)}</div></section>`:''}</div>`;
+}
+function vSaScrap(){const d=S.biData&&S.biData.scrap;if(!d)return `${biHeader('Scrap purchases','Purchase outlay and collection weight by month and material.')}<div class="loading">Loading report…</div>`;return `${biHeader('Scrap purchases','Purchase outlay, collected weight and paid purchase rates.')}${biKpis([['Paid purchase outlay',biCash(d.summary.amount),`${num(d.summary.bill_count)} bills`],['Collected weight',`${kg(d.summary.kg)} kg`,'Across paid bills'],['Weighted purchase rate',d.summary.weighted_avg_rate==null?'—':`₹${num(d.summary.weighted_avg_rate).toFixed(2)}/kg`,'Amount divided by billed kg']])}<div class="cols"><section class="card grow"><div class="card-h"><h2>Purchase outlay by month</h2></div><div class="pad">${biChart(d.monthly,'amount',true)}</div></section><section class="card grow"><div class="card-h"><h2>Collected kg by material</h2></div><div class="pad">${biHorizontal(d.items,'item_name','kg',v=>`${kg(v)} kg`,'#3D6F90')}</div></section></div><section class="card"><div class="card-h"><h2>Purchase detail by material</h2></div><div class="scroll"><table><thead><tr><th>MATERIAL</th><th class="r">KG</th><th class="r">PAID</th><th class="r">AVG ₹/KG</th><th class="r">BILLS</th></tr></thead><tbody>${d.items.map(x=>`<tr><td>${esc(x.item_name)}</td><td class="r">${kg(x.kg)}</td><td class="r">${biCash(x.amount)}</td><td class="r">${x.avg_rate==null?'—':`₹${num(x.avg_rate).toFixed(2)}`}</td><td class="r">${num(x.bills)}</td></tr>`).join('')}</tbody></table></div></section>`}
+function vSaDigester(){const d=S.biData&&S.biData.digester;if(!d)return `${biHeader('Digester sales','Invoice activity, collections and product performance.')}<div class="loading">Loading report…</div>`;const months=Math.max(1,d.monthly.length);return `${biHeader('Digester sales','Invoice value, cash received, outstanding balances and average sales.')}${biKpis([['Sales invoiced',biCash(d.summary.invoiced),`${num(d.summary.invoice_count)} active invoices`],['Received',biCash(d.summary.received),'Receipts in selected period'],['Outstanding',biCash(d.summary.outstanding),'Current due on period invoices']])}<section class="card"><div class="card-h"><h2>Monthly sales value</h2><span class="muted small">Invoice line value</span></div><div class="pad">${biChart(d.monthly,'sales',true)}</div></section><div class="cols"><section class="card grow"><div class="card-h"><h2>Units sold by product</h2></div><div class="pad">${biHorizontal(d.products,'name','qty',v=>`${num(v)} units`,'#3D6F90')}</div></section><section class="card grow"><div class="card-h"><h2>Revenue by product</h2></div><div class="pad">${biHorizontal(d.products,'name','sales',biCash)}</div></section></div><section class="card"><div class="card-h"><h2>Product averages and list prices</h2><span class="muted small">Monthly average is selected period sales ÷ ${months} months</span></div><div class="scroll"><table><thead><tr><th>PRODUCT</th><th class="r">QTY</th><th class="r">SALES</th><th class="r">AVG SELL</th><th class="r">MONTHLY AVG</th><th class="r">LIST PRICE</th></tr></thead><tbody>${d.products.map(x=>`<tr><td>${esc(x.name)}</td><td class="r">${num(x.qty)} ${esc(x.unit)}</td><td class="r">${biCash(x.sales)}</td><td class="r">${x.realized_price==null?'—':biCash(x.realized_price)}</td><td class="r">${biCash(num(x.sales)/months)}</td><td class="r">${x.list_price==null?'—':biCash(x.list_price)}</td></tr>`).join('')}</tbody></table></div></section>`}
+function biKpis(items){return `<div class="kpis">${items.map((x,i)=>`<div class="kpi ${i===0?'dark':''}"><span class="l">${esc(x[0])}</span><span class="v">${esc(x[1])}</span><span class="s">${esc(x[2])}</span></div>`).join('')}</div>`}
+function vSaInventory(){const D=S.biData;if(!D)return `${biHeader('Inventory','Raw material and finished goods stock by franchise.')}<div class="loading">Loading report…</div>`;const s=D.scrap&&D.scrap.stock||[],p=D.digester&&D.digester.stock||[];return `${biHeader('Inventory','Current on hand, split by raw material and finished goods.')}${biKpis([['Scrap stock',`${kg(s.reduce((a,x)=>a+num(x.stock_kg),0))} kg`,`${s.length} franchise material rows`],['Digester stock',`${p.reduce((a,x)=>a+num(x.on_hand),0).toLocaleString('en-IN')} units`,`${p.length} franchise product rows`]])}<div class="cols"><section class="card grow"><div class="card-h"><h2>Raw material stock by franchise</h2><span class="muted small">kg</span></div><div class="pad">${biHorizontal(s.map(x=>({...x,label:`${x.franchise_code} · ${x.item_name}`})),'label','stock_kg',v=>`${kg(v)} kg`,'#3D6F90')}</div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>MATERIAL</th><th class="r">STOCK</th><th class="r">EST. VALUE</th></tr></thead><tbody>${s.map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.item_name)}</td><td class="r">${kg(x.stock_kg)} kg</td><td class="r">${biCash(num(x.stock_kg)*num(x.rate_per_kg))}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No stock.</td></tr>'}</tbody></table></div></section><section class="card grow"><div class="card-h"><h2>Finished goods by franchise</h2><span class="muted small">units</span></div><div class="pad">${biHorizontal(p.map(x=>({...x,label:`${x.franchise_name} · ${x.product_name}`})),'label','on_hand',v=>`${num(v)} units`)}</div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>PRODUCT</th><th>UNIT</th><th class="r">ON HAND</th></tr></thead><tbody>${p.map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.product_name)}</td><td>${esc(x.unit)}</td><td class="r">${num(x.on_hand)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No stock.</td></tr>'}</tbody></table></div></section></div>`}
+function vSaExpenses(){const ex=S.biData&&S.biData.expenses;if(!ex)return `${biHeader('TA / DA','Requested, approved and paid field expenses by staff.')}<div class="loading">Loading report…</div>`;return `${biHeader('TA / DA','Compare claim requests with approved and paid amounts by field staff.')}<section class="card"><div class="card-h"><h2>Claim amounts by field staff</h2><span class="muted small">Grouped bars · ₹</span></div><div class="pad">${biExpenseChart(ex.by_staff)}</div></section><section class="card"><div class="card-h"><h2>Claims by staff</h2></div><div class="scroll"><table><thead><tr><th>FIELD STAFF</th><th>DISTRICTS</th><th>CLAIM STATUS</th><th class="r">DAYS</th><th class="r">REQUESTED</th><th class="r">APPROVED</th><th class="r">PAID</th></tr></thead><tbody>${ex.by_staff.map(x=>`<tr><td>${esc(x.full_name)}</td><td>${esc(x.districts||'Unassigned')}</td><td>${esc(x.claim_statuses||'—')}</td><td class="r">${num(x.claim_days)}</td><td class="r">${biCash(x.requested)}</td><td class="r">${biCash(x.approved)}</td><td class="r">${biCash(x.paid)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No field claims.</td></tr>'}</tbody></table></div><div class="pad muted small">Claims are attributed to staff. District assignments are shown for context; amounts are not allocated to franchises.</div></section>`}
+
+function vSaInventory(){
+  const D=S.biData;
+  if(!D)return `${biHeader('Inventory','Filter stock by franchise and product or material.')}<div class="loading">Loading report…</div>`;
+  const rawScrap=D.scrap&&D.scrap.stock||[], rawDigester=D.digester&&D.digester.stock||[];
+  const franchiseRows=[...new Map([
+    ...rawScrap.map(x=>[`scrap:${x.franchise_id}`,`${x.franchise_name} · Scrap`]),
+    ...rawDigester.map(x=>[`digester:${x.franchise_id}`,`${x.franchise_name} · Digester`]),
+  ]).entries()];
+  const productRows=[
+    ...new Map(rawScrap.map(x=>[`scrap:${x.item_id}`,`Material · ${x.item_name}`])).entries(),
+    ...new Map(rawDigester.map(x=>[`digester:${x.product_id}`,`Product · ${x.product_name}`])).entries(),
+  ];
+  const [frKind,frId]=S.biInventoryFranchise.split(':');
+  const [itemKind,itemId]=S.biInventoryProduct.split(':');
+  const s=rawScrap.filter(x=>(!frKind||(frKind==='scrap'&&String(x.franchise_id)===frId))&&(!itemKind||(itemKind==='scrap'&&String(x.item_id)===itemId)));
+  const p=rawDigester.filter(x=>(!frKind||(frKind==='digester'&&String(x.franchise_id)===frId))&&(!itemKind||(itemKind==='digester'&&String(x.product_id)===itemId)));
+  const filters=`<div class="f"><label for="bi-inventory-franchise">FRANCHISE</label><select id="bi-inventory-franchise" data-act="bi-inventory-franchise"><option value="">All franchises</option>${selectOptions(franchiseRows,S.biInventoryFranchise)}</select></div><div class="f"><label for="bi-inventory-product">PRODUCT / MATERIAL</label><select id="bi-inventory-product" data-act="bi-inventory-product"><option value="">All products and materials</option>${selectOptions(productRows,S.biInventoryProduct)}</select></div>`;
+  const header=`${biHeader('Inventory','Current on hand, filterable by franchise and product or material.')}${filterBar(filters,false)}`;
+  const kpis=biKpis([
+    ['Raw material stock',`${kg(s.reduce((a,x)=>a+num(x.stock_kg),0))} kg`,`${s.length} matching franchise rows`],
+    ['Finished goods stock',`${p.reduce((a,x)=>a+num(x.on_hand),0).toLocaleString('en-IN')} units`,`${p.length} matching franchise rows`],
+  ]);
+  const scrapTable=`<section class="card grow"><div class="card-h"><h2>Raw material stock</h2><span class="muted small">kg · estimated value at current rate</span></div><div class="pad">${biHorizontal(s.map(x=>({...x,label:`${x.franchise_name} · ${x.item_name}`})),'label','stock_kg',v=>`${kg(v)} kg`,'#3D6F90')}</div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>MATERIAL</th><th class="r">STOCK</th><th class="r">EST. VALUE</th></tr></thead><tbody>${s.map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.item_name)}</td><td class="r">${kg(x.stock_kg)} kg</td><td class="r">${biCash(num(x.stock_kg)*num(x.rate_per_kg))}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No raw material rows match these filters.</td></tr>'}</tbody></table></div></section>`;
+  const digesterTable=`<section class="card grow"><div class="card-h"><h2>Finished goods stock</h2><span class="muted small">product units on hand</span></div><div class="pad">${biHorizontal(p.map(x=>({...x,label:`${x.franchise_name} · ${x.product_name}`})),'label','on_hand',v=>`${num(v)} units`)}</div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>PRODUCT</th><th>UNIT</th><th class="r">ON HAND</th></tr></thead><tbody>${p.map(x=>`<tr><td>${esc(x.franchise_name)}</td><td>${esc(x.product_name)}</td><td>${esc(x.unit)}</td><td class="r">${num(x.on_hand)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No finished goods rows match these filters.</td></tr>'}</tbody></table></div></section>`;
+  return `${header}${kpis}<div class="cols">${scrapTable}${digesterTable}</div>`;
+}
+
+function vSaPipeline(){
+  const d=S.biData&&S.biData.digester;
+  if(!d)return `${biHeader('Sales pipeline','Lead stages, weighted opportunities and target attainment.')}<div class="loading">Loading report…</div>`;
+  const opp=d.opportunities||[], leads=d.leads||[], targets=d.targets||[];
+  return `${biHeader('Sales pipeline','Open demand and progress against franchise product targets.')}
+    <div class="cols"><section class="card grow"><div class="card-h"><h2>Opportunity value by stage</h2><span class="muted small">Weighted pipeline</span></div><div class="pad">${biHorizontal(opp,'stage','weighted_pipeline',biCash)}</div><div class="scroll"><table><thead><tr><th>STAGE</th><th class="r">OPPORTUNITIES</th><th class="r">PIPELINE</th><th class="r">WEIGHTED</th></tr></thead><tbody>${opp.map(x=>`<tr><td>${esc(x.stage)}</td><td class="r">${num(x.count)}</td><td class="r">${biCash(x.pipeline)}</td><td class="r">${biCash(x.weighted_pipeline)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No opportunities.</td></tr>'}</tbody></table></div></section>
+    <section class="card grow"><div class="card-h"><h2>Leads by status</h2></div><div class="pad">${biHorizontal(leads,'status','count',v=>`${num(v)} leads`,'#3D6F90')}</div></section></div>
+    <section class="card"><div class="card-h"><h2>Target attainment</h2><span class="muted small">Sold units compared with configured target</span></div><div class="pad">${biHorizontal(targets.map(x=>({...x,label:`${x.business_name} · ${x.product_name}`,attainment:num(x.target_units)?100*num(x.sold_units)/num(x.target_units):0})),'label','attainment',v=>`${num(v).toFixed(1)}%`,'#4F7F3B')}</div><div class="scroll"><table><thead><tr><th>FRANCHISE</th><th>PRODUCT</th><th class="r">TARGET</th><th class="r">SOLD</th><th class="r">ATTAINMENT</th><th class="r">TARGET VALUE</th><th class="r">SALES VALUE</th></tr></thead><tbody>${targets.map(x=>`<tr><td>${esc(x.business_name)}</td><td>${esc(x.product_name)}</td><td class="r">${num(x.target_units)}</td><td class="r">${num(x.sold_units)}</td><td class="r">${num(x.target_units)?`${(100*num(x.sold_units)/num(x.target_units)).toFixed(1)}%`:'—'}</td><td class="r">${biCash(x.target_amount)}</td><td class="r">${biCash(x.sales_value)}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No targets.</td></tr>'}</tbody></table></div></section>`;
+}
+
 /* ---------- routing and render ---------- */
-const VIEWS = { overview: vOverview, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, inventory: vInventory, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
+const VIEWS = { overview: vOverview, business: vBusiness, 'sa-scrap': vSaScrap, 'sa-digester': vSaDigester, 'sa-inventory': vSaInventory, 'sa-pipeline': vSaPipeline, 'sa-expenses': vSaExpenses, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, inventory: vInventory, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
 function navCounts() {
   const o = S.ov; if (!o) return;
   const set = (id, n, hot) => { const e = $(id); e.textContent = n || ''; e.classList.toggle('hot', !!hot && n > 0); };
@@ -1144,6 +1319,7 @@ function navCounts() {
 let frHtml = '';
 function renderFrSel() {
   const sel = $('#frsel'); if (!sel) return;
+  sel.parentElement.classList.toggle('hidden', curView() === 'business' || (S.profile && S.profile.role === 'super_admin'));
   const html = '<option value="">All franchises (' + S.franchises.filter(f => f.active).length + ')</option>' + S.franchises.map(f => '<option value="' + f.id + '">' + esc(f.code) + ' · ' + esc(f.name) + (f.active ? '' : ' (off)') + '</option>').join('');
   if (html !== frHtml) { sel.innerHTML = html; frHtml = html; }
   sel.value = S.fr ? String(S.fr) : '';
@@ -1156,6 +1332,9 @@ function setFranchise(id) {
 function render() {
   renderFrSel();
   const v = curView();
+  const isSuperAdmin = !!(S.profile && S.profile.role === 'super_admin');
+  document.querySelectorAll('[data-sa-nav]').forEach(a => a.classList.toggle('hidden', !isSuperAdmin && a.id !== 'business-nav'));
+  $('#business-nav').classList.toggle('hidden', !S.profile || !(isSuperAdmin || S.profile.is_super_admin));
   const key = v + ':' + (typeof S.fr !== 'undefined' ? (S.fr || '') : ''), app = $('#app'), changed = key !== window.__viewKey;
   if (!changed) app.classList.remove('enter');
   app.innerHTML = VIEWS[v]();
@@ -1195,6 +1374,10 @@ document.addEventListener('change', async e => {
   if (a === 'frsort') { S.frSort = t.value; render(); }
   if (a === 'frstatus') { S.frStatus = t.value; render(); }
   if (a === 'range') { S.from = $('#from').value || S.from; S.to = $('#to').value || S.to; if (S.from > S.to) [S.from, S.to] = [S.to, S.from]; S.preset = ''; await reload(); }
+  if (a === 'bi-stream') { S.biStream = t.value; S.biFranchise = ''; await reload(); }
+  if (a === 'bi-franchise') { S.biFranchise = t.value; await reload(); }
+  if (a === 'bi-inventory-franchise') { S.biInventoryFranchise = t.value; render(); return; }
+  if (a === 'bi-inventory-product') { S.biInventoryProduct = t.value; render(); return; }
   if (a === 'lstatus') { S.lf.status = t.value; await reload(); }
   if (a === 'ldriver') { S.lf.driver = t.value; await reload(); }
   if (a === 'lsearch') { S.lf.q = t.value.trim(); await reload(); }
@@ -1214,6 +1397,12 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
   const a = b.dataset.act, id = +b.dataset.id;
   if (a === 'logout') logout();
+  if (a === 'bi-fy') {
+    const now = todayIST(), month = +now.slice(5,7), year = +now.slice(0,4), currentStart = month >= 4 ? year : year - 1;
+    const startYear = currentStart - (b.dataset.year === 'previous' ? 1 : 0);
+    S.from = `${startYear}-04-01`; S.to = b.dataset.year === 'previous' ? `${startYear+1}-03-31` : now;
+    S.preset = ''; await reload(); return;
+  }
   if (a === 'fr-open') { setFranchise(id); if (curView() === 'franchises') { location.hash = 'overview'; } else { await reload(); } return; }
   if (a === 'fr-add-toggle') { S.frAdd = !S.frAdd; render(); }
   if (a === 'fr-add-ok') {
@@ -1380,13 +1569,16 @@ async function start() {
   $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
   $('#app').innerHTML = '<div class="loading"><svg class="hop" viewBox="-4 -26 392 134" role="img" aria-label="Loading"><g class="h h0"><path d="M99.10 0.00L12.50 0.00A12.50 12.50 0 0 0 1.67 18.75L44.98 93.75A12.50 12.50 0 0 0 66.63 93.75L109.93 18.75A12.50 12.50 0 0 0 99.10 0.00Z"/></g><g transform="translate(141.6 0)"><g class="h h1"><circle cx="50" cy="50" r="50"/></g></g><g transform="translate(271.6 0)"><g class="h h2"><path d="M12.50 100.00L99.10 100.00A12.50 12.50 0 0 0 109.93 81.25L66.63 6.25A12.50 12.50 0 0 0 44.98 6.25L1.67 81.25A12.50 12.50 0 0 0 12.50 100.00Z"/></g></g></svg>Loading HQ…</div>';
   try {
-    const p = await rest(`profiles?id=eq.${encodeURIComponent(session.user_id)}&select=id,full_name,role,active`);
+    const p = await rest(`profiles?id=eq.${encodeURIComponent(session.user_id)}&select=id,full_name,role,active,is_super_admin`);
     const me = p && p[0];
-    if (!me || !me.active || me.role !== 'hq') { logout('This dashboard is for HQ logins only.'); return; }
+    const isSuperAdmin = !!(me && me.active && me.role === 'super_admin' && me.is_super_admin);
+    if (!me || !me.active || (SUPER_ADMIN_MODE ? !isSuperAdmin : me.role !== 'hq')) { logout(SUPER_ADMIN_MODE ? 'This login is not authorized for Super Admin.' : 'This dashboard is for HQ logins only.'); return; }
     S.profile = me;
-    $('#who-name').textContent = me.full_name; $('#who-role').textContent = 'HQ'; $('#who-meta').textContent = '';
+    $('#business-nav').classList.toggle('hidden', !(me.role === 'super_admin' || (me.role === 'hq' && me.is_super_admin)));
+    if (isSuperAdmin) { document.body.classList.add('super-admin-mode'); if (location.hash !== '#business' && !location.hash.startsWith('#sa-')) history.replaceState(null, '', location.pathname + location.search + '#business'); }
+    $('#who-name').textContent = me.full_name; $('#who-role').textContent = isSuperAdmin ? 'Super Admin' : 'HQ'; $('#who-meta').textContent = '';
     api('/auth/v1/user').then(u => { if (u && u.email) $('#who-meta').textContent = u.email; }).catch(() => {});
-    await refresh(); render(); rtConnect();
+    await refresh(); render(); if (!isSuperAdmin) rtConnect();
   } catch (e) { $('#app').innerHTML = `<div class="card pad"><b>Could not load the dashboard.</b><span class="muted">${esc(e.message)}</span><button class="btn" onclick="location.reload()">Try again</button></div>`; }
 }
 
@@ -1413,7 +1605,7 @@ setInterval(checkSession, 20000);
 document.addEventListener('visibilitychange', checkSession);
 /* lets the phone install this page as an app (full screen, no address bar) */
 if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
-function logout(msg) { logoutLocal(msg); location.replace('../' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+function logout(msg) { logoutLocal(msg); location.replace('/logout/' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
 session && session.access_token ? start() : logout();
 </script>
 </body>

@@ -16,6 +16,7 @@ import psycopg
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from django.db import connection
+from django.utils import timezone as django_timezone
 from psycopg.conninfo import make_conninfo
 
 from core import auth
@@ -36,7 +37,7 @@ def _identity(token):
     except auth.AuthError:
         return None
     sid, uid = claims.get("session_id"), claims["sub"]
-    if sid and not AuthSession.objects.filter(pk=sid, user_id=uid).exists():
+    if not sid or not AuthSession.objects.filter(pk=sid, user_id=uid, expires_at__gt=django_timezone.now()).exists():
         return None
     prof = Profile.objects.filter(pk=uid, active=True).first()
     if prof is None:

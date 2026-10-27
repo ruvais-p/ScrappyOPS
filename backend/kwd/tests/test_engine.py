@@ -88,6 +88,9 @@ class ReadTests(KwdCase):
         self.assertEqual(self.ho.select("audit_log", "action", [["eq", "table_name", "lsgds"], ["eq", "action", "DELETE"]])[0]["action"], "DELETE")
 
     def test_upsert(self):
+        self.ho.fails("Invalid conflict columns", self.ho.q, "opportunities", "upsert",
+                      values={"lsgd_id": self.lsgd, "financial_year": "2026-27", "stage": "new"},
+                      onConflict="id) or true --")
         o = self.ho.q("opportunities", "upsert", values={"lsgd_id": self.lsgd, "financial_year": "2026-27", "stage": "new", "expected_units": 3},
                       onConflict="lsgd_id,financial_year", select="*", single=True)["data"]
         o2 = self.ho.q("opportunities", "upsert", values={"lsgd_id": self.lsgd, "financial_year": "2026-27", "stage": "demo_done", "expected_units": 8},
@@ -107,7 +110,7 @@ class ReadTests(KwdCase):
                                                                                     "type": "corporation"},
                       onConflict="name,district_id", ignoreDuplicates=True)
 
-        self.ho.fails("not allowed", self.ho.q, "lsgds", "upsert", values=[
+        self.ho.fails("not valid", self.ho.q, "lsgds", "upsert", values=[
             {"name": "Atomic import first row", "district_id": self.ekm, "type": "municipality"},
             {"name": "Atomic import invalid row", "district_id": 99999, "type": "municipality"},
         ], onConflict="name,district_id", ignoreDuplicates=True)

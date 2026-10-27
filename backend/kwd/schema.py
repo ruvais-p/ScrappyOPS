@@ -40,7 +40,7 @@ TABLES = {
     "expense_items": ("kwd_expense_items", cols("id:u day_id:u tso_id:u category:t amount:n description:t from_place:t to_place:t bill_no:t bill_path:t bill_hash:t flags:a created_at:ts"), set()),
     "claim_events": ("kwd_claim_events", cols("id:i day_id:u actor:u event:t amount:n note:t meta:j at:ts"), set()),
     "fr_franchises": ("kwd_fr_franchises", cols("id:u user_id:u business_name:t district_id:i territory:t address:t gstin:t is_active:b created_at:ts"), set()),
-    "fr_products": ("kwd_fr_products", cols("id:u code:t name:t category:t spec:t unit:t list_price:n needs_install:b is_active:b sort:i"), set()),
+    "fr_products": ("kwd_fr_products", cols("id:u code:t name:t category:t spec:t unit:t list_price:n hsn_sac:t gst_percent:n needs_install:b is_active:b sort:i"), set()),
     "fr_leads": ("kwd_fr_leads", cols("id:u franchise_id:u customer_name:t customer_type:t contact_person:t phone:t district_id:i place:t address:t product_id:u qty:i "
                                       "hq_note:t status:t lost_reason:t next_followup_on:d fr_note:t last_update_at:ts assigned_by:u assigned_at:ts created_at:ts"), set()),
     "fr_lead_events": ("kwd_fr_lead_events", cols("id:i lead_id:u franchise_id:u actor:u from_status:t to_status:t note:t at:ts"), set()),
@@ -51,9 +51,12 @@ TABLES = {
                                       "amount_received:n payment_status:t needs_install:b delivery_status:t dispatched_on:d delivered_on:d delivered_at:ts delivery_note:t "
                                       "installation_status:t install_planned_on:d installed_on:d installed_at:ts install_note:t install_photo:t flags:a status:t "
                                       "cancel_reason:t cancelled_by:u cancelled_at:ts ho_flag:b ho_flag_reason:t created_by:u created_at:ts"), {"payment_status"}),
-    "fr_sale_items": ("kwd_fr_sale_items", cols("id:u sale_id:u product_id:u qty:i unit_price:n line_total:n"), {"line_total"}),
+    "fr_sale_items": ("kwd_fr_sale_items", cols("id:u sale_id:u product_id:u hsn_sac:t qty:i unit_price:n gst_percent:n gst_amount:n line_total:n"), {"gst_amount", "line_total"}),
     "fr_stock_moves": ("kwd_fr_stock_moves", cols("id:u franchise_id:u product_id:u qty:i kind:t sale_id:u ref_no:t note:t created_by:u created_at:ts"), set()),
     "fr_targets": ("kwd_fr_targets", cols("id:u franchise_id:u month:d product_id:u target_units:i target_amount:n set_by:u updated_at:ts"), set()),
+    "fr_company_settings": ("kwd_fr_company_settings", cols("id:i company_name:t address:t phone:t gstin:t email:t state:t updated_by:u updated_at:ts"), set()),
+    "fr_payment_receipts": ("kwd_fr_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
+    "fr_meetings": ("kwd_fr_meetings", cols("id:u scheduled_at:ts meeting_type:t description:t status:t created_by:u created_at:ts completed_by:u completed_at:ts"), set()),
 }
 
 # views the pages read (computed from the rows the caller may see; see engine.VIEWS)

@@ -27,7 +27,7 @@ async function put(S, fid, pid, values) {
 export default {
   state: { month: monthStart(), d: null, err: '', ov: {}, pf: '', pt: {}, busy: false, prices: null, pbusy: '' },
   async init() {
-    this.S.prices = this.ctx.data.products.map((p) => ({ ...p, price: p.list_price ?? '' }))
+    this.S.prices = this.ctx.data.products.map((p) => ({ ...p, price: p.list_price ?? '', gst: p.gst_percent ?? 0 }))
     await this.actions.load.call(this)
   },
   view(S, ctx) {
@@ -65,10 +65,13 @@ export default {
         ${SectionHead({ title: 'Products & list prices' })}
         <p class="muted small" style="margin-top:0">The list price is shown to franchisees when they record a sale. A sale priced more than 10% below it is flagged for you.</p>
         <div class="table-wrap"><table>
-          <thead><tr><th>Product</th><th>Installation needed</th><th>List price (₹)</th><th>Offered</th><th></th></tr></thead>
+          <thead><tr><th>Product</th><th>HSN/SAC</th><th>Unit</th><th>GST (%)</th><th>List price (₹)</th><th>Installation needed</th><th>Offered</th><th></th></tr></thead>
           <tbody>${S.prices.map((p, i) => html`<tr><td><b>${p.name}</b><div class="muted small">${p.code}</div></td>
-            <td>${p.needs_install ? 'Yes' : 'No'}</td>
+            <td><input style="width:110px" data-bind="prices.${i}.hsn_sac" value="${p.hsn_sac || ''}" aria-label="HSN/SAC for ${p.name}"></td>
+            <td>${p.unit || 'unit'}</td>
+            <td><input type="number" min="0" max="100" step="0.01" inputmode="decimal" style="width:85px" data-bind="prices.${i}.gst" value="${p.gst}" aria-label="GST rate for ${p.name}"></td>
             <td><input type="number" min="0" inputmode="decimal" style="width:140px" data-bind="prices.${i}.price" value="${p.price}" aria-label="List price of ${p.name}"></td>
+            <td>${p.needs_install ? 'Yes' : 'No'}</td>
             <td><label class="check inline"><input type="checkbox" data-bind="prices.${i}.is_active" ${p.is_active ? raw('checked') : ''}> On</label></td>
             <td><button class="btn sm" ${S.pbusy === p.id ? raw('disabled') : ''} data-act="savePrice" data-i="${i}">Save</button></td></tr>`)}</tbody></table></div>
       </section>`
@@ -116,10 +119,14 @@ export default {
     },
     async savePrice(el) {
       const p = this.S.prices[Number(el.dataset.i)]
+      if (!Number.isFinite(Number(p.gst)) || Number(p.gst) < 0 || Number(p.gst) > 100) return toast('Enter a GST rate from 0 to 100%.', 'bad')
       this.set({ pbusy: p.id })
-      const { error } = await supabase.from('fr_products').update({ list_price: p.price === '' ? null : Number(p.price), is_active: p.is_active }).eq('id', p.id)
+      const product = { ...p, list_price: p.price === '' ? null : Number(p.price), hsn_sac: p.hsn_sac.trim() || null, gst_percent: Number(p.gst), is_active: p.is_active }
+      const { error } = await supabase.from('fr_products').update({ list_price: product.list_price, hsn_sac: product.hsn_sac, gst_percent: product.gst_percent, is_active: product.is_active }).eq('id', p.id)
       this.set({ pbusy: '' })
       if (error) return toast(errText(error), 'bad')
+      this.ctx.data.products = this.ctx.data.products.map((row) => row.id === p.id ? { ...row, ...product } : row)
+      this.ctx.data.byId = Object.fromEntries(this.ctx.data.products.map((row) => [row.id, row]))
       toast(`${p.name} saved`)
     },
   },

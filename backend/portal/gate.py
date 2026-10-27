@@ -13,6 +13,7 @@ Role -> dashboard
   driver                                 -> /collector/
   warehouse, supervisor                  -> /warehouse/
   hq                                     -> /hq/
+  super_admin                            -> /super-admin/
   tso, zonal_manager, head_office, franchisee (Scrappy Field, the staff app) -> /kwd/
 """
 import time
@@ -29,16 +30,22 @@ COOKIE = "scrappy_gate"
 HOP = "scrappy_hop"           # set for a few seconds when we send someone to a dashboard; breaks redirect loops
 SALT = "portal.gate"
 
-SCRAP_ROLES = {"driver": "collector", "warehouse": "warehouse", "supervisor": "warehouse", "hq": "hq"}
+SCRAP_ROLES = {"driver": "collector", "warehouse": "warehouse", "supervisor": "warehouse", "hq": "hq",
+               "super_admin": "super_admin"}
 KWD_ROLES = {"tso", "zonal_manager", "head_office", "franchisee"}
-DASH_PATH = {"collector": "/collector/", "warehouse": "/warehouse/", "hq": "/hq/", "kwd": "/kwd/"}
+DASH_PATH = {"collector": "/collector/", "warehouse": "/warehouse/", "hq": "/hq/", "kwd": "/kwd/",
+             "super_admin": "/super-admin/"}
 # where each dashboard keeps its login in the browser (the pages read these)
-STORAGE_KEY = {"collector": "scrappy_session", "warehouse": "scrappy_wh_session", "hq": "scrappy_hq_session", "kwd": "scrappy_kwd_session"}
+STORAGE_KEY = {"collector": "scrappy_session", "warehouse": "scrappy_wh_session", "hq": "scrappy_hq_session",
+               "kwd": "scrappy_kwd_session", "super_admin": "scrappy_super_admin_session"}
 
 
 def destination(user_id):
     """The dashboard this login belongs to ('collector', 'warehouse', 'hq' or 'kwd'), or None when the login has no role."""
-    role = Profile.objects.filter(pk=user_id, active=True).values_list("role", flat=True).first()
+    profile = Profile.objects.filter(pk=user_id, active=True).values("role", "is_super_admin").first()
+    role = profile["role"] if profile else None
+    if role == "super_admin" and not profile["is_super_admin"]:
+        return None
     if role in SCRAP_ROLES:
         return SCRAP_ROLES[role]
     row = fetch_one("select role from kwd_profiles where id = %(u)s and is_active", {"u": user_id})

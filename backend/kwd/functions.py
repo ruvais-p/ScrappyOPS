@@ -9,7 +9,7 @@ from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
-from core.models import User
+from core.models import Profile, User
 from core.services.common import ApiError, fetch, fetch_one
 from kwd.scope import HO
 
@@ -64,6 +64,8 @@ def admin_users(ctx, body):
     """Create a login, update a person, or reset a password. Only active Head Office may call it."""
     if ctx.role != HO:
         raise ApiError("Only Head Office can manage staff", status=403)
+    if not isinstance(body, dict):
+        raise ApiError("Send a valid staff request.")
     action = body.get("action")
     if action == "create":
         email, password, name = str(body.get("email") or "").strip().lower(), body.get("password") or "", (body.get("full_name") or "").strip()
@@ -85,16 +87,28 @@ def admin_users(ctx, body):
     if action == "update":
         if not body.get("id"):
             raise ApiError("Missing id")
+        try:
+            target = UUID(str(body["id"]))
+        except (ValueError, TypeError):
+            raise ApiError("Invalid staff id")
+        if Profile.objects.filter(pk=target).exists() or not fetch_one("select id from kwd_profiles where id = %(u)s", {"u": target}):
+            raise ApiError("Staff member not found", status=404)
         prof = body.get("profile") or {}
         if str(body["id"]) == str(ctx.uid) and (prof.get("is_active") is False or (prof.get("role") and prof["role"] != "head_office")):
             raise ApiError("You cannot deactivate or demote your own login")
-        _apply_profile(UUID(str(body["id"])), prof)
+        _apply_profile(target, prof)
         _log(ctx, body["id"], "UPDATE_STAFF", body)
         return {"ok": True}
     if action == "reset_password":
         if not body.get("id") or len(body.get("password") or "") < 8:
             raise ApiError("A password of at least 8 characters is needed")
-        u = User.objects.filter(pk=body["id"]).first()
+        try:
+            target = UUID(str(body["id"]))
+        except (ValueError, TypeError):
+            raise ApiError("Invalid staff id")
+        if Profile.objects.filter(pk=target).exists() or not fetch_one("select id from kwd_profiles where id = %(u)s", {"u": target}):
+            raise ApiError("Staff member not found", status=404)
+        u = User.objects.filter(pk=target).first()
         if not u:
             raise ApiError("User not found")
         u.set_password(body["password"])

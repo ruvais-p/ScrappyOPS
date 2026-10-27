@@ -6,7 +6,10 @@ import { fmtINR, fmtDate, istDate, addDays } from '../../lib.js'
 import { Loading } from '../../ui.js'
 import { Sheet, errLine } from '../../kit.js'
 import { takePhoto, uploadPhoto, signedUrl } from '../../expenses.js'
-import { CUSTOMER_TYPES, LEAD_STATUS, DELIVERY, INSTALL, PAYMENT, SALE_FLAG } from '../../fr.js'
+import { LEAD_STATUS, DELIVERY, INSTALL, PAYMENT, SALE_FLAG } from '../../fr.js'
+
+const BILL_TYPES = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
+const billTypeForLead = (type) => ({ private: 'B2C', lsgd: 'B2G', institution: 'B2B', business: 'B2B' })[type] || 'B2C'
 
 export const LeadPill = (status) => html`<span class="pill ${(LEAD_STATUS[status] && LEAD_STATUS[status].tone) || ''}">${(LEAD_STATUS[status] && LEAD_STATUS[status].label) || status}</span>`
 
@@ -26,23 +29,28 @@ export const saleForm = {
     const first = lead && lead.product_id ? byId[lead.product_id] : null
     return {
       f: {
-        customer_name: (lead && lead.customer_name) || '', customer_type: (lead && lead.customer_type) || 'private', phone: (lead && lead.phone) || '',
-        district: (lead && lead.district_id) || '', place: (lead && lead.place) || '', sale_date: istDate(), invoice_no: '', received: '',
+        customer_name: (lead && lead.customer_name) || '', customer_type: billTypeForLead(lead && lead.customer_type), phone: (lead && lead.phone) || '',
+        district: (lead && lead.district_id) || '', place: (lead && lead.place) || '', sale_date: istDate(), received: '',
+        franchise_id: ctx.props.franchiseId || '',
       },
-      items: [{ product_id: first ? first.id : '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '' }],
-      busy: false, err: '',
+      items: [{ product_id: first ? first.id : '', hsn_sac: first && first.hsn_sac || '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '', gst_percent: first ? first.gst_percent ?? 0 : 0 }],
+      busy: false, err: '', stockByFr: ctx.props.stockByFr || {},
     }
   },
   view(S, ctx) {
     const lead = ctx.props.lead, { products, byId, stock, districts } = ctx.data
     const f = S.f
-    const total = S.items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0), 0)
-    const onHand = (id) => stock[id] ?? 0
-    return Sheet({ title: lead ? 'Close the sale' : 'Record a sale', close: 'close', body: html`
+    const ho = Boolean(ctx.props.ho)
+    const franchiseStock = ho ? (S.stockByFr && S.stockByFr[f.franchise_id]) || {} : stock
+    const total = S.items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100), 0)
+    const onHand = (id) => franchiseStock[id] ?? 0
+    return Sheet({ title: ho ? 'Create bill' : lead ? 'Close the sale' : 'Record a sale', close: 'close', body: html`
       ${lead ? html`<p class="notice info small"><span>This closes the lead for ${lead.customer_name}. Stock goes down by what you enter below.</span></p>` : ''}
+      ${ho ? html`<label>Franchisee<select data-bind="f.franchise_id" data-change="chooseFranchise"><option value="">Choose…</option>${ctx.props.frs.filter((x) => x.is_active).map((x) => opt(x.id, f.franchise_id, x.business_name))}</select></label>
+        ${!f.franchise_id ? html`<p class="muted small">Choose a franchisee to load its current stock before selecting products.</p>` : ''}` : ''}
       <label>Customer name<input data-bind="f.customer_name" value="${f.customer_name}"></label>
       <div class="grid2">
-        <label>Customer type<select data-bind="f.customer_type">${Object.entries(CUSTOMER_TYPES).map(([k, v]) => opt(k, f.customer_type, v))}</select></label>
+        <label>Customer type<select data-bind="f.customer_type">${Object.entries(BILL_TYPES).map(([k, v]) => opt(k, f.customer_type, v))}</select></label>
         <label>Mobile<input type="tel" inputmode="numeric" data-bind="f.phone" value="${f.phone}" placeholder="10 digits"></label>
       </div>
       <div class="grid2">
@@ -56,13 +64,16 @@ export const saleForm = {
         return html`<div class="subcard" style="margin-bottom:10px" data-key="item${i}">
           <label>Product<select data-bind="items.${i}.product_id" data-change="pickProduct" data-i="${i}">
             <option value="">Choose…</option>
-            ${products.filter((q) => q.is_active).map((q) => opt(q.id, x.product_id, `${q.name} · ${onHand(q.id)} in stock`, onHand(q.id) <= 0))}</select></label>
+            ${products.filter((q) => q.is_active).map((q) => opt(q.id, x.product_id, `${q.name} · ${ho && !f.franchise_id ? 'select franchisee first' : `${onHand(q.id)} in stock`}`, ho && !f.franchise_id))}</select></label>
           <div class="grid2">
+            <label>HSN/SAC<input data-bind="items.${i}.hsn_sac" value="${x.hsn_sac || ''}" placeholder="Enter HSN/SAC" ${ho ? raw('required') : ''}></label>
             <label>Quantity<input type="number" min="1" inputmode="numeric" data-bind="items.${i}.qty" data-live value="${x.qty}"></label>
-            <label>Selling price each (₹)<input type="number" min="0" inputmode="decimal" data-bind="items.${i}.unit_price" data-live value="${x.unit_price}"></label>
+            <label>Unit<input value="${p ? p.unit || 'unit' : '—'}" disabled></label>
+            <label>Price/Unit (₹)<input type="number" min="0" inputmode="decimal" data-bind="items.${i}.unit_price" data-live value="${x.unit_price}"></label>
+            <label>GST (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bind="items.${i}.gst_percent" data-live value="${x.gst_percent ?? 0}"></label>
           </div>
           <div class="row">
-            <span class="muted small grow">${p && p.list_price ? `List price ${fmtINR(p.list_price)}` : 'No list price set by Head Office'} · line ${fmtINR((Number(x.qty) || 0) * (Number(x.unit_price) || 0))}</span>
+            <span class="muted small grow">${p && p.list_price ? `List price ${fmtINR(p.list_price)}` : 'No list price set by Head Office'} · line total ${fmtINR((Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100))}</span>
             ${S.items.length > 1 ? html`<button class="btn sm" data-act="removeItem" data-i="${i}">Remove</button>` : ''}
           </div>
           ${low ? html`<p class="notice warn small"><span>Priced more than 10% below the list price. Head Office will see this.</span></p>` : ''}
@@ -72,28 +83,38 @@ export const saleForm = {
       <div class="summary" style="margin:14px 0"><div class="summary-row"><span>Total</span><span><b>${fmtINR(total)}</b></span></div></div>
       <div class="grid2">
         <label>Money received now (₹)<input type="number" min="0" inputmode="decimal" data-bind="f.received" value="${f.received}" placeholder="0"></label>
-        <label>Invoice no. (optional)<input data-bind="f.invoice_no" value="${f.invoice_no}" placeholder="Auto-generated if blank"></label>
       </div>
       <label>Sale date<input type="date" data-bind="f.sale_date" data-live value="${f.sale_date}" min="${addDays(istDate(), -7)}" max="${istDate()}"></label>
       ${f.sale_date < istDate() ? html`<p class="muted small">A sale dated before today is marked "entered for an earlier date".</p>` : ''}
       ${errLine(S.err)}
-      <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="save">${S.busy ? 'Saving…' : 'Record sale & create invoice'}</button>` })
+      <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="save">${S.busy ? 'Saving…' : 'Create bill'}</button>` })
   },
   actions: {
     close() { parentCall(this, 'saleClose') },
+    async chooseFranchise(el) {
+      const franchiseId = el.value
+      if (!franchiseId) return this.set({ stockByFr: {} })
+      const { data, error } = await supabase.from('v_fr_stock').select('product_id,on_hand').eq('franchise_id', franchiseId)
+      if (error) return this.set({ err: errText(error) })
+      this.set({ stockByFr: { ...this.S.stockByFr, [franchiseId]: Object.fromEntries((data || []).map((r) => [r.product_id, r.on_hand])) } })
+    },
     pickProduct(el) {
       const q = this.ctx.data.byId[el.value], i = Number(el.dataset.i)
       this.S.items[i].unit_price = q ? q.list_price ?? '' : ''
+      this.S.items[i].hsn_sac = q ? q.hsn_sac || '' : ''
+      this.S.items[i].gst_percent = q ? q.gst_percent ?? 0 : 0
       this.render()
     },
-    addItem() { this.set({ items: [...this.S.items, { product_id: '', qty: 1, unit_price: '' }] }) },
+    addItem() { this.set({ items: [...this.S.items, { product_id: '', hsn_sac: '', qty: 1, unit_price: '', gst_percent: 0 }] }) },
     removeItem(el) { this.set({ items: this.S.items.filter((_, j) => j !== Number(el.dataset.i)) }) },
     async save() {
-      const S = this.S, f = S.f, items = S.items, lead = this.ctx.props.lead, { byId, stock } = this.ctx.data
+      const S = this.S, f = S.f, items = S.items, lead = this.ctx.props.lead, ho = Boolean(this.ctx.props.ho), { byId } = this.ctx.data
+      const stock = ho ? (S.stockByFr && S.stockByFr[f.franchise_id]) || {} : this.ctx.data.stock
       this.set({ err: '' })
-      const total = items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0), 0)
+      if (ho && !f.franchise_id) return this.set({ err: 'Choose the franchisee.' })
+      const total = items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100), 0)
       if (f.customer_name.trim().length < 2) return this.set({ err: 'Enter the customer name.' })
-      if (items.some((x) => !x.product_id || !(Number(x.qty) > 0) || !(Number(x.unit_price) > 0))) return this.set({ err: 'Choose each product and enter its quantity and selling price.' })
+      if (items.some((x) => !x.product_id || !(Number(x.qty) > 0) || !(Number(x.unit_price) > 0) || !Number.isFinite(Number(x.gst_percent)) || Number(x.gst_percent) < 0 || Number(x.gst_percent) > 100 || (ho && !x.hsn_sac.trim()))) return this.set({ err: 'Choose each product and enter its HSN/SAC, quantity, unit price and valid GST rate.' })
       for (const x of items) {
         const need = items.filter((y) => y.product_id === x.product_id).reduce((a, y) => a + Number(y.qty), 0)
         const have = stock[x.product_id] ?? 0
@@ -103,13 +124,14 @@ export const saleForm = {
       this.set({ busy: true })
       const { error } = await supabase.rpc('fr_record_sale', {
         p_lead: lead ? lead.id : null, p_customer_name: f.customer_name, p_customer_type: f.customer_type, p_phone: f.phone || null,
-        p_district: f.district ? Number(f.district) : null, p_place: f.place || null, p_sale_date: f.sale_date, p_invoice_no: f.invoice_no || null,
+        p_franchise: ho ? f.franchise_id : null,
+        p_district: f.district ? Number(f.district) : null, p_place: f.place || null, p_sale_date: f.sale_date, p_invoice_no: null,
         p_amount_received: Number(f.received || 0),
-        p_items: items.map((x) => ({ product_id: x.product_id, qty: Number(x.qty), unit_price: Number(x.unit_price) })),
+        p_items: items.map((x) => ({ product_id: x.product_id, hsn_sac: x.hsn_sac.trim(), qty: Number(x.qty), unit_price: Number(x.unit_price), gst_percent: Number(x.gst_percent) || 0 })),
       })
       this.set({ busy: false })
       if (error) return this.set({ err: errText(error) })
-      toast('Sale recorded and invoice created. Open the sale to print it.')
+      toast(ho ? 'Bill created. Open it in Billing to print.' : 'Sale recorded and invoice created. Open the sale to print it.')
       parentCall(this, 'saleChanged')
       parentCall(this, 'saleClose')
     },
@@ -246,33 +268,56 @@ export const saleSheet = {
 
 export function printSaleInvoice(sale, items, ctx) {
   const { byId, fr, frs = [], districts = [] } = ctx.data
-  const seller = fr || frs.find((f) => f.id === sale.franchise_id) || {}
+  const seller = ctx.data.company || {
+    company_name: 'SCRAPPY INNOVATIONS PVT LTD.',
+    address: 'HO. WP 18/108 - H,J,K\n1st FLOOR SAJ BUILDING\nMANJERI ROAD WANDOOR\nPIN 679328',
+    phone: '+918592964750', gstin: '32ABFCS0169R1ZX', email: 'info@scrappyinnovations.com', state: 'Kerala',
+  }
   const district = districts.find((d) => d.id === sale.district_id)
   const amount = (n) => fmtINR(n)
-  const rows = items.map((i) => `<tr><td>${esc((byId[i.product_id] || {}).name || 'Product')}</td><td class="num">${esc(i.qty)}</td><td class="num">${esc(amount(i.unit_price))}</td><td class="num">${esc(amount(i.line_total))}</td></tr>`).join('')
-  const due = Math.max(0, Number(sale.total || 0) - Number(sale.amount_received || 0))
-  const address = [seller.address, seller.territory].filter(Boolean).map(esc).join('<br>')
-  const sellerGstin = seller.gstin ? `<div>GSTIN: ${esc(seller.gstin)}</div>` : ''
+  const rows = items.map((i, index) => {
+    const product = byId[i.product_id] || {}
+    return `<tr><td class="center">${index + 1}</td><td>${esc(product.name || 'Product')}</td><td class="center">${esc(i.hsn_sac || '—')}</td><td class="num">${Number(i.qty).toFixed(2)}</td><td>${esc(product.unit || 'unit')}</td><td class="num">${esc(amount(i.unit_price))}</td><td class="center">${Number(i.gst_percent || 0)}%</td><td class="num">${esc(amount(Number(i.line_total) + Number(i.gst_amount || 0)))}</td></tr>`
+  }).join('')
+  const qtyUnits = [...new Set(items.map((i) => (byId[i.product_id] || {}).unit || 'unit'))]
+  const qtySummary = qtyUnits.map((unit) => `${items.filter((i) => ((byId[i.product_id] || {}).unit || 'unit') === unit).reduce((n, i) => n + Number(i.qty || 0), 0)} ${esc(unit)}`).join(' · ')
+  const subtotal = items.reduce((sum, i) => sum + Number(i.line_total || 0), 0)
+  const gstTotal = items.reduce((sum, i) => sum + Number(i.gst_amount || 0), 0)
+  const numberWords = (value) => {
+    const small = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen']
+    const tens = ['', '', 'twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety']
+    const under100 = (n) => n < 20 ? small[n] : `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${small[n % 10]}` : ''}`
+    const under1000 = (n) => `${n >= 100 ? `${small[Math.floor(n / 100)]} hundred${n % 100 ? ' ' : ''}` : ''}${n % 100 ? under100(n % 100) : ''}`
+    const amountValue = Math.round((Number(value) || 0) * 100) / 100
+    let whole = Math.floor(amountValue), paise = Math.round((amountValue - whole) * 100), parts = []
+    for (const [size, label] of [[10000000, 'crore'], [100000, 'lakh'], [1000, 'thousand'], [1, '']]) {
+      const part = Math.floor(whole / size)
+      if (part) parts.push(`${under1000(part)}${label ? ` ${label}` : ''}`)
+      whole %= size
+    }
+    return `Rupees ${parts.join(' ') || 'zero'}${paise ? ` and ${under100(paise)} paise` : ''} only`
+  }
+  const address = esc(seller.address || '').replace(/\n/g, '<br>')
+  const phone = seller.phone
+  const email = seller.email
   const customerAddress = [sale.place, district && district.name].filter(Boolean).map(esc).join(', ')
+  const due = Math.max(0, Number(sale.total || 0) - Number(sale.amount_received || 0))
   const win = window.open('', '_blank')
   if (!win) { toast('Allow pop-ups to print the invoice.', 'bad'); return }
   win.document.open()
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Invoice ${esc(sale.invoice_no || '')}</title>
     <style>
-      @page{size:A4;margin:16mm}*{box-sizing:border-box}body{font:14px/1.45 Arial,sans-serif;color:#242021;max-width:760px;margin:32px auto;padding:0 20px}
-      .top{display:flex;justify-content:space-between;gap:24px;border-bottom:2px solid #7c1723;padding-bottom:18px}.seller{font-size:13px;color:#51494b}.seller strong{font-size:20px;color:#211d1e}.title{text-align:right}.title h1{font-size:28px;letter-spacing:.08em;margin:0;color:#7c1723}.title div{margin-top:6px}
-      .meta{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0}.label{text-transform:uppercase;font-size:10px;letter-spacing:.08em;color:#766c6e;margin-bottom:5px}.box strong{font-size:16px}.muted{color:#766c6e}
-      table{width:100%;border-collapse:collapse;margin-top:18px}th{font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:.06em;color:#655b5d;border-bottom:1px solid #aaa;padding:10px 8px}td{padding:11px 8px;border-bottom:1px solid #e1dcdd}.num{text-align:right;white-space:nowrap}
-      .totals{width:min(340px,100%);margin:20px 0 0 auto}.line{display:flex;justify-content:space-between;padding:6px 0}.grand{font-size:19px;font-weight:700;border-top:2px solid #272123;margin-top:5px;padding-top:12px}.status{display:inline-block;padding:4px 9px;border:1px solid #bbb;border-radius:20px;font-size:12px}.cancel{color:#a11d2b;font-size:22px;font-weight:bold;border:3px solid #a11d2b;padding:5px 12px;transform:rotate(-6deg);display:inline-block;margin-top:12px}.foot{border-top:1px solid #ddd;margin-top:42px;padding-top:12px;color:#766c6e;font-size:11px}
-      @media print{body{margin:0 auto;padding:0}.foot{position:fixed;bottom:0;left:0;right:0}}
+      @page{size:A4;margin:14mm 15mm 18mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#252f34;font:12px/1.4 Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .header{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:22px;align-items:center;margin-bottom:8px}.title-band{background:#0b82a7;color:#fff;padding:23px 20px;font-size:21px;font-weight:700}.logo{width:140px;max-height:70px;object-fit:contain;filter:hue-rotate(190deg)}.seller-name{font-size:20px;font-weight:700;margin:8px 10px 12px}.seller-grid{display:grid;grid-template-columns:1.4fr 1.15fr 1.1fr;gap:20px;padding:0 10px 12px;border-bottom:2px solid #0b82a7}.seller-grid strong{display:block;font-size:11px;margin:0 0 5px}.seller-grid div div{line-height:1.55}.meta{display:grid;grid-template-columns:1.8fr 1fr;border:1px solid #cbdde4;margin:11px 0 18px;min-height:88px}.meta-left{padding:14px 16px;display:grid;grid-template-columns:145px 1fr;align-content:center;gap:9px}.meta-left span{font-size:12px}.bill-to{background:#edf6f9;border-left:1px solid #cbdde4;padding:12px 14px}.bill-to strong{font-size:13px}.bill-to div{margin-top:2px}.items{width:100%;border-collapse:collapse;table-layout:fixed}.items th{background:#0b82a7;color:#fff;text-align:left;font-weight:600;padding:9px 6px;border:1px solid #087396;font-size:10px}.items td{padding:9px 6px;border:1px solid #cbdde4}.items th:nth-child(1){width:5%}.items th:nth-child(2){width:23%}.items th:nth-child(3){width:10%}.items th:nth-child(4){width:12%}.items th:nth-child(5){width:9%}.items th:nth-child(6){width:15%}.items th:nth-child(7){width:9%}.items th:nth-child(8){width:17%}.center{text-align:center}.num{text-align:right;white-space:nowrap}.items tfoot td{background:#edf6f9;color:#087fa5;font-weight:700}.summary{width:100%;border-collapse:collapse;margin-top:10px}.summary td{padding:8px 10px;border:1px solid #cbdde4}.summary td:first-child{width:52%}.summary .grand td{background:#0b82a7;color:#fff;font-size:14px;font-weight:700}.summary .words td{background:#edf6f9}.foot{position:fixed;bottom:-10mm;left:0;right:0;text-align:center;color:#71838a;font-size:10px}
+      @media screen{body{max-width:900px;margin:28px auto;padding:0 24px}}
     </style></head><body>
-    <header class="top"><div class="seller"><strong>${esc(seller.business_name || 'Franchise')}</strong>${address ? `<div>${address}</div>` : ''}${sellerGstin}${seller.profile && seller.profile.phone ? `<div>${esc(seller.profile.phone)}</div>` : ''}</div>
-      <div class="title"><h1>INVOICE</h1><div><b>${esc(sale.invoice_no || 'Invoice number unavailable')}</b></div><div>${esc(fmtDate(sale.sale_date))}</div>${sale.status === 'cancelled' ? '<div class="cancel">CANCELLED</div>' : ''}</div></header>
-    <section class="meta"><div class="box"><div class="label">Bill to</div><strong>${esc(sale.customer_name || '—')}</strong><div>${esc(customerAddress || '—')}</div>${sale.phone ? `<div>${esc(sale.phone)}</div>` : ''}</div>
-      <div class="box"><div class="label">Payment status</div><span class="status">${esc(sale.payment_status || 'unpaid')}</span>${seller.gstin ? `<div style="margin-top:10px"><span class="label">Seller GSTIN</span><br>${esc(seller.gstin)}</div>` : ''}</div></section>
-    <table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>
-    <section class="totals"><div class="line"><span>Total</span><span>${esc(amount(sale.total))}</span></div><div class="line"><span>Amount received</span><span>${esc(amount(sale.amount_received))}</span></div><div class="line grand"><span>Balance due</span><span>${esc(amount(due))}</span></div></section>
-    <footer class="foot">Thank you for your purchase.</footer><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),250))</script></body></html>`)
+    <header class="header"><div class="title-band">COMPANY BILLING · TAX INVOICE</div><img class="logo" src="/static/kwd/brand/scrappy-lockup-horizontal-color.svg" alt="Scrappy"></header>
+    <div class="seller-name">${esc(seller.company_name || 'SCRAPPY INNOVATIONS PVT LTD.')}</div>
+    <section class="seller-grid"><div><strong>Address:</strong><div>${address || '—'}</div></div><div>${phone ? `<strong>Phone:</strong><div>${esc(phone)}</div>` : ''}${email ? `<strong style="margin-top:12px">Email:</strong><div>${esc(email)}</div>` : ''}</div><div>${seller.gstin ? `<strong>GSTIN:</strong><div>${esc(seller.gstin)}</div>` : ''}${seller.state ? `<strong style="margin-top:12px">State:</strong><div>${esc(seller.state)}</div>` : ''}</div></section>
+    <section class="meta"><div class="meta-left"><span>Invoice No.</span><span>${esc(sale.invoice_no || '—')}</span><span>Date:</span><span>${esc(fmtDate(sale.sale_date))}${sale.status === 'cancelled' ? ' · CANCELLED' : ''}</span></div><div class="bill-to"><strong>Bill To:</strong><div>${esc(sale.customer_name || '—')}</div><div>${customerAddress || '—'}</div>${sale.phone ? `<div>Contact No.: ${esc(sale.phone)}</div>` : ''}</div></section>
+    <table class="items"><thead><tr><th class="center">#</th><th>Item name</th><th>HSN/SAC</th><th class="num">Quantity</th><th>Unit</th><th class="num">Price/Unit</th><th class="center">GST</th><th class="num">Amount</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="center">No items recorded</td></tr>'}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="num">${qtySummary}</td><td colspan="3"></td><td class="num">${esc(amount(sale.total))}</td></tr></tfoot></table>
+    <table class="summary"><tbody><tr><td>Total quantity</td><td class="num">${qtySummary || '—'}</td></tr><tr><td>Sub Total</td><td class="num">${esc(amount(subtotal))}</td></tr><tr><td>GST</td><td class="num">${esc(amount(gstTotal))}</td></tr><tr class="grand"><td>Total</td><td class="num">${esc(amount(sale.total))}</td></tr><tr><td>Received</td><td class="num">${esc(amount(sale.amount_received))}</td></tr><tr><td>Balance</td><td class="num">${esc(amount(due))}</td></tr><tr><td>Payment Mode</td><td class="num">Not recorded</td></tr><tr class="words"><td>Invoice Amount In Words</td><td>${esc(numberWords(sale.total))}</td></tr></tbody></table>
+    <footer class="foot">${esc(sale.invoice_no || '')} · Page 1</footer><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),350))</script></body></html>`)
   win.document.close()
 }
 

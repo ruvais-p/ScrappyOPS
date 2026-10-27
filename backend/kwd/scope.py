@@ -1,6 +1,7 @@
 """Who is calling, and which rows they may read: the old database's row-level security rules, written as SQL pieces.
 Every read of a table (and every table joined into a read) is cut down to what the caller may see."""
 from core.models import AuthSession
+from django.utils import timezone
 from core.services.common import fetch, fetch_one, ApiError, SESSION_MSG
 
 HO, ZM, TSO, FR = "head_office", "zonal_manager", "tso", "franchisee"
@@ -20,7 +21,8 @@ class KCtx:
 
     def session_valid(self):
         if self._valid is None:
-            self._valid = True if not self.session_id else AuthSession.objects.filter(id=self.session_id, user_id=self.uid).exists()
+            self._valid = True if not self.session_id else AuthSession.objects.filter(
+                id=self.session_id, user_id=self.uid, expires_at__gt=timezone.now()).exists()
         return self._valid
 
     @property
@@ -131,6 +133,9 @@ class Scope:
             "field_days": lambda: f"({a}.tso_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.tso_id')}))",
             "followups": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",
             "fr_franchises": lambda: self.fr_can_see(a + ".id"),
+            "fr_company_settings": lambda: self.role_in(HO, FR),
+            "fr_payment_receipts": lambda: self.is_ho(),
+            "fr_meetings": lambda: self.is_ho(),
             "fr_lead_events": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_leads": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_presentations": lambda: self.fr_can_see(a + ".franchise_id"),
