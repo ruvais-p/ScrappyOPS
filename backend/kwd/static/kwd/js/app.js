@@ -150,7 +150,7 @@ async function startHo(root, profile) {
       if (m === 'staff') startShell(root, { profile, kind: 'ho', onSwitch: back })
       else {
         patch(root, `<div class="center">${Loading('Loading franchise module…')}</div>`)
-        const mod = await import('./pages/ho/fr/app.js')
+        const mod = await import('./pages/ho/fr/app.js?v=20261027-1')
         mod.start(root, { profile, onSwitch: back })
       }
     },
