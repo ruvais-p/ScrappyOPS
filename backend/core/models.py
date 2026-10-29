@@ -117,6 +117,12 @@ class Franchise(models.Model):
     constituency = models.TextField(null=True, blank=True)
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # what appears on the invoices the franchise issues to HQ
+    gstin = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    phone = models.TextField(null=True, blank=True)
+    email = models.TextField(null=True, blank=True)
+    state = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "franchises"
@@ -165,6 +171,8 @@ class Customer(models.Model):
 class ScrapItem(models.Model):
     name = models.TextField()
     active = models.BooleanField(default=True)
+    hsn_code = models.TextField(null=True, blank=True)                        # on invoices; set by HQ
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     class Meta:
         db_table = "scrap_items"
@@ -435,7 +443,7 @@ class HqRequirement(models.Model):
 
 class HqRelease(AppendOnlyModel):
     code = models.TextField(unique=True)
-    requirement = models.ForeignKey(HqRequirement, on_delete=models.PROTECT, related_name="releases")
+    requirement = models.ForeignKey(HqRequirement, null=True, blank=True, on_delete=models.PROTECT, related_name="releases")   # empty: loaded without a request
     item = models.ForeignKey(ScrapItem, on_delete=models.PROTECT)
     kg = models.DecimalField(max_digits=14, decimal_places=3)
     vehicle_no = models.TextField()
@@ -502,7 +510,7 @@ class HqDispatch(models.Model):
 
 class HqDispatchLine(models.Model):
     dispatch = models.ForeignKey(HqDispatch, on_delete=models.CASCADE, related_name="lines")
-    requirement = models.ForeignKey(HqRequirement, on_delete=models.PROTECT, related_name="+")
+    requirement = models.ForeignKey(HqRequirement, null=True, blank=True, on_delete=models.PROTECT, related_name="+")   # empty: loaded without a request
     item = models.ForeignKey(ScrapItem, on_delete=models.PROTECT, related_name="+")
     kg = models.DecimalField(max_digits=14, decimal_places=3)
     price_per_kg = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)     # fixed when the supervisor finalizes
@@ -514,7 +522,82 @@ class HqDispatchLine(models.Model):
         constraints = [
             models.CheckConstraint(condition=Q(kg__gt=0), name="hq_dispatch_lines_kg_check"),
             models.UniqueConstraint(fields=["dispatch", "requirement"], name="hq_dispatch_lines_once"),
+            models.UniqueConstraint(fields=["dispatch", "item"], condition=Q(requirement__isnull=True), name="hq_dispatch_lines_item_once"),
         ]
+
+
+class Buyer(models.Model):
+    """Someone HQ sells its stock to."""
+    name = models.TextField()
+    gstin = models.TextField(null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    phone = models.TextField(null=True, blank=True)
+    email = models.TextField(null=True, blank=True)
+    state = models.TextField(null=True, blank=True)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.SET_NULL, related_name="+", db_column="created_by")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "buyers"
+        constraints = [models.CheckConstraint(condition=~Q(name=""), name="buyers_name_check")]
+
+
+INVOICE_KINDS = ("purchase", "sale")
+
+
+class Invoice(models.Model):
+    """A tax invoice. 'purchase': a franchise sells stock to HQ (made from a finalized load for HQ). 'sale': HQ sells stock to a buyer.
+    Once issued it only changes by being marked paid or cancelled."""
+    code = models.TextField(unique=True)
+    kind = models.TextField()
+    franchise = models.ForeignKey(Franchise, null=True, blank=True, on_delete=models.PROTECT)
+    dispatch = models.ForeignKey(HqDispatch, null=True, blank=True, on_delete=models.PROTECT)
+    buyer = models.ForeignKey(Buyer, null=True, blank=True, on_delete=models.PROTECT)
+    invoice_date = models.DateField()
+    status = models.TextField(default="issued")
+    payment_status = models.TextField(default="unpaid")
+    paid_on = models.DateField(null=True, blank=True)
+    payment_ref = models.TextField(null=True, blank=True)
+    vehicle_no = models.TextField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+    subtotal = models.DecimalField(max_digits=14, decimal_places=2)
+    gst_total = models.DecimalField(max_digits=14, decimal_places=2)
+    total = models.DecimalField(max_digits=14, decimal_places=2)
+    cancel_reason = models.TextField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(Profile, on_delete=models.PROTECT, related_name="+", db_column="created_by")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "invoices"
+        indexes = [models.Index(fields=["kind", "status"], name="invoices_kind_status_idx"), models.Index(fields=["franchise"], name="invoices_franchise_idx")]
+        constraints = [
+            models.CheckConstraint(condition=Q(kind__in=INVOICE_KINDS), name="invoices_kind_check"),
+            models.CheckConstraint(condition=Q(status__in=("issued", "cancelled")), name="invoices_status_check"),
+            models.CheckConstraint(condition=Q(payment_status__in=("unpaid", "paid")), name="invoices_payment_check"),
+            models.CheckConstraint(condition=(Q(kind="purchase", franchise__isnull=False, dispatch__isnull=False, buyer__isnull=True)
+                                              | Q(kind="sale", buyer__isnull=False, franchise__isnull=True, dispatch__isnull=True)), name="invoices_party_check"),
+            # a finalized load is invoiced once; cancelling the invoice lets it be invoiced again
+            models.UniqueConstraint(fields=["dispatch"], condition=Q(status="issued"), name="invoices_one_per_load"),
+        ]
+
+
+class InvoiceLine(models.Model):
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
+    item = models.ForeignKey(ScrapItem, on_delete=models.PROTECT, related_name="+")
+    hsn_code = models.TextField(null=True, blank=True)
+    kg = models.DecimalField(max_digits=14, decimal_places=3)
+    rate = models.DecimalField(max_digits=12, decimal_places=2)
+    gst_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    taxable = models.DecimalField(max_digits=14, decimal_places=2)
+    gst_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    total = models.DecimalField(max_digits=14, decimal_places=2)
+
+    class Meta:
+        db_table = "invoice_lines"
+        constraints = [models.CheckConstraint(condition=Q(kg__gt=0), name="invoice_lines_kg_check"),
+                       models.CheckConstraint(condition=Q(rate__gte=0), name="invoice_lines_rate_check")]
 
 
 class CashSettlement(models.Model):

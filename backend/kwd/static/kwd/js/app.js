@@ -150,7 +150,7 @@ async function startHo(root, profile) {
       if (m === 'staff') startShell(root, { profile, kind: 'ho', onSwitch: back })
       else {
         patch(root, `<div class="center">${Loading('Loading franchise module…')}</div>`)
-        const mod = await import('./pages/ho/fr/app.js?v=20261027-1')
+        const mod = await import('./pages/ho/fr/app.js?v=20261030-1')
         mod.start(root, { profile, onSwitch: back })
       }
     },
@@ -168,7 +168,7 @@ async function boot() {
   watchSession()
   if (profile.role === 'tso') startShell(root, { profile, kind: 'field' })
   else if (profile.role === 'zonal_manager') startShell(root, { profile, kind: 'zm' })
-  else if (profile.role === 'franchisee') (await import('./pages/fr/app.js')).start(root, { profile })
+  else if (profile.role === 'franchisee') (await import('./pages/fr/app.js?v=20261030-1')).start(root, { profile })
   else await startHo(root, profile)
 }
 

@@ -1,4 +1,4 @@
-/* Head Office: give leads to franchisees (one, or a pasted list) and follow what they do with them. */
+/* Head Office: give leads to franchisees (one, or a pasted list) and follow what they do with them, including the leads franchisees found themselves. */
 import { html, raw, supabase, errText, toast } from '../../../core.js'
 import { Loading, Empty, Icon, PageHead, Stat } from '../../../ui.js'
 import { fmtDate } from '../../../lib.js'
@@ -81,20 +81,20 @@ function importSheet(S, ctx) {
 
 function detailSheet(S, ctx) {
   const { frs, byId, districts } = ctx.data, lead = S.open
-  const movable = ['new', 'contacted', 'lost'].includes(lead.status)
+  const movable = lead.source !== 'own' && ['new', 'contacted', 'lost'].includes(lead.status)
   return Sheet({ title: lead.customer_name, close: 'closeOpen', body: html`
-    <div class="row wrap">${LeadPill(lead.status)}<span class="pill">${CUSTOMER_TYPES[lead.customer_type]}</span></div>
+    <div class="row wrap">${LeadPill(lead.status)}<span class="pill">${CUSTOMER_TYPES[lead.customer_type]}</span>${lead.source === 'own' ? html`<span class="pill">Found by the franchisee</span>` : ''}</div>
     <div class="summary" style="margin:12px 0">
       <div class="summary-row"><span>Contact</span><span>${[lead.contact_person, lead.phone].filter(Boolean).join(' · ') || '—'}</span></div>
       <div class="summary-row"><span>Where</span><span>${[lead.place, (districts.find((d) => d.id === lead.district_id) || {}).name].filter(Boolean).join(', ') || '—'}</span></div>
       <div class="summary-row"><span>Interest</span><span>${lead.product_id ? `${lead.qty || 1} × ${byId[lead.product_id] && byId[lead.product_id].name}` : '—'}</span></div>
-      <div class="summary-row"><span>Assigned</span><span>${fmtDate(lead.assigned_at)}</span></div>
+      <div class="summary-row"><span>${lead.source === 'own' ? 'Added' : 'Assigned'}</span><span>${fmtDate(lead.assigned_at)}</span></div>
       ${lead.next_followup_on ? html`<div class="summary-row"><span>Next follow-up</span><span>${fmtDate(lead.next_followup_on)}</span></div>` : ''}
     </div>
     ${lead.fr_note ? html`<p class="notice info small"><span><b>Franchisee’s note:</b> ${lead.fr_note}</span></p>` : ''}
     ${lead.lost_reason ? html`<p class="notice bad small"><span><b>Lost because:</b> ${lead.lost_reason}</span></p>` : ''}
     <label>Franchisee<select data-bind="ofid" ${movable ? '' : raw('disabled')}>${frs.map((f) => opt(f.id, S.ofid, f.business_name))}</select></label>
-    ${!movable ? html`<p class="muted small">A lead in progress or closed stays with its franchisee.</p>` : ''}
+    ${!movable ? html`<p class="muted small">${lead.source === 'own' ? 'The franchisee found this lead, so it stays with them.' : 'A lead in progress or closed stays with its franchisee.'}</p>` : ''}
     <label>Note for the franchisee<input data-bind="onote" value="${S.onote}"></label>
     ${errLine(S.err)}
     <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="saveOpen">Save</button>
@@ -103,7 +103,7 @@ function detailSheet(S, ctx) {
 }
 
 export default {
-  state: (ctx) => ({ rows: null, err: '', fid: ctx.route.franchiseId || '', st: '', q: '', form: ctx.route.assign ? 'one' : null, v: emptyLead(ctx.route.franchiseId),
+  state: (ctx) => ({ rows: null, err: '', fid: ctx.route.franchiseId || '', st: '', src: '', q: '', form: ctx.route.assign ? 'one' : null, v: emptyLead(ctx.route.franchiseId),
     text: '', open: null, events: [], ofid: '', onote: '', busy: false }),
   async init() { await this.actions.load.call(this) },
   view(S, ctx) {
@@ -113,14 +113,14 @@ export default {
     const fname = (id) => (frs.find((f) => f.id === id) || {}).business_name || '—'
     const dName = (id) => (districts.find((d) => d.id === id) || {}).name
     const q = S.q.trim().toLowerCase()
-    const list = S.rows.filter((l) => (!S.fid || l.franchise_id === S.fid) && (!S.st || (S.st === 'open' ? LEAD_OPEN.includes(l.status) : l.status === S.st))
+    const list = S.rows.filter((l) => (!S.fid || l.franchise_id === S.fid) && (!S.src || (l.source || 'ho') === S.src) && (!S.st || (S.st === 'open' ? LEAD_OPEN.includes(l.status) : l.status === S.st))
       && (!q || `${l.customer_name} ${l.place} ${l.phone} ${fname(l.franchise_id)}`.toLowerCase().includes(q)))
     const scoped = S.rows.filter((l) => !S.fid || l.franchise_id === S.fid)
     const won = scoped.filter((l) => l.status === 'won').length, lost = scoped.filter((l) => l.status === 'lost').length
-    return html`${PageHead({ label: 'Franchise', title: 'Leads', sub: 'Give leads to franchisees and follow what they do with them. They update the status; you see every change.',
+    return html`${PageHead({ label: 'Franchise', title: 'Leads', sub: 'Give leads to franchisees and follow what they do with them, along with the leads they find on their own. They update the status; you see every change.',
         actions: html`<button class="btn" data-act="openForm" data-k="csv">${Icon('upload', 18)} Import list</button><button class="btn primary" data-act="openForm" data-k="one">${Icon('plus', 18)} Assign a lead</button>` })}
       <div class="stats">
-        ${Stat({ lead: true, label: 'Leads given', value: scoped.length })}
+        ${Stat({ lead: true, label: 'Leads', value: scoped.length, sub: `${scoped.filter((l) => l.source === 'own').length} found by franchisees` })}
         ${Stat({ label: 'Open', value: scoped.filter((l) => LEAD_OPEN.includes(l.status)).length })}
         ${Stat({ label: 'Sale closed', value: won, tone: 'ok' })}
         ${Stat({ label: 'Lost', value: lost, sub: won + lost ? `${Math.round((100 * won) / (won + lost))}% of decided leads won` : '' })}
@@ -128,13 +128,15 @@ export default {
       <div class="toolbar">
         <div class="search">${Icon('search', 18)}<input placeholder="Search customer, place, phone" data-bind="q" data-live value="${S.q}"></div>
         <select data-bind="fid" data-live aria-label="Franchisee"><option value="">All franchisees</option>${frs.map((f) => opt(f.id, S.fid, f.business_name))}</select>
+        <select data-bind="src" data-live aria-label="Source"><option value="">Any source</option><option value="ho" ${S.src === 'ho' ? raw('selected') : ''}>Given by Head Office</option><option value="own" ${S.src === 'own' ? raw('selected') : ''}>Found by franchisee</option></select>
         <select data-bind="st" data-live aria-label="Status"><option value="">Any status</option><option value="open" ${S.st === 'open' ? raw('selected') : ''}>All open</option>${Object.entries(LEAD_STATUS).map(([k, v]) => opt(k, S.st, v.label))}</select>
       </div>
       ${list.length === 0 ? Empty(S.rows.length ? 'No leads match.' : 'No leads assigned yet.') : html`<div class="table-wrap"><table>
-        <thead><tr><th>Customer</th><th>Franchisee</th><th>Where</th><th>Interest</th><th>Status</th><th>Follow-up</th><th>Assigned</th></tr></thead>
+        <thead><tr><th>Customer</th><th>Franchisee</th><th>Source</th><th>Where</th><th>Interest</th><th>Status</th><th>Follow-up</th><th>Assigned</th></tr></thead>
         <tbody>${list.map((l) => html`<tr data-act="openLead" data-id="${l.id}" style="cursor:pointer">
           <td><b>${l.customer_name}</b><div class="muted small">${customerShort[l.customer_type]}${l.phone ? ` · ${l.phone}` : ''}</div></td>
           <td>${fname(l.franchise_id)}</td>
+          <td>${l.source === 'own' ? html`<span class="pill tiny">Own</span>` : 'Head Office'}</td>
           <td style="white-space:normal">${[l.place, dName(l.district_id)].filter(Boolean).join(', ') || '—'}</td>
           <td style="white-space:normal">${l.product_id ? `${l.qty || 1} × ${byId[l.product_id] && byId[l.product_id].name}` : '—'}</td>
           <td>${LeadPill(l.status)}${l.status === 'new' && daysSince(l.assigned_at) >= 3 ? html`<span class="pill warn tiny">${daysSince(l.assigned_at)} d untouched</span>` : ''}</td>

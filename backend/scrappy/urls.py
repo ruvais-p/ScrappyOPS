@@ -15,6 +15,7 @@ urlpatterns = [
     path("rest/v1/<str:table>", api.rest_table),
     # the two server-side helpers that used to be edge functions
     path("functions/v1/bill-pdf", api.bill_pdf),
+    path("functions/v1/invoice-pdf", api.invoice_pdf),
     path("functions/v1/hq-logins", api.hq_logins),
     # one front door: the login page, sign-out, and the staff app (Scrappy Field). portal.gate decides who may open which page.
     path("login/", portal.login),

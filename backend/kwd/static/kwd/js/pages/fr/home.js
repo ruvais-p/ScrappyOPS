@@ -38,7 +38,7 @@ export default {
       <div class="stats">
         ${Stat({ lead: true, label: `Target · ${monthName(month)}`, value: a.pctValue != null ? `${a.pctValue}%` : a.pctUnits != null ? `${a.pctUnits}%` : '—',
           sub: a.tValue || a.tUnits ? `${fmtINR(a.value)} of ${a.tValue ? fmtINR(a.tValue) : `${a.tUnits} units`}` : 'No target set yet' })}
-        ${Stat({ label: 'Leads from Head Office', value: d.leads.length, sub: `${fresh.length} new · ${open.length} open · ${won} closed` })}
+        ${Stat({ label: 'Leads', value: d.leads.length, sub: `${fresh.length} new · ${open.length} open · ${won} closed` })}
         ${Stat({ label: 'Sales this month', value: fmtINR(a.value), sub: `${a.units} units`, tone: 'ok' })}
         ${Stat({ label: 'Units in stock', value: unitsInStock, sub: noStock ? 'Add your stock' : lowStock.length ? `${lowStock.length} running low` : 'All stocked', tone: lowStock.length || noStock ? 'warn' : '' })}
       </div>
@@ -48,7 +48,7 @@ export default {
       <section>
         ${SectionHead({ title: 'Needs your action', count: todo, tone: todo ? 'bad' : '' })}
         ${todo === 0 ? Empty('Nothing waiting. You are all caught up.') : html`<ul class="list">
-          ${fresh.length > 0 ? action('leads', 'new', 'followup', '', `${fresh.length} new ${fresh.length === 1 ? 'lead' : 'leads'} from Head Office`, names(fresh, 'customer_name')) : ''}
+          ${fresh.length > 0 ? action('leads', 'new', 'followup', '', `${fresh.length} new ${fresh.length === 1 ? 'lead' : 'leads'}`, names(fresh, 'customer_name')) : ''}
           ${followDue.length > 0 ? action('leads', 'follow', 'clock', 'bad', `${followDue.length} follow-up${followDue.length === 1 ? '' : 's'} due`, names(followDue, 'customer_name')) : ''}
           ${overdueMeet.length > 0 ? action('meetings', '', 'present', 'bad', `${overdueMeet.length} presentation${overdueMeet.length === 1 ? '' : 's'} to update`, `Say how ${overdueMeet.length === 1 ? 'it' : 'they'} went`) : ''}
           ${toDeliver.length > 0 ? action('sales', 'deliver', 'truck', '', `${toDeliver.length} sale${toDeliver.length === 1 ? '' : 's'} to deliver`, names(toDeliver, 'customer_name')) : ''}

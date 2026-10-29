@@ -22,7 +22,7 @@ class FranchiseTests(KwdCase):
 
     def sell(self, who=None, lead=None, items=None, received=0, **kw):
         who = who or self.fr
-        args = dict(p_lead=lead, p_customer_name="Green Residency", p_customer_type="private", p_phone="9446000001", p_district=self.ekm,
+        args = dict(p_lead=lead, p_customer_name="Green Residency", p_customer_type="B2C", p_phone="9446000001", p_district=self.ekm,
                     p_place="Kakkanad", p_sale_date=str(ist_today()), p_invoice_no="INV-1", p_amount_received=received,
                     p_items=items if items is not None else [{"product_id": self.kwd160, "qty": 2, "unit_price": 5880}])
         args.update(kw)
@@ -38,10 +38,80 @@ class FranchiseTests(KwdCase):
         self.ho.update("fr_products", {"list_price": 5880}, [["eq", "code", "KWD-160"]])
         self.ho.update("fr_products", {"list_price": 5880}, [["eq", "code", "KWD-120"]])
 
+    def test_head_office_adds_a_product_with_its_hsn(self):
+        good = {"code": "kwd-480", "name": "Kitchen Waste Digester 480 L", "category": "digester", "hsn_sac": "84798999", "gst_percent": 18, "list_price": 20000, "needs_install": True}
+        self.fr.fails("row-level security", self.fr.insert, "fr_products", good)
+        self.ho.fails("Enter the HSN/SAC", self.ho.insert, "fr_products", {**good, "hsn_sac": ""})
+        self.ho.fails("Enter the HSN/SAC", self.ho.insert, "fr_products", {**good, "hsn_sac": "84A9"})
+        self.ho.fails("product code", self.ho.insert, "fr_products", {**good, "code": "no spaces allowed"})
+        self.ho.fails("Choose the product category", self.ho.insert, "fr_products", {**good, "category": "toy"})
+        self.ho.fails("GST rate", self.ho.insert, "fr_products", {**good, "gst_percent": 150})
+        self.ho.fails("product name", self.ho.insert, "fr_products", {**good, "name": " "})
+        p = self.ho.insert("fr_products", good, select="*", single=True)
+        self.assertEqual((p["code"], p["hsn_sac"], p["gst_percent"], p["list_price"], p["needs_install"], p["is_active"]), ("KWD-480", "84798999", 18, 20000, True, True))
+        self.assertGreater(p["sort"], max(x["sort"] for x in self.products.values()))
+        self.ho.fails("already exists", self.ho.insert, "fr_products", {**good, "name": "Another name"})              # same code
+        self.ho.fails("already exists", self.ho.insert, "fr_products", {**good, "code": "KWD-481"})                  # same name
+        self.assertEqual(len(self.fr.select("fr_products", "id")), 9)                                              # the franchisee can now choose it on a bill
+        self.assertEqual(self.fr.select("fr_products", "hsn_sac", [["eq", "id", p["id"]]]), [{"hsn_sac": "84798999"}])
+
+    def test_the_invoice_can_be_downloaded_as_a_pdf(self):
+        self.stock(self.fr, self.kwd160, 5, "opening")
+        sid = self.sell(items=[{"product_id": self.kwd160, "qty": 2, "unit_price": 5880, "gst_percent": 18, "hsn_sac": "84798999"}], received=5000)
+        url = f"/kwd/api/invoice/{sid}.pdf"
+        get = lambda who: self.client.get(url, **who.h)
+        r = get(self.fr)
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "application/pdf"))
+        pdf = r.content
+        self.assertTrue(pdf.startswith(b"%PDF") and pdf.rstrip().endswith(b"%%EOF") and len(pdf) > 3000)
+        name = r["Content-Disposition"]
+        self.assertTrue(name.startswith('attachment; filename="Invoice-') and name.endswith('.pdf"') and "/" not in name.split("filename=")[1], name)
+        self.assertEqual(get(self.ho).status_code, 200)                                  # Head Office can download any franchise's invoice
+        self.assertEqual(get(self.fr2).status_code, 404)                                 # another franchisee cannot see this sale
+        self.assertEqual(get(self.tso).status_code, 404)
+        self.assertEqual(self.client.get(url).status_code, 401)                          # not signed in
+        self.assertEqual(self.client.post(url, **self.fr.h).status_code, 405)
+        self.assertEqual(self.client.get("/kwd/api/invoice/00000000-0000-0000-0000-000000000000.pdf", **self.fr.h).status_code, 404)
+
+    def test_head_office_adds_a_product_category(self):
+        self.fr.fails("row-level security", self.fr.insert, "fr_product_categories", {"name": "Solar dryer"})
+        self.ho.fails("2 to 40", self.ho.insert, "fr_product_categories", {"name": "x"})
+        self.ho.fails("already exists", self.ho.insert, "fr_product_categories", {"name": "burner"})
+        c = self.ho.insert("fr_product_categories", {"name": "  Solar   dryer "}, select="*", single=True)
+        self.assertEqual((c["key"], c["name"]), ("solar-dryer", "Solar dryer"))
+        self.ho.fails("already exists", self.ho.insert, "fr_product_categories", {"name": "SOLAR DRYER"})
+        self.assertEqual([r["key"] for r in self.fr.select("fr_product_categories", "key", order=[["sort", True]])],
+                         ["digester", "inoculum", "burner", "incinerator", "solar-dryer"])
+        self.assertEqual(self.tso.select("fr_product_categories", "key"), [])
+        # a product can use the new category; an unknown one is refused
+        good = {"code": "SD-1", "name": "Solar Dryer 1", "category": "solar-dryer", "hsn_sac": "84193900", "gst_percent": 12}
+        self.assertEqual(self.ho.insert("fr_products", good, select="category", single=True), {"category": "solar-dryer"})
+        self.ho.fails("Choose the product category", self.ho.insert, "fr_products", {**good, "code": "SD-2", "name": "Solar Dryer 2", "category": "unknown"})
+
+    def test_the_price_can_be_entered_with_gst(self):
+        self.stock(self.fr, self.kwd160, 10, "opening")
+        item = lambda **kw: [{"product_id": self.kwd160, "qty": 2, "unit_price": 1, "gst_percent": 18, **kw}]
+        self.fr.fails("Enter valid product", self.sell, items=item(unit_price_incl=0))
+        # 5,900 with 18% GST is 5,000 without it
+        sid = self.sell(items=item(unit_price_incl=5900))
+        it = self.fr.select("fr_sale_items", "unit_price, gst_percent, gst_amount, line_total", [["eq", "sale_id", sid]])[0]
+        self.assertEqual((float(it["unit_price"]), float(it["gst_amount"]), float(it["line_total"])), (5000.0, 1800.0, 10000.0))   # line_total is before GST
+        self.assertEqual(float(self.fr.select("fr_sales", "total", [["eq", "id", sid]])[0]["total"]), 11800.0)
+        # a price that does not divide evenly still adds up to exactly what was typed
+        sid2 = self.sell(items=item(qty=3, unit_price_incl=100), p_invoice_no="INV-2")
+        total = float(self.fr.select("fr_sales", "total", [["eq", "id", sid2]])[0]["total"])
+        line = self.fr.select("fr_sale_items", "unit_price, line_total", [["eq", "sale_id", sid2]])[0]
+        self.assertEqual(total, 300.0)
+        self.assertAlmostEqual(float(line["line_total"]) + float(self.fr.select("fr_sale_items", "gst_amount", [["eq", "sale_id", sid2]])[0]["gst_amount"]), 300.0, places=3)
+        self.assertAlmostEqual(float(line["unit_price"]), 84.745763, places=6)
+        # the old way (price without GST) is unchanged
+        sid3 = self.sell(items=item(unit_price=5000), p_invoice_no="INV-3")
+        self.assertEqual(float(self.fr.select("fr_sales", "total", [["eq", "id", sid3]])[0]["total"]), 11800.0)
+
     def test_ho_hands_out_leads_and_the_franchisee_works_them(self):
         ld = self.lead(status="won", lost_reason="x", fr_note="x")                      # the starting state is set by the system
         self.assertEqual((ld["status"], ld["lost_reason"], ld["assigned_by"]), ("new", None, str(self.ho_id)))
-        self.fr.fails("row-level security", self.fr.insert, "fr_leads", {"franchise_id": self.fr_id, "customer_name": "Self", "customer_type": "private"})
+        self.fr.fails("row-level security", self.fr.insert, "fr_leads", {"franchise_id": self.fr2_id, "customer_name": "Not mine", "customer_type": "private"})
         self.assertEqual(len(self.fr.select("fr_leads", "id")), 1)
         self.assertEqual(self.fr2.select("fr_leads", "id"), [])
         self.assertEqual(self.zm.select("fr_leads", "id"), [])
@@ -58,6 +128,29 @@ class FranchiseTests(KwdCase):
         moved = self.ho.update("fr_leads", {"franchise_id": self.fr2_id, "status": "new", "fr_note": "wiped"}, [["eq", "id", ld["id"]]], select="franchise_id, status, fr_note")[0]
         self.assertEqual((moved["franchise_id"], moved["status"], moved["fr_note"]), (str(self.fr2_id), "lost", "Spoke to the owner"))
         self.assertEqual(self.fr.select("fr_leads", "id"), [])
+
+    def test_franchisee_adds_and_edits_their_own_leads_and_ho_sees_them(self):
+        given = self.lead()
+        self.assertEqual(given["source"], "ho")
+        mine = self.fr.insert("fr_leads", {"franchise_id": self.fr_id, "customer_name": "Hillview Flats", "customer_type": "business", "phone": "9446000002",
+                                            "qty": 3, "status": "won", "hq_note": "sneaky", "source": "ho", "fr_note": "x"}, select="*", single=True)
+        self.assertEqual((mine["source"], mine["status"], mine["hq_note"], mine["fr_note"], mine["assigned_by"]), ("own", "new", None, None, str(self.fr_user)))
+        self.fr.fails("customer name", self.fr.insert, "fr_leads", {"franchise_id": self.fr_id, "customer_name": " ", "customer_type": "private"})
+        # a franchisee sees both kinds, another franchisee sees neither, Head Office sees both and tells them apart
+        self.assertEqual(sorted(r["source"] for r in self.fr.select("fr_leads", "source")), ["ho", "own"])
+        self.assertEqual(self.fr2.select("fr_leads", "id"), [])
+        self.assertEqual(sorted(r["source"] for r in self.ho.select("fr_leads", "source")), ["ho", "own"])
+        # they can correct their own lead's details and work its status; the source and Head Office's note stay put
+        upd = self.fr.update("fr_leads", {"customer_name": "Hillview Apartments", "qty": 5, "status": "contacted", "source": "ho", "hq_note": "x"},
+                             [["eq", "id", mine["id"]]], select="*")[0]
+        self.assertEqual((upd["customer_name"], upd["qty"], upd["status"], upd["source"], upd["hq_note"]), ("Hillview Apartments", 5, "contacted", "own", None))
+        # a lead Head Office gave keeps its details fixed
+        kept = self.fr.update("fr_leads", {"customer_name": "Renamed"}, [["eq", "id", given["id"]]], select="customer_name")[0]
+        self.assertEqual(kept["customer_name"], "Green Residency")
+        # Head Office cannot take an own lead from the franchisee, nor change its source
+        self.ho.fails("stays with them", self.ho.update, "fr_leads", {"franchise_id": self.fr2_id}, [["eq", "id", mine["id"]]])
+        self.assertEqual(self.ho.update("fr_leads", {"source": "ho", "hq_note": "Call on Monday"}, [["eq", "id", mine["id"]]], select="source, hq_note")[0],
+                         {"source": "own", "hq_note": "Call on Monday"})
 
     # ------------------------------------------------------------------ stock and sales
     def test_stock_rules(self):
@@ -81,7 +174,7 @@ class FranchiseTests(KwdCase):
         self.fr.fails("Only 0 of Kitchen Waste Digester 160 L in stock", self.sell, lead=ld["id"])
         self.stock(self.fr, self.kwd160, 5, "opening")
         self.stock(self.fr, self.inoc, 20, "opening")
-        self.tso.fails("Only a franchisee", self.sell, self.tso)
+        self.tso.fails("Choose a franchisee", self.sell, self.tso)
         self.fr.fails("Add at least one product", self.sell, items=[])
         self.fr.fails("Enter the customer name", self.sell, p_customer_name=" ")
         self.fr.fails("Choose the customer type", self.sell, p_customer_type="alien")

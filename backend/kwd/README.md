@@ -14,7 +14,7 @@ Open it at `/kwd/` after signing in at `/login/` (one login page for every Scrap
 | `tso` | `/kwd/` | Today, LSGDs, log a visit (6 steps), follow-ups, my work (TA/DA requests, visits, Excel) |
 | `zonal_manager` | `/kwd/` | Overview, visit review, TA/DA verification, planning, LSGDs, call-backs, plus their own field day |
 | `head_office` | `/kwd/` | A choice: **Staff monitoring** (network LSGDs, sign-off, TA/DA approval + monthly settlement, fraud check, staff logins, rates) or **Franchise** (leads, sales, stock, meetings, franchisees, targets and prices) |
-| `franchisee` | `/kwd/` | Home, leads, sales, stock, meetings, targets |
+| `franchisee` | `/kwd/` | Home, leads (from Head Office, plus their own: `fr_leads.source = own`, which Head Office sees and cannot reassign), sales, stock, meetings, targets |
 
 The scrap app's roles (`driver`, `warehouse`, `supervisor`, `hq`) open `/collector/`, `/warehouse/`, `/hq/` as before.
 
@@ -37,12 +37,14 @@ In the KWD staff-monitoring area, Head Office can manage network LSGDs and Zonal
 | Piece | File |
 |---|---|
 | Tables, views, checks, links, starting rows (14 districts, expense policy, 8 products) | `migrations/0001_kwd_schema.py` (raw SQL copied from the live database) |
+| Product categories (Head Office can add more; a product points at one) | `migrations/0008_fr_product_categories.py`, rules in `rules/franchise.py` |
 | Column types, links between tables | `schema.py` |
 | Who may read which rows (the old row-level-security policies) | `scope.py` |
 | Query engine: the same query shape supabase-js sent (embeds, filters, order, count, single, insert/update/upsert/delete) | `engine.py` |
 | Rules that were database triggers (visit flags, day recalculation, expense checks, claim steps, franchise stock/sales ...) | `rules/*.py` |
 | Named actions (`pay_month`, `flag_day`, `fr_record_sale`, `fr_cancel_sale`), photo storage, the two edge functions (`admin-users`, `resolve-map-link`) | `api.py`, `functions.py`, `storage.py` |
-| HTTP routes | `urls.py` (`/kwd/api/q`, `rpc/<name>`, `fn/<name>`, `storage/...`, `session`) |
+| HTTP routes | `urls.py` (`/kwd/api/q`, `rpc/<name>`, `fn/<name>`, `storage/...`, `session`, `invoice/<sale id>.pdf`) |
+| The invoice as a PDF file (the "Download PDF" button; the franchisee's own sales and, for Head Office, any sale) | `invoice_pdf.py`, `api.py: sale_invoice_pdf` |
 
 Tables are prefixed `kwd_` so they sit beside the scrap app's tables; the pages still use the original names (`visits`,
 `field_days` ...). The rules are Python, not database triggers, so they run on every write that goes through the API; data

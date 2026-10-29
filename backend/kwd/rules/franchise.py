@@ -1,5 +1,6 @@
 """The franchise module: leads handed out by Head Office, presentations, sales with delivery and installation, stock that moves
 automatically with every sale, and monthly targets. Stock can never go below zero; a sale cannot be edited once cancelled."""
+import re
 from datetime import timedelta
 from decimal import Decimal
 
@@ -51,9 +52,62 @@ class FrFranchises(Rules):
         return ctx.role == HO
 
 
+class FrProductCategories(FrFranchises):
+    """The kinds of product (Digester, Inoculum ...). Head Office can add more; a product points at one of them."""
+    api = "fr_product_categories"
+    defaults = {"sort": 0}
+
+    def before_insert(self, ctx, new):
+        if ctx.role != HO:
+            return new                                   # refused by the permission check
+        name = re.sub(r"\s+", " ", trim(new.get("name")))
+        if not 2 <= len(name) <= 40:
+            raise ApiError("Enter a category name of 2 to 40 characters")
+        key = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40]
+        if not key:
+            raise ApiError("Enter a category name with letters or numbers")
+        if fetch_one("select 1 as x from kwd_fr_product_categories where key = %(k)s or lower(name) = lower(%(n)s)", {"k": key, "n": name}):
+            raise ApiError(f"The category {name} already exists")
+        new["name"], new["key"] = name, key
+        new["sort"] = fetch_one("select coalesce(max(sort), 0) + 1 as s from kwd_fr_product_categories")["s"]
+        return new
+
+
 class FrProducts(FrFranchises):
     api = "fr_products"
     defaults = {"is_active": True, "unit": "unit", "needs_install": False, "sort": 0}
+
+    def before_insert(self, ctx, new):
+        """Head Office adds a product: it needs a name, a unique code, a category and an HSN/SAC, so the bill form can fill the HSN in."""
+        if ctx.role != HO:
+            return new                                   # anyone else is refused by the permission check, not by these messages
+        new["name"], new["code"] = trim(new.get("name")), trim(new.get("code")).upper()
+        if len(new["name"]) < 2:
+            raise ApiError("Enter the product name")
+        if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{1,29}", new["code"]):
+            raise ApiError("Enter a product code of letters, numbers and dashes, for example KWD-480")
+        if not fetch_one("select 1 as x from kwd_fr_product_categories where key = %(k)s", {"k": new.get("category")}):
+            raise ApiError("Choose the product category")
+        hsn = trim(new.get("hsn_sac"))
+        if not re.fullmatch(r"\d{4,8}", hsn):
+            raise ApiError("Enter the HSN/SAC code: 4 to 8 digits")
+        new["hsn_sac"] = hsn
+        try:
+            gst = Decimal(str(new.get("gst_percent") if new.get("gst_percent") not in (None, "") else 0))
+        except Exception:
+            raise ApiError("Enter a GST rate from 0 to 100")
+        if not gst.is_finite() or gst < 0 or gst > 100:
+            raise ApiError("Enter a GST rate from 0 to 100")
+        new["gst_percent"] = gst
+        if fetch_one("select 1 as x from kwd_fr_products where code = %(c)s", {"c": new["code"]}):
+            raise ApiError(f"A product with the code {new['code']} already exists")
+        new["unit"] = trim(new.get("unit")) or "unit"
+        new["spec"] = trim(new.get("spec")) or None
+        if fetch_one("select 1 as x from kwd_fr_products where lower(name) = lower(%(n)s)", {"n": new["name"]}):
+            raise ApiError(f"A product named {new['name']} already exists")
+        if not new.get("sort"):
+            new["sort"] = fetch_one("select coalesce(max(sort), 0) + 1 as s from kwd_fr_products")["s"]
+        return new
 
 
 class FrCompanySettings(Rules):
@@ -144,7 +198,10 @@ class FrLeads(Rules):
     defaults = {"status": "new", "assigned_at": lambda c: now(), "created_at": lambda c: now()}
 
     def insert_check(self, ctx, S, P, new):
-        return ctx.role == HO
+        if ctx.role == HO:
+            return True
+        fid = ctx.franchise_id
+        return f"({S.role_in(FR)} and {uu(P, new['franchise_id'])} = {S.P.add(fid)}::uuid)" if ctx.role == FR and fid else "false"
 
     def update_using(self, ctx, S, a):
         return S.fr_can_see(a + ".franchise_id")
@@ -154,14 +211,27 @@ class FrLeads(Rules):
 
     def before_insert(self, ctx, new):
         new.update(status="new", lost_reason=None, fr_note=None, next_followup_on=None, last_update_at=None, assigned_by=ctx.uid, assigned_at=now())
+        # a franchisee's own lead: marked as theirs, no Head Office note, and the sheet cannot be filed under someone else
+        new["source"] = "own" if ctx.role == FR else "ho"
+        if ctx.role == FR:
+            new["hq_note"] = None
+            if len(trim(new.get("customer_name"))) < 2:
+                raise ApiError("Enter the customer name")
         return new
 
     def before_update(self, ctx, old, new, keys):
         r = ctx.role
         if r == FR:
-            for c in ("id", "franchise_id", "customer_name", "customer_type", "contact_person", "phone", "district_id", "place", "address",
-                      "product_id", "qty", "hq_note", "assigned_by", "assigned_at", "created_at"):
+            # the details of a lead Head Office gave are fixed; a franchisee can correct the details of their own
+            locked = ["id", "franchise_id", "hq_note", "assigned_by", "assigned_at", "created_at", "source"]
+            if old["source"] != "own":
+                locked += ["customer_name", "customer_type", "contact_person", "phone", "district_id", "place", "address", "product_id", "qty"]
+            elif old["status"] == "won" and any(new[c] != old[c] for c in ("customer_name", "customer_type", "product_id", "qty")):
+                raise ApiError("A closed sale cannot be edited")
+            for c in locked:
                 new[c] = old[c]
+            if old["source"] == "own" and len(trim(new.get("customer_name"))) < 2:
+                raise ApiError("Enter the customer name")
             if new["status"] != old["status"]:
                 if old["status"] == "won":
                     raise ApiError("A closed sale cannot be reopened")
@@ -177,9 +247,11 @@ class FrLeads(Rules):
                 new["fr_note"], new["next_followup_on"], new["lost_reason"] = old["fr_note"], old["next_followup_on"], old["lost_reason"]
             new["last_update_at"] = now()
         elif r == HO:
-            for c in ("status", "lost_reason", "fr_note", "next_followup_on", "last_update_at", "assigned_by"):
+            for c in ("status", "lost_reason", "fr_note", "next_followup_on", "last_update_at", "assigned_by", "source"):
                 new[c] = old[c]
             if new["franchise_id"] != old["franchise_id"]:
+                if old["source"] == "own":
+                    raise ApiError("A lead the franchisee found stays with them")
                 if old["status"] in ("won", "presentation_set", "negotiating"):
                     raise ApiError("Only a lead that is new, contacted or lost can be moved to another franchisee")
                 new["assigned_by"], new["assigned_at"] = ctx.uid, now()
@@ -420,9 +492,17 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
     total, install = Decimal(0), False
     for it in p_items:
         try:
-            pid, q, pr = UUID(str(it["product_id"])), int(it["qty"]), Decimal(str(it["unit_price"]))
+            pid, q = UUID(str(it["product_id"])), int(it["qty"])
             gst = Decimal(str(it.get("gst_percent") or 0))
             hsn = trim(it.get("hsn_sac"))
+            # The price can be entered without GST (unit_price) or with GST (unit_price_incl). With GST, the price before tax is worked out here.
+            incl = Decimal(str(it["unit_price_incl"])) if it.get("unit_price_incl") not in (None, "") else None
+            if incl is not None:
+                if not incl.is_finite() or incl <= 0 or gst < 0 or gst > 100:
+                    raise ValueError
+                pr = (incl / (Decimal(1) + gst / Decimal(100))).quantize(Decimal("0.000001"))
+            else:
+                pr = Decimal(str(it["unit_price"]))
         except Exception:
             raise ApiError("Enter valid product, quantity, price and GST details")
         if q <= 0:
@@ -444,7 +524,7 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
                   "values (%(s)s, %(p)s, %(h)s, %(q)s, %(u)s, %(g)s) returning id",
                   {"s": s["id"], "p": pid, "h": hsn or None, "q": q, "u": pr, "g": gst})
         add_stock_move(ctx.uid, f, pid, -q, "sale", s["id"])
-        total += q * pr * (Decimal(1) + gst / Decimal(100))
+        total += q * incl if incl is not None else q * pr * (Decimal(1) + gst / Decimal(100))
         install = install or prod["needs_install"]
         if prod["list_price"] is not None and pr < prod["list_price"] * Decimal("0.9"):
             fl.append("below_list_price")

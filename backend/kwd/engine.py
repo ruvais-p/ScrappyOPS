@@ -13,7 +13,7 @@ from core.services.common import ApiError, fetch, fetch_one
 from kwd import schema as S
 from kwd.scope import Params, Scope
 
-PKS = {"user_districts": ("user_id", "district_id"), "visit_contacts": ("visit_id", "contact_id")}
+PKS = {"user_districts": ("user_id", "district_id"), "visit_contacts": ("visit_id", "contact_id"), "fr_product_categories": ("key",)}
 MAX_ROWS = 5000
 
 

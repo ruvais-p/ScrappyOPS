@@ -64,7 +64,9 @@ export function achievement(sold, targets, month, franchiseId = null) {
   const overall = T.filter((t) => !t.product_id)
   const units = S.reduce((a, r) => a + r.qty, 0)
   const value = S.reduce((a, r) => a + Number(r.line_total), 0)
-  const tUnits = overall.reduce((a, t) => a + (t.target_units || 0), 0)
+  // Head Office sets targets per product; the franchise's unit target is their total (an older overall target still counts if one was saved)
+  const productUnits = T.filter((t) => t.product_id).reduce((a, t) => a + (t.target_units || 0), 0)
+  const tUnits = overall.reduce((a, t) => a + (t.target_units || 0), 0) || productUnits
   const tValue = overall.reduce((a, t) => a + Number(t.target_amount || 0), 0)
   const perProduct = {}
   S.forEach((r) => { (perProduct[r.product_id] = perProduct[r.product_id] || { units: 0, value: 0, target: 0 }); perProduct[r.product_id].units += r.qty; perProduct[r.product_id].value += Number(r.line_total) })
