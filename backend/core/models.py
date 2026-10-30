@@ -550,6 +550,8 @@ class Invoice(models.Model):
     """A tax invoice. 'purchase': a franchise sells stock to HQ (made from a finalized load for HQ). 'sale': HQ sells stock to a buyer.
     Once issued it only changes by being marked paid or cancelled."""
     code = models.TextField(unique=True)
+    seller_details = models.JSONField(default=dict)
+    buyer_details = models.JSONField(default=dict)
     kind = models.TextField()
     franchise = models.ForeignKey(Franchise, null=True, blank=True, on_delete=models.PROTECT)
     dispatch = models.ForeignKey(HqDispatch, null=True, blank=True, on_delete=models.PROTECT)
@@ -586,6 +588,7 @@ class Invoice(models.Model):
 class InvoiceLine(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
     item = models.ForeignKey(ScrapItem, on_delete=models.PROTECT, related_name="+")
+    item_name = models.TextField(default="")
     hsn_code = models.TextField(null=True, blank=True)
     kg = models.DecimalField(max_digits=14, decimal_places=3)
     rate = models.DecimalField(max_digits=12, decimal_places=2)

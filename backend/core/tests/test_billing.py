@@ -2,7 +2,7 @@
 import json
 from decimal import Decimal
 
-from core.models import HqAudit
+from core.models import Buyer, Franchise, HqAudit, Invoice, ScrapItem
 from core.services.billing import financial_year, today
 from core.tests.base import Api
 from core.tests.test_dispatch import DispatchBase
@@ -27,6 +27,77 @@ class BillingFlow(DispatchBase):
 
     def pdf(self, who, invoice_id):
         return self.client.post("/functions/v1/invoice-pdf", data=json.dumps({"invoice_id": invoice_id}), content_type="application/json", **who.h)
+
+    def test_invoice_identity_survives_master_data_edits(self):
+        from core.services.tax_invoice import parties
+        load = self.finalized_load()
+        purchase = self.sup.ok("bill_create_purchase_invoice", p_dispatch_id=load)
+        buyer = self.hq.ok("hq_save_buyer", p_name="Original Buyer", p_address="Original address")
+        sale = self.hq.ok("bill_create_sale_invoice", p_buyer_id=buyer, p_lines=[{"item_id": self.iron, "kg": 1, "rate": 30}])
+        original = {pk: parties(Invoice.objects.get(pk=pk)) for pk in (purchase["id"], sale["id"])}
+        Franchise.objects.filter(pk=self.kkd.pk).update(name="Renamed franchise", address="New address")
+        Buyer.objects.filter(pk=buyer).update(name="Renamed buyer", address="New address")
+        ScrapItem.objects.filter(pk=self.iron).update(name="Renamed material")
+        from core.services.common import fetch
+        fetch("update kwd_fr_company_settings set company_name = 'Renamed HQ' where id = 1 returning id")
+        for pk, details in original.items():
+            self.assertEqual(parties(Invoice.objects.get(pk=pk)), details)
+            self.assertEqual(self.pdf(self.hq, pk).status_code, 200)
+        invoices = {row["id"]: row for row in self.hq.ok("bill_invoices")}
+        self.assertEqual(invoices[sale["id"]]["buyer_name"], "Original Buyer")
+        self.assertEqual(invoices[purchase["id"]]["franchise_name"], original[purchase["id"]][0]["name"])
+        self.assertEqual(invoices[sale["id"]]["lines"][0]["item_name"], "Iron")
+
+    def test_sale_precision_is_validated_before_stock_and_totals(self):
+        self.finalized_load()
+        buyer = self.hq.ok("hq_save_buyer", p_name="Buyer")
+        line = {"item_id": self.iron, "kg": 1, "rate": 30, "gst_percent": 18}
+        for field, value in (("kg", "0.0004"), ("rate", "1.005"), ("gst_percent", "18.001")):
+            self.hq.fail("bill_create_sale_invoice", "decimal places", p_buyer_id=buyer, p_lines=[{**line, field: value}])
+        self.hq.fail("bill_create_sale_invoice", "too large", p_buyer_id=buyer, p_lines=[{**line, "rate": "1e30"}])
+        self.hq.fail("bill_create_sale_invoice", "object", p_buyer_id=buyer, p_lines=[42])
+        self.assertFalse(Invoice.objects.exists())
+        made = self.hq.ok("bill_create_sale_invoice", p_buyer_id=buyer, p_lines=[{**line, "kg": "1.125", "rate": "1.01"}])
+        inv = Invoice.objects.get(pk=made["id"])
+        ln = inv.lines.get()
+        from core.services.billing import line_values
+        self.assertEqual((ln.taxable, ln.gst_amount, ln.total), line_values(ln.kg, ln.rate, ln.gst_percent))
+        self.assertEqual(inv.total, ln.total)
+
+    def test_pdf_rejects_malformed_payloads_without_server_errors(self):
+        for payload in ([], None, {"invoice_id": True}, {"invoice_id": 1.5}, {"invoice_id": 0}):
+            response = self.client.post("/functions/v1/invoice-pdf", data=json.dumps(payload), content_type="application/json", **self.hq.h)
+            self.assertEqual(response.status_code, 400, response.content)
+
+    def test_billing_rejects_malformed_ids_and_oversized_input(self):
+        self.hq.fail("hq_set_item_tax", "valid material", p_item_id="bad", p_hsn="7204", p_gst=18)
+        self.hq.fail("hq_save_buyer", "buyer", p_name="Buyer", p_active="false")
+        self.hq.fail("hq_save_buyer", "name", p_name="B" * 201)
+        self.hq.fail("hq_save_buyer", "address", p_name="Buyer", p_address="a" * 2001)
+        self.hq.fail("bill_create_purchase_invoice", "valid load", p_dispatch_id="bad")
+        self.hq.fail("bill_mark_paid", "valid invoice", p_invoice_id="bad")
+        self.hq.fail("bill_create_sale_invoice", "valid buyer", p_buyer_id="bad", p_lines=[{}])
+        buyer = self.hq.ok("hq_save_buyer", p_name="Buyer")
+        self.hq.fail("bill_create_sale_invoice", "at most", p_buyer_id=buyer, p_lines=[{}] * 101)
+        self.hq.fail("bill_create_sale_invoice", "valid material", p_buyer_id=buyer, p_lines=[{"item_id": "bad"}])
+        self.hq.fail("bill_invoices", "valid limit", p_limit="bad")
+        self.hq.fail("bill_invoices", "valid franchise", p_franchise="bad")
+        self.hq.fail("bill_pending_invoices", "valid franchise", p_franchise="bad")
+
+    def test_existing_invoice_snapshot_backfill(self):
+        from importlib import import_module
+        from django.apps import apps
+        from django.db import connection
+        made = self.sup.ok("bill_create_purchase_invoice", p_dispatch_id=self.finalized_load())
+        inv = Invoice.objects.get(pk=made["id"])
+        Invoice.objects.filter(pk=inv.pk).update(seller_details={}, buyer_details={})
+        inv.lines.update(item_name="")
+        with connection.schema_editor() as editor:
+            import_module("core.migrations.0009_invoice_snapshots").snapshot_existing(apps, editor)
+        inv.refresh_from_db()
+        self.assertEqual(inv.seller_details["name"], self.kkd.name)
+        self.assertTrue(inv.buyer_details["name"])
+        self.assertEqual(set(inv.lines.values_list("item_name", flat=True)), {"Iron", "Paper"})
 
     # ------------------------------------------------------------------ materials and details
     def test_hsn_and_gst_are_set_by_hq_only(self):

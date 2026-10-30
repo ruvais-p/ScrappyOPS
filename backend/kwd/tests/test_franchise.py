@@ -6,6 +6,29 @@ from kwd.tests.base import KwdCase
 
 
 class FranchiseTests(KwdCase):
+    def test_product_edits_validate_tax_details(self):
+        for patch, message in (({"hsn_sac": "BAD"}, "HSN/SAC"), ({"gst_percent": "NaN"}, "GST rate"),
+                               ({"list_price": "NaN"}, "list price")):
+            self.ho.fails(message, self.ho.update, "fr_products", patch, [["eq", "id", self.kwd160]])
+        self.ho.update("fr_products", {"hsn_sac": "84798999", "gst_percent": 18}, [["eq", "id", self.kwd160]])
+
+    def test_bulk_gst_inclusive_price_reconciles_to_paise(self):
+        from decimal import Decimal, ROUND_HALF_UP
+        self.stock(self.fr, self.kwd160, 100000, "opening")
+        sid = self.sell(items=[{"product_id": self.kwd160, "qty": 100000, "unit_price_incl": 100, "gst_percent": 18}])
+        line = fetch_one("select line_total + gst_amount as gross from kwd_fr_sale_items where sale_id = %(s)s", {"s": sid})
+        self.assertEqual(line["gross"].quantize(Decimal(".01"), rounding=ROUND_HALF_UP), Decimal("10000000.00"))
+
+    def test_sale_rejects_fractional_quantities_and_nonfinite_amounts(self):
+        self.stock(self.fr, self.kwd160, 5, "opening")
+        for patch in ({"qty": 1.5}, {"unit_price": "Infinity"}, {"gst_percent": "NaN"}):
+            self.fr.fails("valid product", self.sell, items=[{"product_id": self.kwd160, "qty": 1, "unit_price": 100, **patch}])
+        self.fr.fails("payment amount", self.sell, received="NaN")
+        self.assertEqual(self.fr.select("fr_sales", "id"), [])
+
+    def test_own_lead_without_franchise_returns_permission_error(self):
+        self.fr.fails("row-level security", self.fr.insert, "fr_leads", {"customer_name": "Missing franchise", "customer_type": "private"})
+
     def setUp(self):
         super().setUp()
         self.make_world()
@@ -46,6 +69,7 @@ class FranchiseTests(KwdCase):
         self.ho.fails("product code", self.ho.insert, "fr_products", {**good, "code": "no spaces allowed"})
         self.ho.fails("Choose the product category", self.ho.insert, "fr_products", {**good, "category": "toy"})
         self.ho.fails("GST rate", self.ho.insert, "fr_products", {**good, "gst_percent": 150})
+        self.ho.fails("list price", self.ho.insert, "fr_products", {**good, "list_price": "NaN"})
         self.ho.fails("product name", self.ho.insert, "fr_products", {**good, "name": " "})
         p = self.ho.insert("fr_products", good, select="*", single=True)
         self.assertEqual((p["code"], p["hsn_sac"], p["gst_percent"], p["list_price"], p["needs_install"], p["is_active"]), ("KWD-480", "84798999", 18, 20000, True, True))

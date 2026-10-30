@@ -114,11 +114,19 @@ export default {
     },
     async saveProducts() {
       const S = this.S
+      if (S.busy || !S.pf) return
+      const products = this.ctx.data.products.filter((p) => p.is_active)
+      if (products.some((p) => S.pt[p.id] !== '' && S.pt[p.id] != null && (!Number.isInteger(Number(S.pt[p.id])) || Number(S.pt[p.id]) < 0))) {
+        return toast('Enter whole, non-negative target units.', 'bad')
+      }
       this.set({ busy: true })
-      for (const p of this.ctx.data.products) {
+      for (const p of products) {
         const { error } = await put(S, S.pf, p.id, { target_units: num(S.pt[p.id]), target_amount: null })
         if (error) { this.set({ busy: false }); return toast(errText(error), 'bad') }
       }
+      // Saving the new product targets replaces the now-hidden overall target, even when every box is cleared.
+      const { error } = await put(S, S.pf, null, { target_units: null, target_amount: null })
+      if (error) { this.set({ busy: false }); return toast(errText(error), 'bad') }
       this.set({ busy: false })
       toast('Targets saved')
       await this.actions.load.call(this)
@@ -159,7 +167,9 @@ export default {
       const p = this.S.prices[Number(el.dataset.i)]
       if (!Number.isFinite(Number(p.gst)) || Number(p.gst) < 0 || Number(p.gst) > 100) return toast('Enter a GST rate from 0 to 100%.', 'bad')
       this.set({ pbusy: p.id })
-      const product = { ...p, list_price: p.price === '' ? null : Number(p.price), hsn_sac: p.hsn_sac.trim() || null, gst_percent: Number(p.gst), is_active: p.is_active }
+      const hsn = (p.hsn_sac || '').trim()
+      if (!/^\d{4,8}$/.test(hsn)) { this.set({ pbusy: '' }); return toast('Enter the HSN/SAC code: 4 to 8 digits.', 'bad') }
+      const product = { ...p, list_price: p.price === '' ? null : Number(p.price), hsn_sac: hsn, gst_percent: Number(p.gst), is_active: p.is_active }
       const { error } = await supabase.from('fr_products').update({ list_price: product.list_price, hsn_sac: product.hsn_sac, gst_percent: product.gst_percent, is_active: product.is_active }).eq('id', p.id)
       this.set({ pbusy: '' })
       if (error) return toast(errText(error), 'bad')

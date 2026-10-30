@@ -14,7 +14,6 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from core.models import Invoice
-from core.services.billing import company
 from core.services.common import fetch
 from core.services.invoice import clean, in_words, money
 
@@ -51,19 +50,13 @@ def file_name(inv):
 
 def parties(inv):
     """(seller, buyer) details as dicts with name, address, phone, email, gstin, state."""
-    hq = company()
-    hq_party = {"name": hq["company_name"], "address": hq["address"], "phone": hq["phone"], "email": hq["email"], "gstin": hq["gstin"], "state": hq["state"]}
-    if inv.kind == "purchase":
-        fr = fetch("select name, address, phone, email, gstin, state from franchises where id = %(f)s", {"f": inv.franchise_id})[0]
-        return fr, hq_party
-    b = fetch("select name, address, phone, email, gstin, state from buyers where id = %(b)s", {"b": inv.buyer_id})[0]
-    return hq_party, b
+    return inv.seller_details, inv.buyer_details
 
 
 def build(invoice_id):
     inv = Invoice.objects.get(pk=invoice_id)
     seller, buyer = parties(inv)
-    lines = fetch("""select i.name as item_name, l.hsn_code, l.kg, l.rate, l.gst_percent, l.taxable, l.gst_amount, l.total
+    lines = fetch("""select l.item_name, l.hsn_code, l.kg, l.rate, l.gst_percent, l.taxable, l.gst_amount, l.total
                      from invoice_lines l join scrap_items i on i.id = l.item_id where l.invoice_id = %(i)s order by l.id""", {"i": inv.pk})
     load = fetch("select code from hq_dispatches where id = %(d)s", {"d": inv.dispatch_id})[0]["code"] if inv.dispatch_id else None
 

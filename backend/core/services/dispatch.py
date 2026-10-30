@@ -6,14 +6,15 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 
-from core.models import HqBuyRate, HqDispatch, HqDispatchLine, HqRelease, HqRequirement, ScrapItem
-from core.services.common import (ApiError, advisory_lock, blank, btrim, dec, fetch, fetch_one, hq_log, round_half_up, scalar,
+from core.models import Franchise, HqBuyRate, HqDispatch, HqDispatchLine, HqRelease, HqRequirement, ScrapItem
+from core.services.common import (ApiError, advisory_lock, blank, btrim, dec, fetch, fetch_one, fixed_decimal, hq_log, round_half_up, scalar,
                                   show_num)
 from core.services.registry import rpc
 from core.services.warehouse import stock_kg
 
 EPS = Decimal("0.0001")
 MAX_BUY_RATE = 100000
+MAX_DISPATCH_LINES = 100
 
 
 def _need(ctx, *roles, message):
@@ -81,12 +82,19 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         raise ApiError("Enter the vehicle number.")
     if not isinstance(p_lines, list) or not p_lines:
         raise ApiError("Enter the quantity of at least one material.")
+    if len(p_lines) > MAX_DISPATCH_LINES:
+        raise ApiError(f"A load can have at most {MAX_DISPATCH_LINES} lines.")
     wanted, extra = {}, {}                        # kg by request, and kg by material for what is loaded without a request
     for ln in p_lines:
-        rid, iid = (ln or {}).get("requirement_id"), (ln or {}).get("item_id")
-        kg = dec((ln or {}).get("kg"), "kg")
+        if not isinstance(ln, dict):
+            raise ApiError("Every load line must be an object.")
+        rid, iid = ln.get("requirement_id"), ln.get("item_id")
+        kg = fixed_decimal(ln.get("kg"), "kg", 3, 14)
         if (rid is None) == (iid is None) or kg <= 0:
             raise ApiError("Every line needs a request or a material, and a quantity above zero.")
+        raw_id = rid if rid is not None else iid
+        if isinstance(raw_id, bool) or not str(raw_id).isdigit():
+            raise ApiError("Choose a valid request or material.")
         book, key = (wanted, int(rid)) if rid is not None else (extra, int(iid))
         if key in book:
             raise ApiError("The same request is listed twice." if rid is not None else "The same material is listed twice.")
@@ -105,6 +113,11 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         franchise_id = ctx.fr_scope(p_franchise_id)
         if franchise_id is None:
             raise ApiError("Choose the franchise this load is from.")
+        # Canonicalize HQ's JSON input before comparing it with an existing load's integer FK.
+        fr = Franchise.objects.filter(pk=franchise_id, active=True).first()
+        if fr is None:
+            raise ApiError("Choose an active franchise.")
+        franchise_id = fr.pk
     items = {i.pk: i for i in ScrapItem.objects.filter(pk__in=extra, active=True)}
     if len(items) != len(extra):
         raise ApiError("Unknown material.")

@@ -214,7 +214,15 @@ def invoice_pdf(request):
     if not ctx.session_valid():
         return jr({"error": "Please log in again."}, 401)
     try:
-        invoice_id = int(body_json(request).get("invoice_id"))
+        payload = body_json(request)
+        if not isinstance(payload, dict):
+            return jr({"error": "The arguments must be a JSON object."}, 400)
+        value = payload.get("invoice_id")
+        if isinstance(value, bool) or not str(value).isdigit():
+            return jr({"error": "invoice_id must be a positive integer"}, 400)
+        invoice_id = int(value)
+        if invoice_id <= 0:
+            return jr({"error": "invoice_id must be a positive integer"}, 400)
         billing._need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can open invoices.")
         billing._invoice_for(ctx, invoice_id)
         pdf, name = build(invoice_id)

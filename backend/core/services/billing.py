@@ -10,7 +10,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from core.models import (Buyer, Counter, Franchise, HqDispatch, Invoice, InvoiceLine, ScrapItem, next_number)
-from core.services.common import (ApiError, advisory_lock, blank, btrim, dec, fetch, fetch_one, hq_log, nullify, round_half_up, scalar,
+from core.services.common import (ApiError, advisory_lock, btrim, fetch, fetch_one, fixed_decimal, hq_log, nullify, round_half_up, scalar,
                                   show_num)
 from core.services.registry import rpc
 
@@ -20,6 +20,33 @@ HSN_RE = re.compile(r"^\d{4,8}$")
 HQ_COMPANY = {"company_name": "SCRAPPY INNOVATIONS PVT LTD.", "address": "HO. WP 18/108 - H,J,K\n1st FLOOR SAJ BUILDING\nMANJERI ROAD WANDOOR\nPIN 679328",
               "phone": "+918592964750", "gstin": "32ABFCS0169R1ZX", "email": "info@scrappyinnovations.com", "state": "Kerala"}
 EPS = Decimal("0.0001")
+MAX_INVOICE_LINES = 100
+
+
+def _id(value, label):
+    boolean = isinstance(value, bool)
+    value = str(value)
+    if boolean or len(value) > 18 or not value.isascii() or not value.isdigit() or int(value) <= 0:
+        raise ApiError(f"Choose a valid {label}.")
+    return int(value)
+
+
+def _text(value, label, limit):
+    value = btrim(value)
+    if len(value) > limit:
+        raise ApiError(f"The {label} is too long.")
+    return value or None
+
+
+def _franchise_scope(ctx, requested):
+    value = ctx.fr_scope(requested)
+    return _id(value, "franchise") if value is not None else None
+
+
+def _limit(value, default, maximum):
+    if value in (None, ""):
+        return default
+    return min(_id(value, "limit"), maximum)
 
 
 def today():
@@ -42,6 +69,15 @@ def company():
     """HQ's own details (the company settings the franchise billing already uses), with the defaults when none were saved."""
     row = fetch_one("select * from kwd_fr_company_settings where id = 1") or {}
     return {k: (row.get(k) or HQ_COMPANY[k]) for k in HQ_COMPANY}
+
+
+def party_details(party=None):
+    """Capture the printed identity at issue time, independently of future edits."""
+    if party is None:
+        details = company()
+        details["name"] = details.pop("company_name")
+        return details
+    return {key: getattr(party, key) for key in ("name", "address", "phone", "email", "gstin", "state")}
 
 
 def pick_date(value, floor=None):
@@ -95,13 +131,13 @@ def bill_items(ctx):
 @rpc()
 def hq_set_item_tax(ctx, p_item_id, p_hsn=None, p_gst=0):
     _need(ctx, "hq", message="Only HQ can set the HSN code and GST rate.")
-    item = ScrapItem.objects.filter(pk=p_item_id, active=True).first()
+    item = ScrapItem.objects.filter(pk=_id(p_item_id, "material"), active=True).first()
     if item is None:
         raise ApiError("Unknown material.")
     hsn = btrim(p_hsn)
     if hsn and not HSN_RE.match(hsn):
         raise ApiError("The HSN code is 4 to 8 digits.")
-    gst = dec(p_gst, "GST rate")
+    gst = fixed_decimal(p_gst, "GST rate", 2, 5)
     if gst < 0 or gst > 100:
         raise ApiError("Enter a GST rate from 0 to 100.")
     old = {"hsn": item.hsn_code, "gst": float(item.gst_percent)}
@@ -115,7 +151,7 @@ def hq_set_item_tax(ctx, p_item_id, p_hsn=None, p_gst=0):
 def bill_details(ctx, p_franchise=None):
     """HQ's company details and a franchise's billing details (a supervisor sees their own franchise)."""
     _need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can see this.")
-    f = ctx.fr_scope(p_franchise)
+    f = _franchise_scope(ctx, p_franchise)
     fr = fetch_one("select id, code, name, gstin, address, phone, email, state from franchises where id = %(f)s", {"f": f}) if f else None
     return {"company": company(), "franchise": fr}
 
@@ -124,11 +160,15 @@ def bill_details(ctx, p_franchise=None):
 def set_billing_details(ctx, p_franchise=None, p_gstin=None, p_address=None, p_phone=None, p_email=None, p_state=None):
     """What a franchise's own invoices to HQ show as the seller."""
     _need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can change the billing details.")
-    f = ctx.fr_scope(p_franchise)
+    f = _franchise_scope(ctx, p_franchise)
     fr = Franchise.objects.select_for_update().filter(pk=f).first() if f else None
     if fr is None:
         raise ApiError("Choose the franchise.")
-    fr.gstin, fr.address, fr.phone, fr.email, fr.state = _gstin(p_gstin), nullify(p_address), nullify(p_phone), nullify(p_email), nullify(p_state)
+    fr.gstin = _gstin(p_gstin)
+    fr.address = _text(p_address, "address", 2000)
+    fr.phone = _text(p_phone, "phone", 40)
+    fr.email = _text(p_email, "email", 254)
+    fr.state = _text(p_state, "state", 100)
     fr.save(update_fields=["gstin", "address", "phone", "email", "state"])
     hq_log(ctx, "billing_details_saved", fr.code, None, fr.pk)
     return fr.code
@@ -146,11 +186,17 @@ def hq_buyers(ctx):
 def hq_save_buyer(ctx, p_name, p_gstin=None, p_address=None, p_phone=None, p_email=None, p_state=None, p_active=True, p_buyer_id=None):
     _need(ctx, "hq", message="Only HQ can add buyers.")
     name = re.sub(r"\s+", " ", btrim(p_name))
-    if len(name) < 2:
+    if not 2 <= len(name) <= 200:
         raise ApiError("Enter the buyer's name.")
+    if not isinstance(p_active, bool):
+        raise ApiError("Choose whether the buyer is active.")
+    if p_buyer_id is not None:
+        p_buyer_id = _id(p_buyer_id, "buyer")
     if Buyer.objects.filter(name__iexact=name).exclude(pk=p_buyer_id or 0).exists():
         raise ApiError(f"A buyer named {name} already exists.")
-    values = dict(name=name, gstin=_gstin(p_gstin), address=nullify(p_address), phone=nullify(p_phone), email=nullify(p_email), state=nullify(p_state), active=bool(p_active))
+    values = dict(name=name, gstin=_gstin(p_gstin), address=_text(p_address, "address", 2000),
+                  phone=_text(p_phone, "phone", 40), email=_text(p_email, "email", 254),
+                  state=_text(p_state, "state", 100), active=p_active)
     if p_buyer_id:
         b = Buyer.objects.select_for_update().filter(pk=p_buyer_id).first()
         if b is None:
@@ -169,7 +215,7 @@ def hq_save_buyer(ctx, p_name, p_gstin=None, p_address=None, p_phone=None, p_ema
 def bill_pending_invoices(ctx, p_franchise=None):
     """Finalized loads for HQ that the franchise has not invoiced yet, with what the invoice will say."""
     _need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can see this.")
-    f = ctx.fr_scope(p_franchise)
+    f = _franchise_scope(ctx, p_franchise)
     loads = fetch("""
       select d.id, d.code, d.franchise_id, fr.code as franchise_code, fr.name as franchise_name, d.vehicle_no, d.reviewed_at as finalized_at
       from hq_dispatches d join franchises fr on fr.id = d.franchise_id
@@ -198,7 +244,7 @@ def bill_pending_invoices(ctx, p_franchise=None):
 def bill_create_purchase_invoice(ctx, p_dispatch_id, p_invoice_date=None, p_note=None):
     """The franchise's invoice to HQ for a finalized load: the same kg and price per kg as the load, GST added from the material's rate."""
     _need(ctx, "hq", "supervisor", message="Only the supervisor can make the franchise's invoice.")
-    d = HqDispatch.objects.select_for_update().filter(pk=p_dispatch_id).first()
+    d = HqDispatch.objects.select_for_update().filter(pk=_id(p_dispatch_id, "load")).first()
     if d is None or not ctx.fr_ok(d.franchise_id):
         raise ApiError("Load not found.")
     if d.status != "finalized":
@@ -213,10 +259,14 @@ def bill_create_purchase_invoice(ctx, p_dispatch_id, p_invoice_date=None, p_note
             raise ApiError("This load has no price. Ask HQ to set the price and finalize it again.")
         g = ln.item.gst_percent
         gst_amount = round_half_up(ln.amount * g / 100, 2)
-        rows.append(dict(item_id=ln.item_id, hsn_code=ln.item.hsn_code, kg=ln.kg, rate=ln.price_per_kg, gst_percent=g, taxable=ln.amount,
+        rows.append(dict(item_id=ln.item_id, item_name=ln.item.name, hsn_code=ln.item.hsn_code, kg=ln.kg, rate=ln.price_per_kg, gst_percent=g, taxable=ln.amount,
                          gst_amount=gst_amount, total=ln.amount + gst_amount))
         sub, gst = sub + ln.amount, gst + gst_amount
+    if not rows:
+        raise ApiError("A load with no materials cannot be invoiced.")
+    fixed_decimal(sub + gst, "invoice total", 2, 14)
     inv = Invoice.objects.create(code=next_code(fr.code, when), kind="purchase", franchise_id=fr.pk, dispatch_id=d.pk, invoice_date=when, vehicle_no=d.vehicle_no,
+                                 seller_details=party_details(fr), buyer_details=party_details(),
                                  note=nullify(p_note), subtotal=sub, gst_total=gst, total=sub + gst, created_by_id=ctx.uid)
     InvoiceLine.objects.bulk_create([InvoiceLine(invoice_id=inv.pk, **r) for r in rows])
     hq_log(ctx, "invoice_issued", inv.code, {"load": d.code, "total": float(inv.total)}, fr.pk)
@@ -240,20 +290,24 @@ def hq_stock_summary(ctx):
 def bill_create_sale_invoice(ctx, p_buyer_id, p_lines, p_invoice_date=None, p_vehicle_no=None, p_note=None):
     """p_lines = [{"item_id": 1, "kg": 40, "rate": 21.5, "gst_percent": 18}, ...]. HQ cannot sell more than it holds."""
     _need(ctx, "hq", message="Only HQ can sell its stock.")
-    buyer = Buyer.objects.filter(pk=p_buyer_id, active=True).first()
+    buyer = Buyer.objects.filter(pk=_id(p_buyer_id, "buyer"), active=True).first()
     if buyer is None:
         raise ApiError("Choose the buyer.")
     if not isinstance(p_lines, list) or not p_lines:
         raise ApiError("Add at least one material.")
+    if len(p_lines) > MAX_INVOICE_LINES:
+        raise ApiError(f"An invoice can have at most {MAX_INVOICE_LINES} lines.")
     when = pick_date(p_invoice_date)
     wanted, per_item = [], {}
     for ln in p_lines:
-        ln = ln or {}
-        item = ScrapItem.objects.filter(pk=ln.get("item_id"), active=True).first()
+        if not isinstance(ln, dict):
+            raise ApiError("Every invoice line must be an object.")
+        item = ScrapItem.objects.filter(pk=_id(ln.get("item_id"), "material"), active=True).first()
         if item is None:
             raise ApiError("Choose the material on every line.")
-        kg, rate = dec(ln.get("kg"), "kg"), dec(ln.get("rate"), "rate")
-        gst = dec(ln["gst_percent"], "GST rate") if ln.get("gst_percent") not in (None, "") else item.gst_percent
+        kg = fixed_decimal(ln.get("kg"), "kg", 3, 14)
+        rate = fixed_decimal(ln.get("rate"), "rate", 2, 12)
+        gst = fixed_decimal(ln["gst_percent"], "GST rate", 2, 5) if ln.get("gst_percent") not in (None, "") else item.gst_percent
         if kg <= 0 or rate <= 0:
             raise ApiError(f"Enter the kg and the rate for {item.name}.")
         if gst < 0 or gst > 100:
@@ -269,9 +323,11 @@ def bill_create_sale_invoice(ctx, p_buyer_id, p_lines, p_invoice_date=None, p_ve
     rows, sub, gst_sum = [], Decimal(0), Decimal(0)
     for item, kg, rate, gst in wanted:
         taxable, gst_amount, total = line_values(kg, rate, gst)
-        rows.append(dict(item_id=item.pk, hsn_code=item.hsn_code, kg=kg, rate=rate, gst_percent=gst, taxable=taxable, gst_amount=gst_amount, total=total))
+        rows.append(dict(item_id=item.pk, item_name=item.name, hsn_code=item.hsn_code, kg=kg, rate=rate, gst_percent=gst, taxable=taxable, gst_amount=gst_amount, total=total))
         sub, gst_sum = sub + taxable, gst_sum + gst_amount
+    fixed_decimal(sub + gst_sum, "invoice total", 2, 14)
     inv = Invoice.objects.create(code=next_code("HQ", when), kind="sale", buyer_id=buyer.pk, invoice_date=when, vehicle_no=nullify(p_vehicle_no),
+                                 seller_details=party_details(), buyer_details=party_details(buyer),
                                  note=nullify(p_note), subtotal=sub, gst_total=gst_sum, total=sub + gst_sum, created_by_id=ctx.uid)
     InvoiceLine.objects.bulk_create([InvoiceLine(invoice_id=inv.pk, **r) for r in rows])
     hq_log(ctx, "invoice_issued", inv.code, {"buyer": buyer.name, "total": float(inv.total)})
@@ -283,23 +339,24 @@ def bill_create_sale_invoice(ctx, p_buyer_id, p_lines, p_invoice_date=None, p_ve
 def bill_invoices(ctx, p_kind=None, p_from=None, p_to=None, p_franchise=None, p_limit=300):
     """Invoices, newest first, with their lines. HQ sees all of them; a supervisor sees their own franchise's invoices to HQ."""
     _need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can see invoices.")
-    f = ctx.fr_scope(p_franchise)
+    f = _franchise_scope(ctx, p_franchise)
     kind = p_kind if p_kind in ("purchase", "sale") else None
     if ctx.role != "hq":
         kind = "purchase"
     heads = fetch("""
       select v.id, v.code, v.kind, v.invoice_date, v.status, v.payment_status, v.paid_on, v.payment_ref, v.vehicle_no, v.note, v.subtotal, v.gst_total, v.total,
-             v.cancel_reason, v.created_at, v.franchise_id, fr.code as franchise_code, fr.name as franchise_name, v.dispatch_id, d.code as load_code,
-             v.buyer_id, b.name as buyer_name, p.full_name as created_by_name
+             v.cancel_reason, v.created_at, v.franchise_id, fr.code as franchise_code,
+             case when v.kind = 'purchase' then v.seller_details->>'name' end as franchise_name, v.dispatch_id, d.code as load_code,
+             v.buyer_id, case when v.kind = 'sale' then v.buyer_details->>'name' end as buyer_name, p.full_name as created_by_name
       from invoices v left join franchises fr on fr.id = v.franchise_id left join buyers b on b.id = v.buyer_id
            left join hq_dispatches d on d.id = v.dispatch_id join profiles p on p.id = v.created_by
       where (%(k)s::text is null or v.kind = %(k)s::text) and (%(f)s::integer is null or v.franchise_id = %(f)s::integer)
         and (%(a)s::date is null or v.invoice_date >= %(a)s::date) and (%(z)s::date is null or v.invoice_date <= %(z)s::date)
       order by v.invoice_date desc, v.id desc limit %(n)s""",
-                  {"k": kind, "f": f, "a": p_from or None, "z": p_to or None, "n": max(1, min(int(p_limit or 300), 1000))})
+                  {"k": kind, "f": f, "a": p_from or None, "z": p_to or None, "n": _limit(p_limit, 300, 1000)})
     if not heads:
         return []
-    lines = fetch("""select l.invoice_id, l.item_id, i.name as item_name, l.hsn_code, l.kg, l.rate, l.gst_percent, l.taxable, l.gst_amount, l.total
+    lines = fetch("""select l.invoice_id, l.item_id, l.item_name, l.hsn_code, l.kg, l.rate, l.gst_percent, l.taxable, l.gst_amount, l.total
                      from invoice_lines l join scrap_items i on i.id = l.item_id where l.invoice_id = any(%(ids)s) order by l.id""", {"ids": [h["id"] for h in heads]})
     by = {}
     for ln in lines:
@@ -311,7 +368,7 @@ def bill_invoices(ctx, p_kind=None, p_from=None, p_to=None, p_franchise=None, p_
 
 
 def _invoice_for(ctx, invoice_id, lock=False):
-    inv = (Invoice.objects.select_for_update() if lock else Invoice.objects).filter(pk=invoice_id).first()
+    inv = (Invoice.objects.select_for_update() if lock else Invoice.objects).filter(pk=_id(invoice_id, "invoice")).first()
     if inv is None:
         raise ApiError("Invoice not found.")
     if ctx.role == "hq":

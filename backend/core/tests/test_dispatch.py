@@ -47,6 +47,19 @@ class DispatchBase(ScrappyTestCase):
 
 
 class DispatchFlow(DispatchBase):
+    def test_requestless_load_validates_precision_and_franchise(self):
+        self.wh.fail("wh_submit_dispatch", "at most", p_lines=[{"item_id": self.paper, "kg": 1}] * 101, p_vehicle_no="KL 1")
+        for line, message in ((42, "object"), ({"item_id": self.paper, "kg": "0.0004"}, "decimal places"),
+                              ({"item_id": 1.5, "kg": 1}, "valid request")):
+            self.wh.fail("wh_submit_dispatch", message, p_lines=[line], p_vehicle_no="KL 1")
+        self.hq.fail("wh_submit_dispatch", "active franchise", p_lines=[{"item_id": self.paper, "kg": 1}],
+                     p_vehicle_no="KL 1", p_franchise_id=99999)
+        self.hq.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 1}], p_vehicle_no="KL 1", p_franchise_id=str(self.kkd.pk))
+        load = self.hq.ok("wh_dispatches")[0]
+        self.hq.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 2}], p_vehicle_no="KL 2",
+                   p_franchise_id=str(self.kkd.pk), p_dispatch_id=load["id"])
+        self.assertEqual(self.hq.ok("wh_dispatches")[0]["total_kg"], 2)
+
     # ------------------------------------------------------------------ the whole path
     def test_warehouse_prepares_supervisor_finalizes_at_hq_price(self):
         self.set_prices()

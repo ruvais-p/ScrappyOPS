@@ -112,6 +112,14 @@ Stop the services with `Ctrl+C`; add `-d` to run them in the background, then us
 
 Run the tests: `python manage.py test core --settings=scrappy.settings_test` (the test settings use a fast password method; never use them live).
 
+The billing and franchise regression suite is `python manage.py test core kwd --settings=scrappy.settings_test`.
+Run the target calculation and target-save checks with `node kwd/tests/test_achievement.mjs`.
+Use a fresh test database: the concurrency tests flush migration seed data, so reusing it with `--keepdb` requires reseeding.
+
+Core migration `0009_invoice_snapshots` preserves the seller, buyer and material names on issued scrap invoices.
+Run `python manage.py migrate` before serving the updated code. Existing invoices are backfilled with details available
+at migration time; earlier versions of edited details cannot be reconstructed. New invoices capture details when issued.
+
 ## 5. Go live (Docker, one machine)
 
 1. A Linux machine (2 GB RAM is plenty to start) with Docker, and a domain name pointing at it (for example `api.scrappy.in`).

@@ -37,7 +37,7 @@ export default {
         actions: html`<button class="btn primary" data-act="openSale">${Icon('plus', 18)} Record a sale</button>` })}
       <div class="stats">
         ${Stat({ lead: true, label: `Target · ${monthName(month)}`, value: a.pctValue != null ? `${a.pctValue}%` : a.pctUnits != null ? `${a.pctUnits}%` : '—',
-          sub: a.tValue || a.tUnits ? `${fmtINR(a.value)} of ${a.tValue ? fmtINR(a.tValue) : `${a.tUnits} units`}` : 'No target set yet' })}
+          sub: a.tValue ? `${fmtINR(a.value)} of ${fmtINR(a.tValue)}` : a.tUnits ? `${a.units} of ${a.tUnits} units` : 'No target set yet' })}
         ${Stat({ label: 'Leads', value: d.leads.length, sub: `${fresh.length} new · ${open.length} open · ${won} closed` })}
         ${Stat({ label: 'Sales this month', value: fmtINR(a.value), sub: `${a.units} units`, tone: 'ok' })}
         ${Stat({ label: 'Units in stock', value: unitsInStock, sub: noStock ? 'Add your stock' : lowStock.length ? `${lowStock.length} running low` : 'All stocked', tone: lowStock.length || noStock ? 'warn' : '' })}

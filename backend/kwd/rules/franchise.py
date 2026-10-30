@@ -99,6 +99,9 @@ class FrProducts(FrFranchises):
         if not gst.is_finite() or gst < 0 or gst > 100:
             raise ApiError("Enter a GST rate from 0 to 100")
         new["gst_percent"] = gst
+        price = new.get("list_price")
+        if price is not None and (not price.is_finite() or price < 0):
+            raise ApiError("Enter a non-negative list price")
         if fetch_one("select 1 as x from kwd_fr_products where code = %(c)s", {"c": new["code"]}):
             raise ApiError(f"A product with the code {new['code']} already exists")
         new["unit"] = trim(new.get("unit")) or "unit"
@@ -107,6 +110,22 @@ class FrProducts(FrFranchises):
             raise ApiError(f"A product named {new['name']} already exists")
         if not new.get("sort"):
             new["sort"] = fetch_one("select coalesce(max(sort), 0) + 1 as s from kwd_fr_products")["s"]
+        return new
+
+    def before_update(self, ctx, old, new, keys):
+        # The editable price table must enforce the same tax rules as Add product.
+        if "hsn_sac" in keys:
+            new["hsn_sac"] = trim(new.get("hsn_sac"))
+            if not re.fullmatch(r"\d{4,8}", new["hsn_sac"]):
+                raise ApiError("Enter the HSN/SAC code: 4 to 8 digits")
+        if "gst_percent" in keys:
+            gst = new.get("gst_percent")
+            if gst is None or not gst.is_finite() or not 0 <= gst <= 100:
+                raise ApiError("Enter a GST rate from 0 to 100")
+        if "list_price" in keys and new.get("list_price") is not None:
+            price = new["list_price"]
+            if not price.is_finite() or price < 0:
+                raise ApiError("Enter a non-negative list price")
         return new
 
 
@@ -201,7 +220,7 @@ class FrLeads(Rules):
         if ctx.role == HO:
             return True
         fid = ctx.franchise_id
-        return f"({S.role_in(FR)} and {uu(P, new['franchise_id'])} = {S.P.add(fid)}::uuid)" if ctx.role == FR and fid else "false"
+        return f"({S.role_in(FR)} and {uu(P, new.get('franchise_id'))} = {S.P.add(fid)}::uuid)" if ctx.role == FR and fid else "false"
 
     def update_using(self, ctx, S, a):
         return S.fr_can_see(a + ".franchise_id")
@@ -492,17 +511,25 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
     total, install = Decimal(0), False
     for it in p_items:
         try:
-            pid, q = UUID(str(it["product_id"])), int(it["qty"])
+            pid, quantity = UUID(str(it["product_id"])), Decimal(str(it["qty"]))
+            if not quantity.is_finite() or quantity != quantity.to_integral_value():
+                raise ValueError
+            q = int(quantity)
             gst = Decimal(str(it.get("gst_percent") or 0))
+            if not gst.is_finite():
+                raise ValueError
             hsn = trim(it.get("hsn_sac"))
             # The price can be entered without GST (unit_price) or with GST (unit_price_incl). With GST, the price before tax is worked out here.
             incl = Decimal(str(it["unit_price_incl"])) if it.get("unit_price_incl") not in (None, "") else None
             if incl is not None:
                 if not incl.is_finite() or incl <= 0 or gst < 0 or gst > 100:
                     raise ValueError
-                pr = (incl / (Decimal(1) + gst / Decimal(100))).quantize(Decimal("0.000001"))
+                # Keep sufficient precision for bulk quantities; six places can change a line by rupees.
+                pr = incl / (Decimal(1) + gst / Decimal(100))
             else:
                 pr = Decimal(str(it["unit_price"]))
+            if not pr.is_finite():
+                raise ValueError
         except Exception:
             raise ApiError("Enter valid product, quantity, price and GST details")
         if q <= 0:
@@ -528,7 +555,12 @@ def record_sale(ctx, p_lead=None, p_customer_name=None, p_customer_type=None, p_
         install = install or prod["needs_install"]
         if prod["list_price"] is not None and pr < prod["list_price"] * Decimal("0.9"):
             fl.append("below_list_price")
-    received = Decimal(str(p_amount_received or 0))
+    try:
+        received = Decimal(str(p_amount_received or 0))
+        if not received.is_finite() or received < 0:
+            raise ValueError
+    except Exception:
+        raise ApiError("Enter a valid non-negative payment amount")
     if received > total:
         raise ApiError("Money received cannot be more than the sale total")
     business_start = sale_date.year if sale_date.month >= 4 else sale_date.year - 1
