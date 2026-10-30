@@ -1,6 +1,6 @@
 /* Franchise pieces shared by several screens: status pills, the "record a sale" form and the one-sale sheet.
    Both forms are widgets; the screen that opens them provides the actions saleClose and saleChanged (and data in ctx.data). */
-import { html, raw, supabase, errText, toast, esc } from '../../core.js'
+import { html, raw, supabase, errText, toast, esc, download } from '../../core.js'
 import { Icon } from '../../ui.js'
 import { fmtINR, fmtDate, istDate, addDays } from '../../lib.js'
 import { Loading } from '../../ui.js'
@@ -22,6 +22,14 @@ export const SalePills = (s) => s.status === 'cancelled' ? html`<span class="pil
 const opt = (v, cur, label, disabled) => html`<option value="${v}" ${String(cur) === String(v) ? raw('selected') : ''} ${disabled ? raw('disabled') : ''}>${label}</option>`
 const parentCall = (sc, name, ...a) => { const p = sc.ctx.parent; return p.actions[name].call(p, ...a) }
 
+// A line's price is typed either without GST (default) or with GST (x.incl). These give both figures from whichever was typed.
+const round2 = (n) => Math.round(n * 100) / 100
+const typedPrice = (x) => Number(x.unit_price) || 0
+const gstFactor = (x) => 1 + (Number(x.gst_percent) || 0) / 100
+const exPrice = (x) => (x.incl ? typedPrice(x) / gstFactor(x) : typedPrice(x))
+const inclPrice = (x) => (x.incl ? typedPrice(x) : typedPrice(x) * gstFactor(x))
+const lineTotal = (x) => (Number(x.qty) || 0) * inclPrice(x)
+
 // ---------------------------------------------------------------- record a sale (closes the lead). props: { lead }
 export const saleForm = {
   state: (ctx) => {
@@ -33,7 +41,7 @@ export const saleForm = {
         district: (lead && lead.district_id) || '', place: (lead && lead.place) || '', sale_date: istDate(), received: '',
         franchise_id: ctx.props.franchiseId || '',
       },
-      items: [{ product_id: first ? first.id : '', hsn_sac: first && first.hsn_sac || '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '', gst_percent: first ? first.gst_percent ?? 0 : 0 }],
+      items: [{ product_id: first ? first.id : '', hsn_sac: first && first.hsn_sac || '', qty: (lead && lead.qty) || 1, unit_price: first ? first.list_price : '', gst_percent: first ? first.gst_percent ?? 0 : 0, incl: false }],
       busy: false, err: '', stockByFr: ctx.props.stockByFr || {},
     }
   },
@@ -42,7 +50,7 @@ export const saleForm = {
     const f = S.f
     const ho = Boolean(ctx.props.ho)
     const franchiseStock = ho ? (S.stockByFr && S.stockByFr[f.franchise_id]) || {} : stock
-    const total = S.items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100), 0)
+    const total = S.items.reduce((a, x) => a + lineTotal(x), 0)
     const onHand = (id) => franchiseStock[id] ?? 0
     return Sheet({ title: ho ? 'Create bill' : lead ? 'Close the sale' : 'Record a sale', close: 'close', body: html`
       ${lead ? html`<p class="notice info small"><span>This closes the lead for ${lead.customer_name}. Stock goes down by what you enter below.</span></p>` : ''}
@@ -60,7 +68,7 @@ export const saleForm = {
       <div class="field-label">Products sold</div>
       ${S.items.map((x, i) => {
         const p = byId[x.product_id]
-        const low = p && p.list_price && Number(x.unit_price) > 0 && Number(x.unit_price) < p.list_price * 0.9
+        const low = p && p.list_price && exPrice(x) > 0 && exPrice(x) < p.list_price * 0.9
         return html`<div class="subcard" style="margin-bottom:10px" data-key="item${i}">
           <label>Product<select data-bind="items.${i}.product_id" data-change="pickProduct" data-i="${i}">
             <option value="">Choose…</option>
@@ -69,11 +77,15 @@ export const saleForm = {
             <label>HSN/SAC<input data-bind="items.${i}.hsn_sac" value="${x.hsn_sac || ''}" placeholder="Enter HSN/SAC" ${ho ? raw('required') : ''}></label>
             <label>Quantity<input type="number" min="1" inputmode="numeric" data-bind="items.${i}.qty" data-live value="${x.qty}"></label>
             <label>Unit<input value="${p ? p.unit || 'unit' : '—'}" disabled></label>
-            <label>Price/Unit (₹)<input type="number" min="0" inputmode="decimal" data-bind="items.${i}.unit_price" data-live value="${x.unit_price}"></label>
+            <label>Price/Unit ${x.incl ? 'with GST' : 'without GST'} (₹)<input type="number" min="0" inputmode="decimal" data-bind="items.${i}.unit_price" data-live value="${x.unit_price}"></label>
             <label>GST (%)<input type="number" min="0" max="100" step="0.01" inputmode="decimal" data-bind="items.${i}.gst_percent" data-live value="${x.gst_percent ?? 0}"></label>
           </div>
+          <div class="row wrap" style="gap:10px;margin-bottom:6px">
+            <div class="seg" role="group" aria-label="The price you typed is"><button class="${x.incl ? '' : 'on'}" data-act="priceMode" data-i="${i}" data-m="excl">Without GST</button><button class="${x.incl ? 'on' : ''}" data-act="priceMode" data-i="${i}" data-m="incl">With GST</button></div>
+            <span class="muted small grow">${typedPrice(x) > 0 ? `Without GST ${fmtINR(exPrice(x))} · With GST ${fmtINR(inclPrice(x))} per unit` : 'Type the price with or without GST'}</span>
+          </div>
           <div class="row">
-            <span class="muted small grow">${p && p.list_price ? `List price ${fmtINR(p.list_price)}` : 'No list price set by Head Office'} · line total ${fmtINR((Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100))}</span>
+            <span class="muted small grow">${p && p.list_price ? `List price ${fmtINR(p.list_price)} without GST` : 'No list price set by Head Office'} · line total ${fmtINR(lineTotal(x))}</span>
             ${S.items.length > 1 ? html`<button class="btn sm" data-act="removeItem" data-i="${i}">Remove</button>` : ''}
           </div>
           ${low ? html`<p class="notice warn small"><span>Priced more than 10% below the list price. Head Office will see this.</span></p>` : ''}
@@ -100,19 +112,28 @@ export const saleForm = {
     },
     pickProduct(el) {
       const q = this.ctx.data.byId[el.value], i = Number(el.dataset.i)
-      this.S.items[i].unit_price = q ? q.list_price ?? '' : ''
-      this.S.items[i].hsn_sac = q ? q.hsn_sac || '' : ''
-      this.S.items[i].gst_percent = q ? q.gst_percent ?? 0 : 0
+      const it = this.S.items[i]
+      it.hsn_sac = q ? q.hsn_sac || '' : ''
+      it.gst_percent = q ? q.gst_percent ?? 0 : 0
+      it.unit_price = q && q.list_price != null ? (it.incl ? round2(q.list_price * gstFactor(it)) : q.list_price) : ''
       this.render()
     },
-    addItem() { this.set({ items: [...this.S.items, { product_id: '', hsn_sac: '', qty: 1, unit_price: '', gst_percent: 0 }] }) },
+    priceMode(el) {
+      const x = this.S.items[Number(el.dataset.i)], incl = el.dataset.m === 'incl'
+      if (incl === Boolean(x.incl)) return
+      const v = typedPrice(x)
+      if (v > 0) x.unit_price = round2(incl ? v * gstFactor(x) : v / gstFactor(x))
+      x.incl = incl
+      this.render()
+    },
+    addItem() { this.set({ items: [...this.S.items, { product_id: '', hsn_sac: '', qty: 1, unit_price: '', gst_percent: 0, incl: false }] }) },
     removeItem(el) { this.set({ items: this.S.items.filter((_, j) => j !== Number(el.dataset.i)) }) },
     async save() {
       const S = this.S, f = S.f, items = S.items, lead = this.ctx.props.lead, ho = Boolean(this.ctx.props.ho), { byId } = this.ctx.data
       const stock = ho ? (S.stockByFr && S.stockByFr[f.franchise_id]) || {} : this.ctx.data.stock
       this.set({ err: '' })
       if (ho && !f.franchise_id) return this.set({ err: 'Choose the franchisee.' })
-      const total = items.reduce((a, x) => a + (Number(x.qty) || 0) * (Number(x.unit_price) || 0) * (1 + (Number(x.gst_percent) || 0) / 100), 0)
+      const total = items.reduce((a, x) => a + lineTotal(x), 0)
       if (f.customer_name.trim().length < 2) return this.set({ err: 'Enter the customer name.' })
       if (items.some((x) => !x.product_id || !(Number(x.qty) > 0) || !(Number(x.unit_price) > 0) || !Number.isFinite(Number(x.gst_percent)) || Number(x.gst_percent) < 0 || Number(x.gst_percent) > 100 || (ho && !x.hsn_sac.trim()))) return this.set({ err: 'Choose each product and enter its HSN/SAC, quantity, unit price and valid GST rate.' })
       for (const x of items) {
@@ -127,11 +148,11 @@ export const saleForm = {
         p_franchise: ho ? f.franchise_id : null,
         p_district: f.district ? Number(f.district) : null, p_place: f.place || null, p_sale_date: f.sale_date, p_invoice_no: null,
         p_amount_received: Number(f.received || 0),
-        p_items: items.map((x) => ({ product_id: x.product_id, hsn_sac: x.hsn_sac.trim(), qty: Number(x.qty), unit_price: Number(x.unit_price), gst_percent: Number(x.gst_percent) || 0 })),
+        p_items: items.map((x) => ({ product_id: x.product_id, hsn_sac: x.hsn_sac.trim(), qty: Number(x.qty), unit_price: x.incl ? Number(exPrice(x).toFixed(6)) : Number(x.unit_price), ...(x.incl ? { unit_price_incl: Number(x.unit_price) } : {}), gst_percent: Number(x.gst_percent) || 0 })),
       })
       this.set({ busy: false })
       if (error) return this.set({ err: errText(error) })
-      toast(ho ? 'Bill created. Open it in Billing to print.' : 'Sale recorded and invoice created. Open the sale to print it.')
+      toast(ho ? 'Bill created. Open it in Billing to print or download it.' : 'Sale recorded and invoice created. Open the sale to print it or download the PDF.')
       parentCall(this, 'saleChanged')
       parentCall(this, 'saleClose')
     },
@@ -143,7 +164,7 @@ export const saleSheet = {
   state: (ctx) => {
     const sale = ctx.props.sale
     return {
-      s: sale, items: null, busy: false, err: '', pay: String(sale.amount_received), dDate: istDate(), dNote: sale.delivery_note || '',
+      s: sale, items: null, busy: false, dl: false, err: '', pay: String(sale.amount_received), dDate: istDate(), dNote: sale.delivery_note || '',
       iDate: sale.install_planned_on || istDate(), iNote: sale.install_note || '', photo: null, photoUrl: '', reason: '',
     }
   },
@@ -168,7 +189,10 @@ export const saleSheet = {
         <div class="summary-row"><span>Received</span><span>${fmtINR(s.amount_received)}</span></div>
         ${due > 0 ? html`<div class="summary-row"><span>Still to collect</span><span class="text-bad">${fmtINR(due)}</span></div>` : ''}
       </div>
-      <button class="btn primary block" ${!S.items ? raw('disabled') : ''} data-act="printInvoice">${Icon('download', 16)} Print invoice</button>
+      <div class="grid2" style="margin-bottom:12px">
+        <button class="btn primary" ${!S.items ? raw('disabled') : ''} data-act="printInvoice">Print invoice</button>
+        <button class="btn" ${S.dl ? raw('disabled') : ''} data-act="downloadPdf">${Icon('download', 16)} ${S.dl ? 'Preparing…' : 'Download PDF'}</button>
+      </div>
 
       ${!locked && due > 0 ? html`<div class="subcard" style="margin-bottom:12px">
         <label>Money received so far (₹)<input type="number" inputmode="decimal" min="${s.amount_received}" max="${s.total}" data-bind="pay" data-live value="${S.pay}"></label>
@@ -213,6 +237,7 @@ export const saleSheet = {
   actions: {
     close() { parentCall(this, 'saleClose') },
     printInvoice() { if (this.S.items) printSaleInvoice(this.S.s, this.S.items, this.ctx) },
+    async downloadPdf() { await downloadInvoicePdf(this, this.S.s) },
     pickPhoto() { document.getElementById('install-photo').click() },
     async patchSale(values, msg) {
       this.set({ busy: true, err: '' })
@@ -264,6 +289,13 @@ export const saleSheet = {
       parentCall(this, 'saleClose')
     },
   },
+}
+
+export async function downloadInvoicePdf(sc, sale) {
+  if (sc.S.dl) return
+  sc.set({ dl: true })
+  try { await download(`/kwd/api/invoice/${sale.id}.pdf`, `Invoice-${(sale.invoice_no || sale.id).replace(/[^A-Za-z0-9._-]+/g, '-')}.pdf`) } catch (e) { toast(errText(e), 'bad') }
+  sc.set({ dl: false })
 }
 
 export function printSaleInvoice(sale, items, ctx) {

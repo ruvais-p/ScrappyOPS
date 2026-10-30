@@ -77,6 +77,23 @@ async function call(path, body, { raw: rawBody, headers } = {}, retry = true) {
   return { ok: res.ok, status: res.status, data }
 }
 
+// Fetch a file that needs the login (a PDF) and hand it to the browser as a download.
+export async function download(path, fallbackName = 'download') {
+  await ensureFresh()
+  const get = () => fetch(path, { headers: { Authorization: 'Bearer ' + (cur ? cur.access_token : '') } })
+  let res = await get()
+  if (res.status === 401 && cur) {
+    try { await tokenCall('refresh_token', { refresh_token: cur.refresh_token }) } catch (e) { endSession('You were logged out. This account may have been opened on another device, or the session expired.'); throw e }
+    res = await get()
+  }
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error((d.error && d.error.message) || 'Could not download the file.') }
+  const name = (/filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || fallbackName
+  const url = URL.createObjectURL(await res.blob())
+  const a = Object.assign(document.createElement('a'), { href: url, download: name })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+}
+
 // ------------------------------------------------------------------------------------------------ the data client
 const unwrap = (r) => (r.ok ? r.data : { error: r.data.error || { message: 'Request failed' } })
 

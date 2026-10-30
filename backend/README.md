@@ -22,13 +22,15 @@ scrappy_backend/
   scrappy/            settings, URLs, ASGI entry (also serves the live-update websocket)
   core/
     models.py         every table (same names and columns as the old database)
-    migrations/       0001 tables · 0002 reporting views, running numbers, tamper guards · 0003 live-update notes · 0004 vehicle loads for HQ and HQ's purchase price
+    migrations/       0001 tables · 0002 reporting views, running numbers, tamper guards · 0003 live-update notes · 0004 vehicle loads for HQ and HQ's purchase price · 0007 billing (invoices, buyers, HSN/GST)
     auth.py           login, refresh, logout, "newest login wins", rate limit
     api/              views.py (HTTP), rest.py (table reads, per-role), frontend.py (optional: serve the website)
     realtime.py       live updates websocket
     services/
       pickup.py       collector: start, weigh, send, WhatsApp text, agree, pay, could-not-complete, end route
       warehouse.py    weighing + tolerance, stock, HQ requirements, releases, float, cash count, verify, leads assign/split, reports
+      billing.py      tax invoices: a franchise invoices HQ for a finalized load; HQ invoices buyers for the stock it holds; payment, cancelling, buyers, HQ stock
+      tax_invoice.py  the invoice as a PDF (served at /functions/v1/invoice-pdf)
       dispatch.py     vehicle loads for HQ: warehouse manager enters quantities, supervisor finalizes; HQ's purchase price (sale price of stock)
       hq.py           HQ reports, franchises, people, rates, materials, lead moves, dispute decisions
       lead_import.py  HQ Excel upload checks (phone, date, time, location, driver, franchise, duplicates)
@@ -109,6 +111,14 @@ Password for all demo accounts: `Scrappy#2026`. Sign in as Super Admin at `http:
 Stop the services with `Ctrl+C`; add `-d` to run them in the background, then use `docker compose -f docker-compose.dev.yml down` to stop them.
 
 Run the tests: `python manage.py test core --settings=scrappy.settings_test` (the test settings use a fast password method; never use them live).
+
+The billing and franchise regression suite is `python manage.py test core kwd --settings=scrappy.settings_test`.
+Run the target calculation and target-save checks with `node kwd/tests/test_achievement.mjs`.
+Use a fresh test database: the concurrency tests flush migration seed data, so reusing it with `--keepdb` requires reseeding.
+
+Core migration `0009_invoice_snapshots` preserves the seller, buyer and material names on issued scrap invoices.
+Run `python manage.py migrate` before serving the updated code. Existing invoices are backfilled with details available
+at migration time; earlier versions of edited details cannot be reconstructed. New invoices capture details when issued.
 
 ## 5. Go live (Docker, one machine)
 

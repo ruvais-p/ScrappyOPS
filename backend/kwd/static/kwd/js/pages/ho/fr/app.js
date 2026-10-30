@@ -17,7 +17,7 @@ const TABS = [
 ]
 const SIDE = [{ label: 'Franchise', items: TABS.slice(0, 5) }, { label: 'Set up', items: TABS.slice(5) }]
 const PAGES = {
-  overview: () => import('./overview.js'), leads: () => import('./leads.js'), sales: () => import('./sales.js?v=20261027-1'), invoices: () => import('./invoices.js?v=20261027-1'), stock: () => import('./stock.js'),
+  overview: () => import('./overview.js'), leads: () => import('./leads.js?v=20261030-1'), sales: () => import('./sales.js?v=20261029-1'), invoices: () => import('./invoices.js?v=20261029-1'), stock: () => import('./stock.js'),
   meetings: () => import('./meetings.js'), franchisees: () => import('./franchisees.js'), targets: () => import('./targets.js'), 'company-settings': () => import('./company-settings.js'),
 }
 

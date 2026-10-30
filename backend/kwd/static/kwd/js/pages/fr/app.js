@@ -13,7 +13,7 @@ const TABS = [
 ]
 const SIDE = [{ label: 'My business', items: [...TABS, { id: 'targets', label: 'Targets', icon: 'target' }] }]
 const PAGES = {
-  home: () => import('./home.js'), leads: () => import('./leads.js'), sales: () => import('./sales.js'),
+  home: () => import('./home.js?v=20261030-1'), leads: () => import('./leads.js?v=20261030-1'), sales: () => import('./sales.js'),
   stock: () => import('./stock.js'), targets: () => import('./targets.js'), meetings: () => import('./meetings.js'),
 }
 

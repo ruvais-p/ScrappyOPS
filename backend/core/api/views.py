@@ -18,7 +18,7 @@ from core.models import (AuthSession, Bill, BillItem, Franchise, HqAudit, Immuta
 from core.services import hq as hq_service            # noqa: F401  (registers the HQ actions)
 from core.services import super_admin as super_admin_service  # noqa: F401
 from core.services import lead_import                 # noqa: F401
-from core.services import dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse and stock-to-HQ actions)
+from core.services import billing, dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse, stock-to-HQ and billing actions)
 from core.services.common import ApiError, Ctx, UUID_RE, btrim
 from core.services.registry import RPC, rpc
 
@@ -200,6 +200,43 @@ def _plain(msg, status):
     r = HttpResponse(msg, status=status, content_type="text/plain; charset=utf-8")
     r["Cache-Control"] = "no-store"
     return r
+
+
+def invoice_pdf(request):
+    """POST {invoice_id}: the tax invoice as a PDF file. HQ can open any invoice; a supervisor the invoices of their own franchise."""
+    from core.services.tax_invoice import build
+    if request.method != "POST":
+        return jr({"error": "Use POST"}, 405)
+    try:
+        ctx = auth.context_from_request(request)
+    except auth.AuthError:
+        return jr({"error": "Please log in again."}, 401)
+    if not ctx.session_valid():
+        return jr({"error": "Please log in again."}, 401)
+    try:
+        payload = body_json(request)
+        if not isinstance(payload, dict):
+            return jr({"error": "The arguments must be a JSON object."}, 400)
+        value = payload.get("invoice_id")
+        if isinstance(value, bool) or not str(value).isdigit():
+            return jr({"error": "invoice_id must be a positive integer"}, 400)
+        invoice_id = int(value)
+        if invoice_id <= 0:
+            return jr({"error": "invoice_id must be a positive integer"}, 400)
+        billing._need(ctx, "hq", "supervisor", message="Only the supervisor or HQ can open invoices.")
+        billing._invoice_for(ctx, invoice_id)
+        pdf, name = build(invoice_id)
+    except (ValueError, TypeError):
+        return jr({"error": "invoice_id is required"}, 400)
+    except ApiError as e:
+        return jr({"error": e.message}, 404 if "not found" in e.message.lower() else 403)
+    except Exception:
+        log.exception("invoice-pdf failed")
+        return jr({"error": "Could not make the invoice PDF. Try again."}, 500)
+    resp = HttpResponse(pdf, content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{name}"'
+    resp["Cache-Control"] = "no-store"
+    return resp
 
 
 def bill_pdf(request):

@@ -1,7 +1,7 @@
 """Shared pieces for every action: the error type, who is calling, and small database helpers."""
 import json
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from uuid import UUID
 
 from django.db import connection
@@ -145,6 +145,20 @@ def dec(v, field="value"):
 
 def round_half_up(d, places=2):
     return Decimal(d).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+
+
+def fixed_decimal(value, field, places, digits):
+    """Validate before calculations so the database cannot silently round an input."""
+    value = dec(value, field)
+    if abs(value) >= Decimal(10) ** (digits - places):
+        raise ApiError(f"The {field} is too large.")
+    try:
+        rounded = round_half_up(value, places)
+    except InvalidOperation:
+        raise ApiError(f"Enter a valid {field}.")
+    if rounded != value:
+        raise ApiError(f"Enter the {field} with at most {places} decimal places.")
+    return rounded
 
 
 def show_num(d, places=None):

@@ -6,7 +6,9 @@ from core.models import HqAudit, HqRelease
 from core.tests.base import Api, ScrappyTestCase
 
 
-class DispatchFlow(ScrappyTestCase):
+class DispatchBase(ScrappyTestCase):
+    """A franchise with 10 kg of iron and 5.5 kg of paper in the yard and HQ requests for iron and paper."""
+
     def setUp(self):
         super().setUp()
         self.make_team()
@@ -42,6 +44,21 @@ class DispatchFlow(ScrappyTestCase):
     def set_prices(self):
         self.hq.ok("hq_set_buy_rate", p_item_id=self.iron, p_rate=20.5)
         self.hq.ok("hq_set_buy_rate", p_item_id=self.paper, p_rate=8)
+
+
+class DispatchFlow(DispatchBase):
+    def test_requestless_load_validates_precision_and_franchise(self):
+        self.wh.fail("wh_submit_dispatch", "at most", p_lines=[{"item_id": self.paper, "kg": 1}] * 101, p_vehicle_no="KL 1")
+        for line, message in ((42, "object"), ({"item_id": self.paper, "kg": "0.0004"}, "decimal places"),
+                              ({"item_id": 1.5, "kg": 1}, "valid request")):
+            self.wh.fail("wh_submit_dispatch", message, p_lines=[line], p_vehicle_no="KL 1")
+        self.hq.fail("wh_submit_dispatch", "active franchise", p_lines=[{"item_id": self.paper, "kg": 1}],
+                     p_vehicle_no="KL 1", p_franchise_id=99999)
+        self.hq.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 1}], p_vehicle_no="KL 1", p_franchise_id=str(self.kkd.pk))
+        load = self.hq.ok("wh_dispatches")[0]
+        self.hq.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 2}], p_vehicle_no="KL 2",
+                   p_franchise_id=str(self.kkd.pk), p_dispatch_id=load["id"])
+        self.assertEqual(self.hq.ok("wh_dispatches")[0]["total_kg"], 2)
 
     # ------------------------------------------------------------------ the whole path
     def test_warehouse_prepares_supervisor_finalizes_at_hq_price(self):
@@ -119,6 +136,31 @@ class DispatchFlow(ScrappyTestCase):
         self.assertEqual(code, "DP-0001")
         self.wh.ok("wh_withdraw_dispatch", p_dispatch_id=d["id"], p_note="vehicle did not come")
         self.assertEqual(self.wh.ok("wh_dispatches", p_status="withdrawn")[0]["code"], "DP-0001")
+
+    # ------------------------------------------------------------------ loading without an HQ request
+    def test_a_load_can_go_to_hq_without_a_request(self):
+        self.set_prices()
+        # paper only: nobody asked for this load, and the yard holds 5.5 kg of it
+        self.wh.fail("wh_submit_dispatch", "Every line", p_lines=[{"item_id": self.paper, "requirement_id": self.rq_paper, "kg": 1}], p_vehicle_no="KL 9")
+        self.wh.fail("wh_submit_dispatch", "Not enough Paper", p_lines=[{"item_id": self.paper, "kg": 6}], p_vehicle_no="KL 9")
+        self.wh.fail("wh_submit_dispatch", "listed twice", p_lines=[{"item_id": self.paper, "kg": 1}, {"item_id": self.paper, "kg": 1}], p_vehicle_no="KL 9")
+        self.wh.fail("wh_submit_dispatch", "Unknown material", p_lines=[{"item_id": 99999, "kg": 1}], p_vehicle_no="KL 9")
+        code = self.wh.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 2}, {"requirement_id": self.rq_iron, "kg": 3}], p_vehicle_no="KL 9")
+        d = [x for x in self.sup.ok("wh_dispatches") if x["code"] == code][0]
+        by = {x["item_name"]: x for x in d["lines"]}
+        self.assertEqual((by["Paper"]["requirement_id"], by["Paper"]["requirement_code"]), (None, None))
+        self.assertIsNotNone(by["Iron"]["requirement_id"])
+        # the waiting load holds the paper: only 3.5 kg is left to promise
+        self.wh.fail("wh_submit_dispatch", "Not enough Paper", p_lines=[{"item_id": self.paper, "kg": 4}], p_vehicle_no="KL 10")
+        self.sup.ok("sup_review_dispatch", p_dispatch_id=d["id"], p_decision="finalize")
+        rels = self.hq.rows("hq_releases?select=requirement_id,item_id,kg&order=id")
+        self.assertEqual(sorted((r["requirement_id"] is None, Decimal(str(r["kg"]))) for r in rels), [(False, Decimal("3")), (True, Decimal("2"))])
+        # the stock left the yard, and HQ's open request for paper is untouched
+        prog = {r["id"]: r for r in self.hq.rows("hq_requirement_progress?select=id,released_kg")}
+        self.assertEqual(Decimal(str(prog[self.rq_paper]["released_kg"])), Decimal("0"))
+        # only HQ has to say which franchise when the load names no request
+        self.hq.fail("wh_submit_dispatch", "Choose the franchise", p_lines=[{"item_id": self.paper, "kg": 1}], p_vehicle_no="KL 11")
+        self.hq.ok("wh_submit_dispatch", p_lines=[{"item_id": self.paper, "kg": 1}], p_vehicle_no="KL 11", p_franchise_id=self.kkd.pk)
 
     # ------------------------------------------------------------------ stock cannot be promised twice
     def test_two_waiting_loads_cannot_promise_the_same_stock(self):

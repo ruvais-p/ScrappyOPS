@@ -6,14 +6,15 @@ from decimal import Decimal
 from django.db.models import Sum
 from django.utils import timezone
 
-from core.models import HqBuyRate, HqDispatch, HqDispatchLine, HqRelease, HqRequirement, ScrapItem
-from core.services.common import (ApiError, advisory_lock, blank, btrim, dec, fetch, fetch_one, hq_log, round_half_up, scalar,
+from core.models import Franchise, HqBuyRate, HqDispatch, HqDispatchLine, HqRelease, HqRequirement, ScrapItem
+from core.services.common import (ApiError, advisory_lock, blank, btrim, dec, fetch, fetch_one, fixed_decimal, hq_log, round_half_up, scalar,
                                   show_num)
 from core.services.registry import rpc
 from core.services.warehouse import stock_kg
 
 EPS = Decimal("0.0001")
 MAX_BUY_RATE = 100000
+MAX_DISPATCH_LINES = 100
 
 
 def _need(ctx, *roles, message):
@@ -71,8 +72,9 @@ def hq_buy_rates(ctx):
 
 # ---------------------------------------------------------------------------------------------- the warehouse manager prepares a load
 @rpc()
-def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=None):
-    """p_lines = [{"requirement_id": 3, "kg": 41.5}, ...], one line per HQ request being loaded on the vehicle.
+def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=None, p_franchise_id=None):
+    """p_lines = [{"requirement_id": 3, "kg": 41.5}, {"item_id": 2, "kg": 10}, ...]: a line is either for an HQ request, or for a
+    material loaded without a request ("item_id"). A load with no request lines needs the franchise (only HQ has to say which).
     Sends the load to the supervisor. With p_dispatch_id it corrects a load the supervisor sent back (or one still waiting)."""
     _need(ctx, "warehouse", "hq", message="Only the warehouse manager can prepare a load for HQ.")
     vehicle = btrim(p_vehicle_no)
@@ -80,24 +82,45 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         raise ApiError("Enter the vehicle number.")
     if not isinstance(p_lines, list) or not p_lines:
         raise ApiError("Enter the quantity of at least one material.")
-    wanted = {}
+    if len(p_lines) > MAX_DISPATCH_LINES:
+        raise ApiError(f"A load can have at most {MAX_DISPATCH_LINES} lines.")
+    wanted, extra = {}, {}                        # kg by request, and kg by material for what is loaded without a request
     for ln in p_lines:
-        rid = (ln or {}).get("requirement_id")
-        kg = dec((ln or {}).get("kg"), "kg")
-        if rid is None or kg <= 0:
-            raise ApiError("Every line needs a request and a quantity above zero.")
-        if int(rid) in wanted:
-            raise ApiError("The same request is listed twice.")
-        wanted[int(rid)] = kg
+        if not isinstance(ln, dict):
+            raise ApiError("Every load line must be an object.")
+        rid, iid = ln.get("requirement_id"), ln.get("item_id")
+        kg = fixed_decimal(ln.get("kg"), "kg", 3, 14)
+        if (rid is None) == (iid is None) or kg <= 0:
+            raise ApiError("Every line needs a request or a material, and a quantity above zero.")
+        raw_id = rid if rid is not None else iid
+        if isinstance(raw_id, bool) or not str(raw_id).isdigit():
+            raise ApiError("Choose a valid request or material.")
+        book, key = (wanted, int(rid)) if rid is not None else (extra, int(iid))
+        if key in book:
+            raise ApiError("The same request is listed twice." if rid is not None else "The same material is listed twice.")
+        book[key] = kg
     reqs = {r.pk: r for r in HqRequirement.objects.filter(pk__in=wanted)}
     if len(reqs) != len(wanted):
         raise ApiError("Requirement not found.")
     franchises = {r.franchise_id for r in reqs.values()}
-    if len(franchises) != 1:
+    if len(franchises) > 1:
         raise ApiError("One vehicle load can only carry stock of one franchise.")
-    franchise_id = franchises.pop()
-    if not ctx.fr_ok(franchise_id):
-        raise ApiError("This request belongs to another franchise.")
+    if franchises:
+        franchise_id = franchises.pop()
+        if not ctx.fr_ok(franchise_id):
+            raise ApiError("This request belongs to another franchise.")
+    else:                                         # nothing here names a franchise: staff use their own, HQ must say
+        franchise_id = ctx.fr_scope(p_franchise_id)
+        if franchise_id is None:
+            raise ApiError("Choose the franchise this load is from.")
+        # Canonicalize HQ's JSON input before comparing it with an existing load's integer FK.
+        fr = Franchise.objects.filter(pk=franchise_id, active=True).first()
+        if fr is None:
+            raise ApiError("Choose an active franchise.")
+        franchise_id = fr.pk
+    items = {i.pk: i for i in ScrapItem.objects.filter(pk__in=extra, active=True)}
+    if len(items) != len(extra):
+        raise ApiError("Unknown material.")
 
     dispatch = None
     if p_dispatch_id is not None:
@@ -109,7 +132,7 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         if dispatch.franchise_id != franchise_id:
             raise ApiError("One vehicle load can only carry stock of one franchise.")
 
-    for item_id in sorted({r.item_id for r in reqs.values()}):          # one at a time per material, in a fixed order
+    for item_id in sorted({r.item_id for r in reqs.values()} | set(extra)):          # one at a time per material, in a fixed order
         advisory_lock(item_id, franchise_id)
     skip = dispatch.pk if dispatch else None
     need_by_item = {}
@@ -121,6 +144,8 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         if kg > room + EPS:
             raise ApiError(f"HQ only needs {show_num(max(room, Decimal(0)), 1)} kg more for {r.code}.")
         need_by_item[r.item_id] = need_by_item.get(r.item_id, Decimal(0)) + kg
+    for item_id, kg in extra.items():
+        need_by_item[item_id] = need_by_item.get(item_id, Decimal(0)) + kg
     for item_id, kg in need_by_item.items():
         have = stock_kg(item_id, franchise_id) - _waiting(item_id=item_id, franchise_id=franchise_id, skip=skip)
         if kg > have + EPS:
@@ -136,7 +161,9 @@ def wh_submit_dispatch(ctx, p_lines, p_vehicle_no, p_note=None, p_dispatch_id=No
         dispatch.lines.all().delete()
     for rid, kg in wanted.items():
         HqDispatchLine.objects.create(dispatch_id=dispatch.pk, requirement_id=rid, item_id=reqs[rid].item_id, kg=kg)
-    hq_log(ctx, "dispatch_submitted", dispatch.code, {"vehicle": vehicle, "lines": len(wanted)}, franchise_id)
+    for iid, kg in extra.items():
+        HqDispatchLine.objects.create(dispatch_id=dispatch.pk, requirement=None, item_id=iid, kg=kg)
+    hq_log(ctx, "dispatch_submitted", dispatch.code, {"vehicle": vehicle, "lines": len(wanted) + len(extra), "without_request": len(extra)}, franchise_id)
     return dispatch.code
 
 
@@ -183,10 +210,10 @@ def sup_review_dispatch(ctx, p_dispatch_id, p_decision, p_note=None):
         advisory_lock(item_id, d.franchise_id)
     rates = {}
     for ln in lines:
-        req = HqRequirement.objects.select_for_update().get(pk=ln.requirement_id)
-        if req.status != "open":
+        req = HqRequirement.objects.select_for_update().get(pk=ln.requirement_id) if ln.requirement_id else None
+        if req is not None and req.status != "open":
             raise ApiError(f"{req.code} has been cancelled. Send this load back to the warehouse manager.")
-        if ln.kg > (req.required_kg - _released(req.pk)) + EPS:
+        if req is not None and ln.kg > (req.required_kg - _released(req.pk)) + EPS:
             raise ApiError(f"HQ no longer needs {show_num(ln.kg, 1)} kg for {req.code}. Send this load back.")
         rate = rates.get(ln.item_id) or _buy_rate(ln.item_id)
         if rate is None:
@@ -236,7 +263,7 @@ def wh_dispatches(ctx, p_status=None, p_limit=200, p_franchise=None):
     lines = fetch("""
       select l.id, l.dispatch_id, l.requirement_id, q.code as requirement_code, l.item_id, i.name as item_name, l.kg,
              l.price_per_kg, l.amount, l.release_id
-      from hq_dispatch_lines l join hq_requirements q on q.id = l.requirement_id join scrap_items i on i.id = l.item_id
+      from hq_dispatch_lines l left join hq_requirements q on q.id = l.requirement_id join scrap_items i on i.id = l.item_id
       where l.dispatch_id = any(%(ids)s) order by l.id""", {"ids": [h["id"] for h in heads]})
     show_price = ctx.role in ("supervisor", "hq")
     now_rates = {}

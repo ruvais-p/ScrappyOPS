@@ -4,7 +4,7 @@ import { Loading, Empty, Icon, PageHead, Stat, SectionHead } from '../../../ui.j
 import { fmtDate, fmtINR } from '../../../lib.js'
 import { itemsText } from '../../../fr.js'
 import { Sheet } from '../../../kit.js'
-import { printSaleInvoice, saleForm } from '../../fr/parts.js?v=20261027-1'
+import { downloadInvoicePdf, printSaleInvoice, saleForm } from '../../fr/parts.js?v=20261029-1'
 
 const PAYMENT = { pending: 'Unpaid', unpaid: 'Unpaid', partial: 'Part paid', paid: 'Paid' }
 const DELIVERY = { pending: 'To deliver', dispatched: 'Dispatched', delivered: 'Delivered' }
@@ -13,7 +13,7 @@ const CUSTOMER = { B2B: 'B2B', B2C: 'B2C', B2G: 'B2G' }
 
 const METHOD = { cash: 'Cash', upi: 'UPI', bank_transfer: 'Bank transfer', cheque: 'Cheque', card: 'Card', other: 'Other' }
 
-function invoiceDetail(sale, items, ctx, fname, receipts) {
+function invoiceDetail(sale, items, ctx, fname, receipts, downloading = false) {
   const { byId } = ctx.data
   const due = Math.max(0, Number(sale.total || 0) - Number(sale.amount_received || 0))
   const lines = items.filter((i) => i.sale_id === sale.id)
@@ -21,7 +21,8 @@ function invoiceDetail(sale, items, ctx, fname, receipts) {
     ${SectionHead({ title: 'Invoice details' })}
     <div class="row wrap" style="justify-content:flex-end;margin:8px 0">
       ${sale.status === 'active' && due > 0 ? html`<button class="btn" data-act="recordPayment">${Icon('plus', 18)} Settle due</button>` : ''}
-      <button class="btn primary" data-act="printInvoice">${Icon('download', 18)} Print invoice</button></div>
+      <button class="btn primary" data-act="printInvoice">Print invoice</button>
+      <button class="btn" ${downloading ? raw('disabled') : ''} data-act="downloadPdf">${Icon('download', 18)} ${downloading ? 'Preparing…' : 'Download PDF'}</button></div>
     <div class="summary" style="margin:12px 0">
       <div class="summary-row"><span>Invoice number</span><b>${sale.invoice_no || 'Not recorded'}</b></div>
       <div class="summary-row"><span>Sale date</span><span>${fmtDate(sale.sale_date)}</span></div>
@@ -55,7 +56,7 @@ function invoiceDetail(sale, items, ctx, fname, receipts) {
 }
 
 export default {
-  state: { rows: null, items: [], receipts: [], stockByFr: {}, err: '', fid: '', status: '', q: '', selected: '', create: false, payment: null, payForm: { amount: '', method: 'cash', reference: '' }, payErr: '' },
+  state: { dl: false, rows: null, items: [], receipts: [], stockByFr: {}, err: '', fid: '', status: '', q: '', selected: '', create: false, payment: null, payForm: { amount: '', method: 'cash', reference: '' }, payErr: '' },
   widgets: { createBill: saleForm },
   async init() { await this.actions.load.call(this) },
   view(S, ctx) {
@@ -92,7 +93,7 @@ export default {
           <td style="white-space:normal;max-width:240px">${productSummary(s.id)}</td>
           <td class="num"><b>${fmtINR(s.total)}</b></td><td class="num">${s.status === 'active' ? fmtINR(Math.max(0, Number(s.total || 0) - Number(s.amount_received || 0))) : '—'}</td>
           <td>${s.status === 'cancelled' ? 'Cancelled' : PAYMENT[s.payment_status] || '—'}</td></tr>`)}</tbody></table></div>`}
-      ${selected ? invoiceDetail(selected, S.items, ctx, fname, S.receipts.filter((r) => r.sale_id === selected.id)) : ''}
+      ${selected ? invoiceDetail(selected, S.items, ctx, fname, S.receipts.filter((r) => r.sale_id === selected.id), S.dl) : ''}
       ${S.payment && selected ? Sheet({ title: 'Record payment', close: 'closePayment', body: html`
         <p class="muted">Balance due: <b>${fmtINR(Math.max(0, Number(selected.total || 0) - Number(selected.amount_received || 0)))}</b></p>
         <label>Amount received (₹)<input type="number" min="0.01" step="0.01" max="${Math.max(0, Number(selected.total || 0) - Number(selected.amount_received || 0))}" inputmode="decimal" data-bind="payForm.amount" value="${S.payForm.amount}"></label>
@@ -127,6 +128,10 @@ export default {
       await this.actions.load.call(this)
     },
     async saleChanged() { this.set({ create: false }); await this.actions.load.call(this) },
+    async downloadPdf() {
+      const sale = this.S.rows.find((s) => s.id === this.S.selected)
+      if (sale) await downloadInvoicePdf(this, sale)
+    },
     printInvoice() {
       const sale = this.S.rows.find((s) => s.id === this.S.selected)
       if (sale) printSaleInvoice(sale, this.S.items.filter((i) => i.sale_id === sale.id), this.ctx)

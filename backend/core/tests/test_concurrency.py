@@ -5,9 +5,9 @@ from decimal import Decimal
 from django.db import close_old_connections, connection, transaction
 from django.test import TransactionTestCase
 
-from core.models import (Bill, BillItem, CashLedger, Counter, Customer, Franchise, HqRelease, HqRequirement, Lead, Load,
+from core.models import (Bill, BillItem, Buyer, CashLedger, Counter, Customer, Franchise, HqRelease, HqRequirement, Invoice, Lead, Load,
                          LoadWeighing, Profile, Rate, ScrapItem, User)
-from core.services import pickup, warehouse
+from core.services import billing, pickup, warehouse
 from core.services.common import ApiError, Ctx
 
 
@@ -61,6 +61,18 @@ class ConcurrencyTests(TransactionTestCase):
         self.assertIn("Not enough stock", bad[0].message)
         self.assertEqual(HqRelease.objects.count(), 1)
         self.assertEqual(warehouse.stock_kg(self.item.pk, self.fr.pk), Decimal("2"))
+
+    def test_two_sale_invoices_cannot_sell_the_same_hq_stock(self):
+        with transaction.atomic():
+            hq = Profile.objects.create(user=User.objects.create_user("hq@t.test", "x"), full_name="HQ", role="hq")
+            buyer = Buyer.objects.create(name="Buyer")
+            HqRelease.objects.create(item=self.item, kg=10, vehicle_no="KL 1", released_by=self.sup, franchise=self.fr)
+        args = (buyer.pk, [{"item_id": self.item.pk, "kg": 8, "rate": 30}])
+        out = run_together([lambda: billing.bill_create_sale_invoice(Ctx(hq.pk), *args) for _ in range(2)])
+        self.assertEqual(sum(isinstance(r, dict) for r in out), 1, out)
+        self.assertEqual(sum(isinstance(r, ApiError) for r in out), 1, out)
+        self.assertEqual(Invoice.objects.count(), 1)
+        self.assertEqual(billing.hq_in_hand(self.item.pk), Decimal("2"))
 
     def test_two_cash_payments_cannot_spend_the_same_cash(self):
         bills = []

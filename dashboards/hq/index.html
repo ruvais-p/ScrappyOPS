@@ -354,6 +354,7 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
       <a href="#loads" data-view="loads">Loads and weighing <span class="count" id="nav-loads"></span></a>
       <a href="#inventory" data-view="inventory">Inventory</a>
       <a href="#stock" data-view="stock">Stock and requests</a>
+      <a href="#billing" data-view="billing" id="billing-nav">Billing</a>
       <a href="#cash" data-view="cash">Cash <span class="count" id="nav-cash"></span></a>
       <a href="#team" data-view="team">Team</a>
       <a href="#rates" data-view="rates">Rates</a>
@@ -481,7 +482,7 @@ const S = {
   inventory: [], stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
   biStream: 'all', biFranchise: '', biData: null, biError: '', biInventoryFranchise: '', biInventoryProduct: '',
   routes: [], txns: [], cashSel: null, resolutions: [], disputes: [], fd: '', disputeAct: null,
-  rates: [], ratehist: [], buy: [], editPerson: null, audit: [],
+  rates: [], ratehist: [], buy: [], taxItems: [], bl: null, editPerson: null, audit: [],
   feed: [], prevOv: null, wsOpen: false,
   allItems: [], addItem: false, removeItem: null, creds: null, resetAsk: null,
   fr: load('scrappy_hq_fr') || null, franchises: [], fran: [], frQ: '', frSort: 'attention', frStatus: 'active', frEdit: null, frAdd: false, personAdd: false
@@ -527,6 +528,13 @@ const LOAD = {
   },
   overview: async () => { [S.daily, S.isum, S.fran] = await Promise.all([rpc('hq_daily', rangeArgs()), rpc('hq_item_summary', rangeArgs()), S.fr ? Promise.resolve([]) : rpc('hq_franchises', { p_from: S.from, p_to: S.to })]); },
   franchises: async () => { S.fran = await rpc('hq_franchises', { p_from: S.from, p_to: S.to }); },
+  billing: async () => {
+    const B = bl();
+    const [purchases, sales, pending, buyers, stock, items] = await Promise.all([
+      rpc('bill_invoices', { p_kind: 'purchase', p_franchise: S.fr || null, p_limit: 300 }), rpc('bill_invoices', { p_kind: 'sale', p_limit: 300 }),
+      rpc('bill_pending_invoices', { p_franchise: S.fr || null }), rpc('hq_buyers'), rpc('hq_stock_summary'), rpc('bill_items')]);
+    B.inv = [...sales, ...purchases]; B.pending = pending; B.buyers = buyers; B.stock = stock; B.items = items;
+  },
   leads: async () => {
     S.leads = await rpc('hq_leads', { ...rangeArgs(), p_status: S.lf.status || null, p_driver: S.lf.driver || null, p_search: S.lf.q || null, p_limit: 300, p_franchise: S.fr || null });
     if (S.leadTab === 'upload') S.imports = await rest('lead_import?select=id,customer_name,phone,driver_email,franchise_code,pickup_date,status,message,lead_code,imported_at&order=id.desc&limit=60');
@@ -547,7 +555,7 @@ const LOAD = {
       rpc('hq_open_disputes', { p_franchise: S.fr || null })]);
   },
   team: async () => { S.score = await rpc('hq_driver_scorecard', rangeArgs()); },
-  rates: async () => { [S.rates, S.ratehist, S.buy] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100'), rpc('hq_buy_rates')]); },
+  rates: async () => { [S.rates, S.ratehist, S.buy, S.taxItems] = await Promise.all([rest('current_rates?select=item_id,item_name,rate_per_kg,effective_from&order=item_id'), rest('rates?select=id,item_id,rate_per_kg,effective_from,set_by&order=id.desc&limit=100'), rpc('hq_buy_rates'), rpc('bill_items')]); },
   activity: async () => {
     const q = 'hq_audit?select=id,at,by_id,action,ref,detail,franchise_id&order=id.desc&limit=200';
     if (!S.fr) { S.audit = await rest(q); return; }
@@ -1144,6 +1152,11 @@ function vRates() {
     <tbody>${S.buy.map(i => `<tr><td class="b">${esc(i.item_name)}</td><td class="r b">${i.rate_per_kg == null ? '<span class="var-bad">not set</span>' : '₹' + num(i.rate_per_kg)}</td><td class="muted">${i.effective_from ? dtlabel(i.effective_from) : ''}</td>
       <td class="r"><input id="nb-${i.item_id}" type="number" min="0" step="0.5" style="width:110px;padding:8px;border:1px solid var(--line);background:var(--pearl);text-align:right" aria-label="New purchase price for ${esc(i.item_name)}"></td>
       <td class="r"><button class="btn sm" data-act="set-buy" data-id="${i.item_id}">Set</button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">No materials.</td></tr>'}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><h2>HSN code and GST on invoices</h2><span class="muted small">Used on every invoice, for franchises and for HQ</span></div>
+    <div class="scroll"><table style="min-width:520px"><thead><tr><th>MATERIAL</th><th>HSN CODE</th><th class="r">GST %</th><th></th></tr></thead>
+    <tbody>${S.taxItems.map(i => `<tr><td class="b">${esc(i.name)}</td><td><input id="tx-h-${i.id}" value="${esc(i.hsn_code || '')}" inputmode="numeric" placeholder="4 to 8 digits" style="width:130px;padding:8px;border:1px solid var(--line);background:var(--pearl)" aria-label="HSN code for ${esc(i.name)}"></td>
+      <td class="r"><input id="tx-g-${i.id}" type="number" min="0" max="100" step="0.01" value="${num(i.gst_percent)}" style="width:90px;padding:8px;border:1px solid var(--line);background:var(--pearl);text-align:right" aria-label="GST percent for ${esc(i.name)}"></td>
+      <td class="r"><button class="btn sm" data-act="bl-tax-save" data-id="${i.id}">Save</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">No materials.</td></tr>'}</tbody></table></div></section>
   <section class="card"><div class="card-h"><h2>Rate history</h2><span class="muted small">Latest 100 changes</span></div>
     <div class="scroll"><table style="min-width:480px"><thead><tr><th>WHEN</th><th>MATERIAL</th><th class="r">RATE ₹/KG</th><th>SET BY</th></tr></thead>
     <tbody>${S.ratehist.map(r => `<tr><td class="muted">${dtlabel(r.effective_from)}</td><td class="b">${esc(itemName(r.item_id))}</td><td class="r">₹${num(r.rate_per_kg)}</td><td>${esc(personName(r.set_by))}</td></tr>`).join('') || '<tr><td colspan="4" class="empty">No history.</td></tr>'}</tbody></table></div></section>`;
@@ -1309,7 +1322,180 @@ function vSaPipeline(){
 }
 
 /* ---------- routing and render ---------- */
-const VIEWS = { overview: vOverview, business: vBusiness, 'sa-scrap': vSaScrap, 'sa-digester': vSaDigester, 'sa-inventory': vSaInventory, 'sa-pipeline': vSaPipeline, 'sa-expenses': vSaExpenses, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, inventory: vInventory, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
+/* ---------- billing: HQ's invoices to buyers, the franchises' invoices to HQ, HQ stock, buyers ---------- */
+const rs2 = n => (num(n) < 0 ? '−₹' : '₹') + Math.abs(num(n)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const r2 = n => Math.round((num(n) + Number.EPSILON) * 100) / 100;
+const blLine = l => { const t = r2(num(l.kg) * num(l.rate)), g = r2(t * num(l.gst) / 100); return { taxable: t, gst: g, total: r2(t + g) }; };
+const blTotals = d => d.lines.reduce((a, l) => { const x = blLine(l); return { taxable: a.taxable + x.taxable, gst: a.gst + x.gst, total: a.total + x.total }; }, { taxable: 0, gst: 0, total: 0 });
+const blBlankLine = () => ({ item: '', kg: '', rate: '', gst: '' });
+const blBlank = () => ({ buyer: '', date: todayIST(), vehicle: '', note: '', lines: [blBlankLine()] });
+const blBlankBuyer = () => ({ id: null, name: '', gstin: '', address: '', phone: '', email: '', state: '', active: true });
+function bl() {
+  return S.bl || (S.bl = { tab: 'sales', inv: [], pending: [], buyers: [], stock: [], items: [], d: blBlank(), buyer: null, pay: null, payForm: { date: '', ref: '' }, cancel: null, reason: '', pdf: null });
+}
+const blInHand = id => { const r = bl().stock.find(x => x.item_id === id); return r ? num(r.received_kg) - num(r.sold_kg) : 0; };
+const invBadge = v => v.status === 'cancelled' ? '<span class="badge b-flag">Cancelled</span>' : v.payment_status === 'paid' ? '<span class="badge b-ok">✓ Paid</span>' : '<span class="badge b-cash">Unpaid</span>';
+
+/* the invoice as a PDF file, made on the server */
+async function downloadInvoice(id) {
+  await ensureFresh();
+  const call = () => fetch(`${SUPABASE_URL}/functions/v1/invoice-pdf`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice_id: id })
+  });
+  let res = await call();
+  if (res.status === 401) { try { await authCall('refresh_token', { refresh_token: session.refresh_token }); res = await call(); } catch (e) {} }
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not make the invoice PDF.'); }
+  const m = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') || ''), url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a'); a.href = url; a.download = m ? m[1] : 'invoice.pdf'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function invRows(list, who) {
+  const B = bl();
+  return list.map(v => {
+    const open = v.status === 'issued' && v.payment_status === 'unpaid';
+    return `<tr><td class="b">${esc(v.code)}${v.load_code ? `<br><span class="muted small">Load ${esc(v.load_code)}</span>` : ''}${v.status === 'cancelled' && v.cancel_reason ? `<br><span class="muted small">${esc(v.cancel_reason)}</span>` : ''}</td>
+      <td>${dlabel(v.invoice_date)}</td><td>${esc(who(v))}</td><td class="r">${kg(v.total_kg)}</td><td class="r muted">${rs2(v.gst_total)}</td><td class="r b">${rs2(v.total)}</td>
+      <td>${invBadge(v)}${v.payment_status === 'paid' && v.paid_on ? `<br><span class="muted small">${dlabel(v.paid_on)}${v.payment_ref ? ' · ' + esc(v.payment_ref) : ''}</span>` : ''}</td>
+      <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-act="bl-pdf" data-id="${v.id}" ${B.pdf === v.id ? 'disabled' : ''}>${B.pdf === v.id ? 'Preparing…' : 'PDF'}</button>
+        ${open ? `<button class="btn sm" data-act="bl-pay-open" data-id="${v.id}">Mark paid</button> <button class="btn ghost sm" data-act="bl-cancel-open" data-id="${v.id}">Cancel</button>` : ''}</td></tr>`;
+  }).join('');
+}
+function blPanels() {
+  const B = bl(), P = B.pay && B.inv.find(x => x.id === B.pay), C = B.cancel && B.inv.find(x => x.id === B.cancel);
+  return `${P ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Payment for ${esc(P.code)} · ${rs2(P.total)}</h2><button class="linkbtn" data-act="bl-pay-close">Close</button></div>
+      <div class="inl"><div class="fld"><label for="bl-pd">PAID ON</label><input id="bl-pd" type="date" value="${esc(B.payForm.date || todayIST())}" max="${todayIST()}"></div>
+      <div class="fld" style="flex:1 1 220px"><label for="bl-pr">REFERENCE (OPTIONAL)</label><input id="bl-pr" placeholder="UTR, cheque no."></div>
+      <button class="btn green" data-act="bl-pay-ok" data-id="${P.id}">Mark as paid</button></div></section>` : ''}
+    ${C ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Cancel ${esc(C.code)}?</h2><button class="linkbtn" data-act="bl-cancel-close">Keep it</button></div>
+      <div class="muted">${C.kind === 'sale' ? 'The stock goes back to HQ.' : 'The franchise can make a new invoice for the load.'} The number is not used again.</div>
+      <div class="inl"><div class="fld" style="flex:1 1 260px"><label for="bl-cr">REASON (REQUIRED)</label><input id="bl-cr"></div><button class="btn" data-act="bl-cancel-ok" data-id="${C.id}">Cancel invoice</button></div></section>` : ''}`;
+}
+function blSalesForm() {
+  const B = bl(), d = B.d, t = blTotals(d), buyers = B.buyers.filter(b => b.active);
+  const lines = d.lines.map((l, i) => {
+    const x = blLine(l), have = l.item ? blInHand(+l.item) : null;
+    return `<tr><td><select data-act="bl-item" data-i="${i}" aria-label="Material"><option value="">Choose…</option>${B.stock.map(s => `<option value="${s.item_id}" ${String(l.item) === String(s.item_id) ? 'selected' : ''}>${esc(s.item_name)} · ${kg(num(s.received_kg) - num(s.sold_kg))} kg</option>`).join('')}</select></td>
+      <td><input type="number" min="0" step="0.1" style="width:100px" data-bl="kg" data-i="${i}" value="${esc(l.kg)}" aria-label="Kg"></td>
+      <td><input type="number" min="0" step="0.01" style="width:100px" data-bl="rate" data-i="${i}" value="${esc(l.rate)}" aria-label="Rate per kg"></td>
+      <td><input type="number" min="0" max="100" step="0.01" style="width:80px" data-bl="gst" data-i="${i}" value="${esc(l.gst)}" aria-label="GST percent"></td>
+      <td class="r" id="bl-lt-${i}">${l.item ? rs2(x.total) : '—'}${have !== null && num(l.kg) > have ? '<br><span class="var-bad small">more than in stock</span>' : ''}</td>
+      <td class="r">${d.lines.length > 1 ? `<button class="btn ghost sm" data-act="bl-del-line" data-i="${i}" aria-label="Remove line">✕</button>` : ''}</td></tr>`;
+  }).join('');
+  return `<section class="card pad"><h3>New invoice to a buyer</h3>
+    ${buyers.length ? '' : '<div class="notice">Add a buyer first: open the Buyers tab.</div>'}
+    <div class="inl">
+      <div class="fld"><label for="bl-b">BUYER</label><select id="bl-b" data-act="bl-buyer-pick"><option value="">Choose…</option>${buyers.map(b => `<option value="${b.id}" ${String(d.buyer) === String(b.id) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+      <div class="fld"><label for="bl-d">DATE</label><input id="bl-d" type="date" data-bl="date" value="${esc(d.date)}" max="${todayIST()}"></div>
+      <div class="fld"><label for="bl-v">VEHICLE (OPTIONAL)</label><input id="bl-v" data-bl="vehicle" value="${esc(d.vehicle)}" style="width:160px"></div></div>
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>MATERIAL · IN STOCK</th><th>KG</th><th>RATE ₹/KG</th><th>GST %</th><th class="r">AMOUNT</th><th></th></tr></thead><tbody>${lines}</tbody></table></div>
+    <div class="row-split" style="flex-wrap:wrap;margin-top:10px"><button class="btn ghost sm" data-act="bl-add-line">+ Add a material</button>
+      <span id="bl-tot" class="muted">Taxable ${rs2(t.taxable)} · GST ${rs2(t.gst)} · <b>Total ${rs2(t.total)}</b></span></div>
+    <div class="inl"><div class="fld" style="flex:1 1 260px"><label for="bl-n">NOTE (OPTIONAL)</label><input id="bl-n" data-bl="note" value="${esc(d.note)}"></div>
+      <button class="btn green" data-act="bl-create" ${buyers.length ? '' : 'disabled'}>Create invoice</button></div></section>`;
+}
+function blBuyerForm() {
+  const f = bl().buyer;
+  if (!f) return '';
+  const fld = (k, label, w = '', area = false) => `<div class="fld" ${w ? `style="flex:1 1 ${w}"` : ''}><label for="bb-${k}">${label}</label>${area ? `<textarea id="bb-${k}" data-blb="${k}" rows="3" style="width:100%;padding:10px 12px;font:inherit;resize:vertical">${esc(f[k])}</textarea>` : `<input id="bb-${k}" data-blb="${k}" value="${esc(f[k])}">`}</div>`;
+  return `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>${f.id ? 'Edit buyer' : 'Add a buyer'}</h2><button class="linkbtn" data-act="bl-buyer-close">Close</button></div>
+    <div class="inl">${fld('name', 'NAME', '260px')}${fld('gstin', 'GSTIN (OPTIONAL)', '200px')}${fld('state', 'STATE', '140px')}</div>
+    <div class="inl">${fld('address', 'ADDRESS', '320px', true)}${fld('phone', 'PHONE', '150px')}${fld('email', 'EMAIL', '200px')}</div>
+    <div class="inl"><label class="chk"><input type="checkbox" data-act="bl-buyer-active" ${f.active ? 'checked' : ''}> Active</label><button class="btn green" data-act="bl-buyer-save">Save buyer</button></div></section>`;
+}
+function vBilling() {
+  const B = bl(), T = B.tab;
+  const sales = B.inv.filter(v => v.kind === 'sale'), purchases = B.inv.filter(v => v.kind === 'purchase');
+  const tabs = [['sales', 'Sales to buyers'], ['purchases', 'Purchases from franchises'], ['stock', 'HQ stock'], ['buyers', 'Buyers']];
+  const live = list => list.filter(v => v.status === 'issued'), sum = (list, f) => live(list).reduce((a, v) => a + num(v[f]), 0);
+  const head = `<table style="min-width:820px"><thead><tr><th>INVOICE</th><th>DATE</th><th>${T === 'sales' ? 'BUYER' : 'FRANCHISE'}</th><th class="r">KG</th><th class="r">GST</th><th class="r">TOTAL</th><th>PAYMENT</th><th></th></tr></thead>`;
+  let body = '';
+  if (T === 'sales') {
+    body = `<div class="kpis"><div class="kpi dark"><span class="l">Sold to buyers</span><span class="v">${rs2(sum(sales, 'total'))}</span><span class="s">${live(sales).length} invoice${live(sales).length === 1 ? '' : 's'}</span></div>
+      <div class="kpi"><span class="l">Still to receive</span><span class="v">${rs2(live(sales).filter(v => v.payment_status === 'unpaid').reduce((a, v) => a + num(v.total), 0))}</span><span class="s">Unpaid invoices</span></div></div>
+      ${blSalesForm()}${blPanels()}
+      <section class="card"><div class="card-h"><h2>Invoices to buyers</h2><span class="muted small">Latest ${sales.length}</span></div>
+        ${sales.length ? `<div class="scroll">${head}<tbody>${invRows(sales, v => v.buyer_name || '—')}</tbody></table></div>` : '<div class="empty">No invoices to buyers yet.</div>'}</section>`;
+  } else if (T === 'purchases') {
+    body = `<div class="kpis"><div class="kpi dark"><span class="l">Invoiced by franchises</span><span class="v">${rs2(sum(purchases, 'total'))}</span><span class="s">${live(purchases).length} invoice${live(purchases).length === 1 ? '' : 's'}</span></div>
+      <div class="kpi"><span class="l">Still to pay</span><span class="v">${rs2(live(purchases).filter(v => v.payment_status === 'unpaid').reduce((a, v) => a + num(v.total), 0))}</span><span class="s">Unpaid invoices</span></div>
+      <div class="kpi"><span class="l">Waiting for the franchise's invoice</span><span class="v">${B.pending.length}</span><span class="s">Finalized loads without an invoice</span></div></div>
+      ${blPanels()}
+      <section class="card"><div class="card-h"><h2>Invoices from franchises</h2><span class="muted small">The supervisor of the franchise makes each one from a finalized load</span></div>
+        ${purchases.length ? `<div class="scroll">${head}<tbody>${invRows(purchases, v => (v.franchise_code ? v.franchise_code + ' · ' : '') + (v.franchise_name || ''))}</tbody></table></div>` : '<div class="empty">No invoices from franchises yet.</div>'}</section>
+      ${B.pending.length ? `<section class="card"><div class="card-h"><h2>Finalized loads waiting for an invoice</h2></div><div class="scroll"><table style="min-width:520px"><thead><tr><th>LOAD</th><th>FRANCHISE</th><th>VEHICLE</th><th>FINALIZED</th><th class="r">TAXABLE</th><th class="r">WITH GST</th></tr></thead>
+        <tbody>${B.pending.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${esc(x.franchise_code)} · ${esc(x.franchise_name)}</td><td>${esc(x.vehicle_no)}</td><td>${dlabel(dayOf(x.finalized_at))}</td><td class="r">${rs2(x.taxable)}</td><td class="r b">${rs2(x.total)}</td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
+  } else if (T === 'stock') {
+    body = `<section class="card"><div class="card-h"><h2>What HQ holds</h2><span class="muted small">Released to HQ by the franchises, minus what was invoiced to buyers</span></div>
+      <div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL</th><th class="r">RECEIVED</th><th class="r">SOLD</th><th class="r">IN HAND</th><th>HSN</th><th class="r">GST</th></tr></thead>
+      <tbody>${B.stock.map(r => `<tr><td class="b">${esc(r.item_name)}</td><td class="r">${kg(r.received_kg)} kg</td><td class="r">${num(r.sold_kg) ? '− ' + kg(r.sold_kg) + ' kg' : '—'}</td><td class="r b">${kg(num(r.received_kg) - num(r.sold_kg))} kg</td><td>${esc(r.hsn_code || '—')}</td><td class="r">${num(r.gst_percent)}%</td></tr>`).join('')}</tbody></table></div></section>`;
+  } else {
+    body = `${blBuyerForm()}<section class="card"><div class="card-h"><h2>Buyers</h2><button class="btn sm" data-act="bl-buyer-new">+ Add a buyer</button></div>
+      ${B.buyers.length ? `<div class="scroll"><table style="min-width:620px"><thead><tr><th>NAME</th><th>GSTIN</th><th>CONTACT</th><th class="r">INVOICES</th><th></th></tr></thead>
+      <tbody>${B.buyers.map(b => `<tr style="${b.active ? '' : 'opacity:.6'}"><td class="b">${esc(b.name)}${b.active ? '' : ' <span class="muted small">(inactive)</span>'}<br><span class="muted small">${esc([b.address, b.state].filter(Boolean).join(', '))}</span></td><td>${esc(b.gstin || '—')}</td><td>${esc([b.phone, b.email].filter(Boolean).join(' · ') || '—')}</td><td class="r">${num(b.invoices)}</td><td class="r"><button class="btn ghost sm" data-act="bl-buyer-edit" data-id="${b.id}">Edit</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No buyers yet.</div>'}</section>`;
+  }
+  return `<div><div class="eyebrow">Billing</div><h1>Invoices in and out.</h1>
+    <div class="muted">When a franchise releases stock to HQ it invoices HQ. When HQ sells its stock, it invoices its buyer.</div></div>
+    <div class="filters"><div class="tabs">${tabs.map(t => `<button class="tab ${T === t[0] ? 'on' : ''}" data-act="bl-tab" data-t="${t[0]}">${t[1]}</button>`).join('')}</div></div>${body}`;
+}
+async function billingClick(a, b, id) {
+  const B = bl(), i = +b.dataset.i;
+  if (a === 'bl-tab') { B.tab = b.dataset.t; B.pay = B.cancel = null; render(); }
+  if (a === 'bl-add-line') { B.d.lines.push(blBlankLine()); render(); }
+  if (a === 'bl-del-line') { B.d.lines.splice(i, 1); render(); }
+  if (a === 'bl-create') {
+    const d = B.d, lines = d.lines.filter(l => l.item || num(l.kg) || num(l.rate));
+    if (!d.buyer) { toast('Choose the buyer.', true); return; }
+    if (!lines.length || lines.some(l => !l.item || !(num(l.kg) > 0) || !(num(l.rate) > 0))) { toast('Choose the material and enter the kg and the rate on every line.', true); return; }
+    const ok = await act(b, () => rpc('bill_create_sale_invoice', { p_buyer_id: +d.buyer, p_invoice_date: d.date || null, p_vehicle_no: d.vehicle.trim() || null, p_note: d.note.trim() || null,
+      p_lines: lines.map(l => ({ item_id: +l.item, kg: num(l.kg), rate: num(l.rate), gst_percent: l.gst === '' ? null : num(l.gst) })) }), r => `Invoice ${r.code} created: ${rs2(r.total)}.`);
+    if (ok) { B.d = blBlank(); render(); }
+  }
+  if (a === 'bl-pdf') { B.pdf = id; render(); try { await downloadInvoice(id); } catch (e) { toast(e.message, true); } B.pdf = null; render(); }
+  if (a === 'bl-pay-open') { B.pay = id; B.cancel = null; B.payForm = { date: todayIST(), ref: '' }; render(); setTimeout(() => $('#bl-pd') && $('#bl-pd').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'bl-pay-close') { B.pay = null; render(); }
+  if (a === 'bl-pay-ok') { const ok = await act(b, () => rpc('bill_mark_paid', { p_invoice_id: id, p_paid_on: val('#bl-pd') || null, p_reference: val('#bl-pr').trim() || null }), c => `${c} marked as paid.`); if (ok) { B.pay = null; render(); } }
+  if (a === 'bl-cancel-open') { B.cancel = id; B.pay = null; render(); setTimeout(() => $('#bl-cr') && $('#bl-cr').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'bl-cancel-close') { B.cancel = null; render(); }
+  if (a === 'bl-cancel-ok') {
+    const reason = val('#bl-cr').trim(); if (!reason) { toast('Say why the invoice is cancelled.', true); return; }
+    const ok = await act(b, () => rpc('bill_cancel_invoice', { p_invoice_id: id, p_reason: reason }), c => `${c} cancelled.`); if (ok) { B.cancel = null; render(); }
+  }
+  if (a === 'bl-buyer-new') { B.buyer = blBlankBuyer(); render(); }
+  if (a === 'bl-buyer-edit') { const x = B.buyers.find(y => y.id === id); if (x) { B.buyer = { id: x.id, name: x.name || '', gstin: x.gstin || '', address: x.address || '', phone: x.phone || '', email: x.email || '', state: x.state || '', active: x.active }; render(); } }
+  if (a === 'bl-buyer-close') { B.buyer = null; render(); }
+  if (a === 'bl-buyer-save') {
+    const f = B.buyer; if (!f.name.trim()) { toast('Enter the buyer\'s name.', true); return; }
+    const ok = await act(b, () => rpc('hq_save_buyer', { p_buyer_id: f.id, p_name: f.name, p_gstin: f.gstin, p_address: f.address, p_phone: f.phone, p_email: f.email, p_state: f.state, p_active: f.active }), () => `${f.name.trim()} saved.`);
+    if (ok) { B.buyer = null; render(); }
+  }
+  if (a === 'bl-tax-save') {
+    const hsn = val('#tx-h-' + id).trim(), gst = num(val('#tx-g-' + id));
+    await act(b, () => rpc('hq_set_item_tax', { p_item_id: id, p_hsn: hsn, p_gst: gst }), n => `${n}: HSN and GST saved.`);
+  }
+}
+function billingChange(a, t) {
+  const B = bl();
+  if (a === 'bl-item') {
+    const l = B.d.lines[+t.dataset.i], it = B.items.find(x => String(x.id) === t.value);
+    l.item = t.value; l.gst = it ? String(num(it.gst_percent)) : ''; render();
+  }
+  if (a === 'bl-buyer-pick') B.d.buyer = t.value;
+  if (a === 'bl-buyer-active') B.buyer.active = t.checked;
+}
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.blb) { bl().buyer[t.dataset.blb] = t.value; return; }
+  const k = t.dataset.bl; if (!k) return;
+  const B = bl();
+  if (k === 'kg' || k === 'rate' || k === 'gst') {
+    const i = +t.dataset.i; B.d.lines[i][k] = t.value;
+    const l = B.d.lines[i], cell = $('#bl-lt-' + i); if (cell && l.item) cell.textContent = rs2(blLine(l).total);
+    const x = blTotals(B.d), tot = $('#bl-tot'); if (tot) tot.innerHTML = `Taxable ${rs2(x.taxable)} · GST ${rs2(x.gst)} · <b>Total ${rs2(x.total)}</b>`;
+  } else B.d[k] = t.value;
+});
+
+const VIEWS = { overview: vOverview, billing: vBilling, business: vBusiness, 'sa-scrap': vSaScrap, 'sa-digester': vSaDigester, 'sa-inventory': vSaInventory, 'sa-pipeline': vSaPipeline, 'sa-expenses': vSaExpenses, franchises: vFranchises, leads: vLeads, pickups: vPickups, loads: vLoads, inventory: vInventory, stock: vStock, cash: vCash, team: vTeam, rates: vRates, activity: vActivity };
 function navCounts() {
   const o = S.ov; if (!o) return;
   const set = (id, n, hot) => { const e = $(id); e.textContent = n || ''; e.classList.toggle('hot', !!hot && n > 0); };
@@ -1335,6 +1521,7 @@ function render() {
   const isSuperAdmin = !!(S.profile && S.profile.role === 'super_admin');
   document.querySelectorAll('[data-sa-nav]').forEach(a => a.classList.toggle('hidden', !isSuperAdmin && a.id !== 'business-nav'));
   $('#business-nav').classList.toggle('hidden', !S.profile || !(isSuperAdmin || S.profile.is_super_admin));
+  $('#billing-nav').classList.toggle('hidden', isSuperAdmin);
   const key = v + ':' + (typeof S.fr !== 'undefined' ? (S.fr || '') : ''), app = $('#app'), changed = key !== window.__viewKey;
   if (!changed) app.classList.remove('enter');
   app.innerHTML = VIEWS[v]();
@@ -1369,6 +1556,7 @@ async function act(btn, fn, okMsg) {
 document.addEventListener('change', async e => {
   const t = e.target, a = t.dataset.act;
   if (!a) return;
+  if (a.startsWith('bl-')) { billingChange(a, t); return; }
   if (a === 'frsel') { setFranchise(t.value ? +t.value : null); await reload(); return; }
   if (a === 'frsearch') { S.frQ = t.value.trim(); render(); }
   if (a === 'frsort') { S.frSort = t.value; render(); }
@@ -1397,6 +1585,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
   const a = b.dataset.act, id = +b.dataset.id;
   if (a === 'logout') logout();
+  if (a.startsWith('bl-')) { await billingClick(a, b, id); return; }
   if (a === 'bi-fy') {
     const now = todayIST(), month = +now.slice(5,7), year = +now.slice(0,4), currentStart = month >= 4 ? year : year - 1;
     const startYear = currentStart - (b.dataset.year === 'previous' ? 1 : 0);
@@ -1583,7 +1772,7 @@ async function start() {
 }
 
 /* ---------- look and feel: icons, screen-change animation, busy bar ---------- */
-const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>"};
+const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>","billing":"<path d=\"M6 3h12v18l-3-2-3 2-3-2-3 2z\"/><path d=\"M9 8h6M9 12h6\"/>"};
 document.querySelectorAll('nav a[data-view]').forEach(a => { const d = NAV_ICONS[a.dataset.view]; if (d) a.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'); });
 function busyBar(on) { const b = document.getElementById('topbar'); if (!b) return; b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } }
 function shake() { const f = document.getElementById('login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }

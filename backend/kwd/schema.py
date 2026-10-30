@@ -40,9 +40,10 @@ TABLES = {
     "expense_items": ("kwd_expense_items", cols("id:u day_id:u tso_id:u category:t amount:n description:t from_place:t to_place:t bill_no:t bill_path:t bill_hash:t flags:a created_at:ts"), set()),
     "claim_events": ("kwd_claim_events", cols("id:i day_id:u actor:u event:t amount:n note:t meta:j at:ts"), set()),
     "fr_franchises": ("kwd_fr_franchises", cols("id:u user_id:u business_name:t district_id:i territory:t address:t gstin:t is_active:b created_at:ts"), set()),
+    "fr_product_categories": ("kwd_fr_product_categories", cols("key:t name:t sort:i"), set()),
     "fr_products": ("kwd_fr_products", cols("id:u code:t name:t category:t spec:t unit:t list_price:n hsn_sac:t gst_percent:n needs_install:b is_active:b sort:i"), set()),
     "fr_leads": ("kwd_fr_leads", cols("id:u franchise_id:u customer_name:t customer_type:t contact_person:t phone:t district_id:i place:t address:t product_id:u qty:i "
-                                      "hq_note:t status:t lost_reason:t next_followup_on:d fr_note:t last_update_at:ts assigned_by:u assigned_at:ts created_at:ts"), set()),
+                                      "hq_note:t status:t lost_reason:t next_followup_on:d fr_note:t last_update_at:ts assigned_by:u assigned_at:ts created_at:ts source:t"), set()),
     "fr_lead_events": ("kwd_fr_lead_events", cols("id:i lead_id:u franchise_id:u actor:u from_status:t to_status:t note:t at:ts"), set()),
     "fr_presentations": ("kwd_fr_presentations", cols("id:u franchise_id:u lead_id:u scheduled_at:ts venue_type:t venue_name:t lsgd_name:t district_id:i address:t "
                                                       "contact_person:t phone:t expected_attendees:i product_ids:ua purpose:t status:t reschedule_count:i cancel_reason:t "

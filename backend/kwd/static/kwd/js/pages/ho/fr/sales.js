@@ -3,7 +3,7 @@ import { html, raw, supabase, errText, toast, widget } from '../../../core.js'
 import { Loading, Empty, Icon, PageHead, Stat } from '../../../ui.js'
 import { fmtINR, fmtDate } from '../../../lib.js'
 import { monthStart, monthName, itemsText } from '../../../fr.js'
-import { SalePills, saleSheet } from '../../fr/parts.js?v=20261027-1'
+import { SalePills, saleSheet } from '../../fr/parts.js?v=20261029-1'
 
 const FILTERS = [['all', 'All'], ['flagged', 'Flagged'], ['deliver', 'To deliver'], ['install', 'To install'], ['unpaid', 'Money due'], ['cancelled', 'Cancelled']]
 const test = {

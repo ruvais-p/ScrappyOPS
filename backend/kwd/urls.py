@@ -10,4 +10,5 @@ urlpatterns = [
     path("storage/upload", api.storage_upload),
     path("storage/sign", api.storage_sign),
     path("storage/object", api.storage_object),
+    path("invoice/<uuid:sale_id>.pdf", api.sale_invoice_pdf),
 ]

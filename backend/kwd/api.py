@@ -11,7 +11,7 @@ from core import auth
 from core.api.views import Encoder
 from core.models import ImmutableError
 from core.services.common import ApiError
-from kwd import functions, storage
+from kwd import functions, invoice_pdf, storage
 from kwd.engine import run_query
 from kwd.rules import RULES, days, franchise
 from kwd.scope import HO, KCtx, ZM
@@ -181,4 +181,22 @@ def storage_object(request):
     resp["X-Content-Type-Options"] = "nosniff"
     resp["Content-Security-Policy"] = "default-src 'none'; sandbox"
     resp["Content-Disposition"] = 'inline; filename="photo.jpg"'
+    return resp
+
+
+# ---------------------------------------------------------------------------------------------- invoices
+@guarded
+def sale_invoice_pdf(request, ctx, sale_id):
+    """The tax invoice of one sale as a PDF file. Whoever may see the sale may download its invoice: its franchisee and Head Office."""
+    if request.method != "GET":
+        return err("Use GET", 405)
+    ctx.need_active()
+    sale = run_query(ctx, {"table": "fr_sales", "op": "select", "select": "*", "filters": [["eq", "id", str(sale_id)]], "order": [], "maybe": True}).get("data")
+    if not sale:
+        raise ApiError("Invoice not found", status=404)
+    items, seller, district = invoice_pdf.gather(sale)
+    resp = HttpResponse(invoice_pdf.build(sale, items, seller, district), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="{invoice_pdf.file_name(sale)}"'
+    resp["Cache-Control"] = "no-store"
+    resp["X-Content-Type-Options"] = "nosniff"
     return resp

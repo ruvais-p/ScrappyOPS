@@ -43,7 +43,8 @@ class ImportTests(TestCase):
         cls.src.execute(up)
         cls.src.execute("create schema app")
         for api, (table, _c, _g) in schema.TABLES.items():
-            cls.src.execute(f'create view app."{api}" as select * from "{table}"')
+            if cls.src.execute("select to_regclass(%s)", [table]).fetchone()[0]:           # tables added after the old project do not exist in it
+                cls.src.execute(f'create view app."{api}" as select * from "{table}"')
         cls.src.execute("create schema authx")
         cls.src.execute("create table authx.users (id uuid primary key, email text, encrypted_password text, created_at timestamptz default now(), last_sign_in_at timestamptz)")
         cls.fill()

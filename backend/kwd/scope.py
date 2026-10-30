@@ -139,6 +139,7 @@ class Scope:
             "fr_lead_events": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_leads": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_presentations": lambda: self.fr_can_see(a + ".franchise_id"),
+            "fr_product_categories": lambda: self.role_in(HO, FR),
             "fr_products": lambda: self.role_in(HO, FR),
             "fr_sale_items": lambda: f"exists (select 1 from kwd_fr_sales _s where _s.id = {a}.sale_id and {self.fr_can_see('_s.franchise_id')})",
             "fr_sales": lambda: self.fr_can_see(a + ".franchise_id"),

@@ -337,6 +337,7 @@ td input[type=checkbox],th input[type=checkbox]{width:18px;height:18px;accent-co
       <a href="#requirements" data-view="requirements">HQ requirements <span class="count" id="nav-req"></span></a>
       <a href="#dispatch" data-view="dispatch">Loading for HQ <span class="count" id="nav-dp"></span></a>
       <a href="#prices" data-view="prices" id="nav-prices">Sale prices</a>
+      <a href="#billing" data-view="billing" id="nav-billing">Billing <span class="count" id="nav-bgc"></span></a>
       <a href="#finance" data-view="finance">Finance <span class="count" id="nav-fin"></span></a>
       <button class="navbtn mob-only" data-act="logout" type="button">Log out</button>
     </nav>
@@ -422,7 +423,7 @@ const rpc = (fn, args = {}) => api('/rest/v1/rpc/' + fn, { method: 'POST', body:
 const FAR_PAST = '2026-01-01';
 const S = {
   profile: null, role: '', tol: 2, items: [], profiles: [], loads: [], totals: {}, paid: {}, wmap: {}, reqs: [], rels: [],
-  stock: [], moves: [], routes: [], txns: [], cash: [], pk: {}, dp: [], pv: null, dpf: 'active', dpd: { veh: '', note: '', kg: {}, edit: null },
+  stock: [], moves: [], routes: [], txns: [], cash: [], pk: {}, dp: [], pv: null, dpf: 'active', dpd: { veh: '', note: '', kg: {}, ex: {}, edit: null },
   from: addDays(todayIST(), -6), to: todayIST(), preset: '7', status: 'submitted', sel: null, draft: {}, notes: {},
   rs: 'all', cancel: null, fd: 'all', ft: 'all', rsel: null, feed: [], snap: null, wsOpen: false, lastOk: 0,
   lv: null, lc: { unassigned: 0, failed_recent: 0, open_today: 0 }, lf: { tab: 'assign', driver: '', q: '' }, lsel: [], lsplit: false, lsplitDrv: [], ldrv: ''
@@ -462,7 +463,7 @@ const waitingLoads = () => S.loads.filter(l => l.status === 'submitted');
 /* ---------- data ---------- */
 async function refresh() {
   const to = S.to < todayIST() ? todayIST() : S.to;
-  const [items, profiles, loads, totals, paid, wts, reqs, rels, stock, moves, routes, txns, cash, lcnt, dps, pv] = await Promise.all([
+  const [items, profiles, loads, totals, paid, wts, reqs, rels, stock, moves, routes, txns, cash, lcnt, dps, pv, bgPending, bgInv, bgDetails] = await Promise.all([
     rest('scrap_items?select=id,name&active=eq.true&order=id'),
     rest('profiles?select=id,full_name,role,vehicle_no,territory,active'),
     rest('loads?select=id,code,driver_id,vehicle_no,status,started_at,submitted_at,warehouse_kg,weighed_at,weighing_note,resolved_at,resolved_by,resolution_note&order=id.desc&limit=1000'),
@@ -478,11 +479,15 @@ async function refresh() {
     rest('driver_cash_in_hand?select=*'),
     rpc('wh_lead_counts'),
     rpc('wh_dispatches', { p_limit: 200 }),
-    seesPrice() ? rpc('sup_stock_value') : Promise.resolve(null)
+    seesPrice() ? rpc('sup_stock_value') : Promise.resolve(null),
+    seesPrice() ? rpc('bill_pending_invoices') : Promise.resolve([]),
+    seesPrice() ? rpc('bill_invoices', { p_limit: 200 }) : Promise.resolve([]),
+    seesPrice() ? rpc('bill_details') : Promise.resolve(null)
   ]);
   S.items = items; S.profiles = profiles; S.loads = loads; S.reqs = reqs; S.rels = rels; S.stock = stock; S.moves = moves;
   S.routes = routes; S.txns = txns; S.cash = cash; if (lcnt && lcnt[0]) S.lc = lcnt[0];
   S.dp = dps || []; S.pv = pv;
+  S.bg.pending = bgPending || []; S.bg.inv = bgInv || []; S.bg.details = bgDetails; bgSyncForm();
   S.totals = {}; totals.forEach(t => { (S.totals[t.load_id] = S.totals[t.load_id] || {})[t.item_name] = { kg: num(t.total_kg), value: num(t.total_value) }; });
   S.paid = {}; paid.forEach(b => { S.paid[b.load_id] = (S.paid[b.load_id] || 0) + 1; });
   S.wmap = {}; wts.forEach(w => { (S.wmap[w.load_id] = S.wmap[w.load_id] || {})[w.item_id] = w; });
@@ -854,6 +859,7 @@ const seesPrice = () => S.role === 'supervisor';
 const DPST = { pending: ['Waiting for supervisor', 'b-cash'], finalized: ['✓ Finalized', 'b-ok'], rejected: ['Sent back', 'b-flag'], withdrawn: ['Withdrawn', 'b-sched'] };
 const dpBadge = s => `<span class="badge ${(DPST[s] || ['', 'b-sched'])[1]}">${esc((DPST[s] || [s])[0])}</span>`;
 const dpLines = (d, f) => d.lines.filter(f);
+const dpTotal = D => Object.values(D.kg).concat(Object.values(D.ex)).reduce((a, v) => a + num(v), 0);
 const waitingKg = (itemId, skip) => S.dp.filter(d => d.status === 'pending' && d.id !== skip).reduce((a, d) => a + dpLines(d, x => x.item_id === itemId).reduce((b, x) => b + num(x.kg), 0), 0);
 const waitingReq = (reqId, skip) => S.dp.filter(d => d.status === 'pending' && d.id !== skip).reduce((a, d) => a + dpLines(d, x => x.requirement_id === reqId).reduce((b, x) => b + num(x.kg), 0), 0);
 const dpActive = () => S.dp.filter(d => d.status === 'pending' || d.status === 'rejected');
@@ -871,16 +877,25 @@ function dpComposer() {
     return `<tr><td class="b">${esc(r.item_name)}<br><span class="muted small">${esc(r.code)}</span></td><td class="r">${kg(room)}</td><td class="r ${yard < room ? 'var-bad' : ''}">${kg(yard)}</td>
       <td class="r"><input type="number" min="0" step="0.1" style="width:120px" data-act="dpkg" data-id="${r.id}" aria-label="Kg of ${esc(r.item_name)} loaded" value="${esc(D.kg[r.id] ?? '')}"></td></tr>`;
   }).join('');
-  const total = reqs.reduce((a, r) => a + num(D.kg[r.id]), 0);
+  const total = dpTotal(D);
+  const free = S.items.map(i => {
+    const yard = Math.max(0, stockNow(i.id) - waitingKg(i.id, D.edit));
+    return `<tr><td class="b">${esc(i.name)}</td><td class="r">${kg(yard)}</td>
+      <td class="r"><input type="number" min="0" step="0.1" style="width:120px" data-act="dpex" data-id="${i.id}" aria-label="Kg of ${esc(i.name)} loaded without a request" value="${esc(D.ex[i.id] ?? '')}"></td></tr>`;
+  }).join('');
   return `<section class="card pad" ${editing ? 'style="border:2px solid var(--ox)"' : ''}>
     <div class="row-split" style="flex-wrap:wrap"><h2>${editing ? `Correct ${esc(editing.code)}` : 'Load a vehicle for HQ'}</h2>${editing ? '<button class="linkbtn" data-act="dp-cancel-edit">Stop editing</button>' : ''}</div>
-    <div class="muted">${editing && editing.review_note ? `<b>Supervisor said:</b> ${esc(editing.review_note)}<br>` : ''}Enter the quantity of each material that went on the vehicle, then send it to the supervisor. Nothing leaves the stock until the supervisor finalizes it.</div>
-    ${reqs.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL / REQUEST</th><th class="r">HQ STILL NEEDS</th><th class="r">IN YARD</th><th class="r">KG LOADED</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">HQ has no open requirement. Nothing to load.</div>'}
+    <div class="muted">${editing && editing.review_note ? `<b>Supervisor said:</b> ${esc(editing.review_note)}<br>` : ''}Enter the quantity of each material that went on the vehicle, then send it to the supervisor. Nothing leaves the stock until the supervisor finalizes it. You can load against an HQ request, or load stock HQ has not asked for.</div>
+    <h3 style="margin:14px 0 4px">Requested by HQ</h3>
+    ${reqs.length ? `<div class="scroll"><table style="min-width:560px"><thead><tr><th>MATERIAL / REQUEST</th><th class="r">HQ STILL NEEDS</th><th class="r">IN YARD</th><th class="r">KG LOADED</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="muted small">HQ has no open request right now.</div>'}
+    <h3 style="margin:14px 0 4px">Load without a request</h3>
+    <div class="muted small">Stock HQ has not asked for. It goes to HQ in the same way once the supervisor finalizes it.</div>
+    ${S.items.length ? `<div class="scroll"><table style="min-width:420px"><thead><tr><th>MATERIAL</th><th class="r">IN YARD</th><th class="r">KG LOADED</th></tr></thead><tbody>${free}</tbody></table></div>` : '<div class="empty">No materials.</div>'}
     <div class="inl">
       <div class="fld"><label for="dp-veh">VEHICLE NO.</label><input id="dp-veh" style="width:200px" placeholder="e.g. KL-07-HQ-5566" value="${esc(D.veh)}"></div>
       <div class="fld" style="flex:1 1 200px"><label for="dp-note">NOTE (OPTIONAL)</label><input id="dp-note" value="${esc(D.note)}"></div>
       <div class="fld"><label>TOTAL</label><b id="dp-total" style="padding:10px 0;display:block">${kg(total)} kg</b></div>
-      <button class="btn green" data-act="dp-send" ${reqs.length ? '' : 'disabled'}>${editing ? 'Resend for approval' : 'Send to supervisor for approval'}</button>
+      <button class="btn green" data-act="dp-send">${editing ? 'Resend for approval' : 'Send to supervisor for approval'}</button>
     </div></section>`;
 }
 function dpCard(d) {
@@ -892,7 +907,7 @@ function dpCard(d) {
       const p = fin ? x.price_per_kg : x.expected_price_per_kg, a = fin ? x.amount : x.expected_amount;
       cells = p == null ? '<td class="r var-bad" colspan="2">price not set by HQ</td>' : `<td class="r">${rs2(p)}${fin ? '' : ' <span class="muted small">today</span>'}</td><td class="r b">${rs2(a)}</td>`;
     }
-    return `<tr><td class="b">${esc(x.item_name)}</td><td>${esc(x.requirement_code)}</td><td class="r b">${kg(x.kg)}</td>${cells}</tr>`;
+    return `<tr><td class="b">${esc(x.item_name)}</td><td>${x.requirement_code ? esc(x.requirement_code) : '<span class="muted">No request</span>'}</td><td class="r b">${kg(x.kg)}</td>${cells}</tr>`;
   }).join('');
   const foot = price ? `<tr><td class="b" colspan="2">Total</td><td class="r b">${kg(d.total_kg)}</td><td></td><td class="r b">${d.total_amount == null ? '—' : rs2(d.total_amount)}</td></tr>`
     : `<tr><td class="b" colspan="2">Total</td><td class="r b">${kg(d.total_kg)}</td></tr>`;
@@ -945,6 +960,85 @@ function vPrices() {
     <tbody>${sold.map(d => `<tr><td class="b">${esc(d.code)}</td><td>${dlabel(dayOf(d.reviewed_at))}</td><td>${esc(d.vehicle_no)}</td><td>${d.lines.map(x => `${esc(x.item_name)} ${kg(x.kg)} kg @ ${rs2(x.price_per_kg)}`).join('<br>')}</td><td class="r">${kg(d.total_kg)}</td><td class="r b">${rs2(d.total_amount)}</td></tr>`).join('')}
     <tr><td class="b" colspan="5">Total in range</td><td class="r b">${rs2(sold.reduce((a, d) => a + num(d.total_amount), 0))}</td></tr></tbody></table></div>` : '<div class="empty">Nothing sold to HQ in this range.</div>'}</section>`;
 }
+
+/* ---------- billing: the franchise's invoices to HQ (supervisor only, because invoices carry prices) ---------- */
+S.bg = { details: null, pending: [], inv: [], form: { gstin: '', address: '', phone: '', email: '', state: '' }, dirty: false, cancel: null, pdf: null };
+const bgBadge = v => v.status === 'cancelled' ? '<span class="badge b-flag">Cancelled</span>' : v.payment_status === 'paid' ? '<span class="badge b-ok">✓ Paid by HQ</span>' : '<span class="badge b-cash">Waiting for HQ to pay</span>';
+
+async function downloadInvoice(id) {
+  await ensureFresh();
+  const call = () => fetch(`${SUPABASE_URL}/functions/v1/invoice-pdf`, {
+    method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ invoice_id: id })
+  });
+  let res = await call();
+  if (res.status === 401) { try { await authCall('refresh_token', { refresh_token: session.refresh_token }); res = await call(); } catch (e) {} }
+  if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Could not make the invoice PDF.'); }
+  const m = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') || ''), url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a'); a.href = url; a.download = m ? m[1] : 'invoice.pdf'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function bgSyncForm() {
+  const f = S.bg.details && S.bg.details.franchise;
+  if (!S.bg.dirty && f) S.bg.form = { gstin: f.gstin || '', address: f.address || '', phone: f.phone || '', email: f.email || '', state: f.state || '' };
+}
+function vBilling() {
+  if (!seesPrice()) return '<div class="card pad"><div class="empty">Only the supervisor can make invoices.</div></div>';
+  const G = S.bg, fr = G.details && G.details.franchise, f = G.form, hq = G.details && G.details.company;
+  const live = G.inv.filter(v => v.status === 'issued'), toCollect = live.filter(v => v.payment_status === 'unpaid').reduce((a, v) => a + num(v.total), 0);
+  const C = G.cancel && G.inv.find(v => v.id === G.cancel);
+  const missing = fr && !(fr.address && fr.address.trim());
+  const fld = (k, label, w, area) => `<div class="fld" style="flex:1 1 ${w}"><label for="bg-${k}">${label}</label>${area ? `<textarea id="bg-${k}" data-bgf="${k}" rows="3" style="width:100%;padding:10px 12px;font:inherit;resize:vertical">${esc(f[k])}</textarea>` : `<input id="bg-${k}" data-bgf="${k}" value="${esc(f[k])}">`}</div>`;
+  return `
+  <div><div class="eyebrow">Billing</div><h1>Invoices to HQ.</h1>
+    <div class="muted">When stock is released to HQ, the franchise invoices HQ for it. Make the invoice from the finalized load: the kg and the price per kg come from the load, and GST is added.</div></div>
+  <div class="kpis">
+    <div class="kpi dark"><span class="l">Invoiced to HQ</span><span class="v">${rs2(live.reduce((a, v) => a + num(v.total), 0))}</span><span class="s">${live.length} invoice${live.length === 1 ? '' : 's'}</span></div>
+    <div class="kpi"><span class="l">Waiting for HQ to pay</span><span class="v">${rs2(toCollect)}</span><span class="s">Unpaid invoices</span></div>
+    <div class="kpi"><span class="l">Loads to invoice</span><span class="v" style="color:${G.pending.length ? 'var(--ox)' : 'inherit'}">${G.pending.length}</span><span class="s">Finalized, no invoice yet</span></div>
+  </div>
+  <section class="card pad"><div class="row-split" style="flex-wrap:wrap"><h3>Our billing details</h3><span class="muted small">Shown as the seller on every invoice${fr ? ' · ' + esc(fr.name) : ''}</span></div>
+    ${missing ? '<div class="notice">Add your address (and GSTIN if you have one) so the invoice shows who is selling.</div>' : ''}
+    <div class="inl">${fld('gstin', 'GSTIN (OPTIONAL)', '210px')}${fld('state', 'STATE', '150px')}${fld('phone', 'PHONE', '160px')}${fld('email', 'EMAIL', '210px')}</div>
+    <div class="inl">${fld('address', 'ADDRESS', '420px', true)}<button class="btn" data-act="bg-details-save">Save details</button></div>
+    ${hq ? `<span class="muted small">Invoices are made out to ${esc(hq.company_name)}${hq.gstin ? ' · GSTIN ' + esc(hq.gstin) : ''}.</span>` : ''}</section>
+  <section class="card"><div class="card-h"><h2>Finalized loads waiting for an invoice</h2><span class="muted small">${G.pending.length}</span></div>
+    ${G.pending.length ? `<div class="scroll"><table style="min-width:700px"><thead><tr><th>LOAD</th><th>FINALIZED</th><th>VEHICLE</th><th>MATERIALS</th><th class="r">TAXABLE</th><th class="r">GST</th><th class="r">TOTAL</th><th></th></tr></thead>
+      <tbody>${G.pending.map(x => `<tr><td class="b">${esc(x.code)}</td><td>${dlabel(dayOf(x.finalized_at))}</td><td>${esc(x.vehicle_no)}</td>
+        <td>${x.lines.map(l => `${esc(l.item_name)} ${kg(l.kg)} kg @ ${rs2(l.rate)}${num(l.gst_percent) ? ` + ${num(l.gst_percent)}% GST` : ''}`).join('<br>')}</td>
+        <td class="r">${rs2(x.taxable)}</td><td class="r muted">${rs2(x.gst_amount)}</td><td class="r b">${rs2(x.total)}</td>
+        <td class="r"><button class="btn sm" data-act="bg-create" data-id="${x.id}" data-t="${esc(x.code)}" data-total="${num(x.total)}">Create invoice</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Every finalized load has an invoice.</div>'}</section>
+  ${C ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Cancel ${esc(C.code)}?</h2><button class="linkbtn" data-act="bg-cancel-close">Keep it</button></div>
+    <div class="muted">The load can be invoiced again. The number is not used again.</div>
+    <div class="inl"><div class="fld" style="flex:1 1 260px"><label for="bg-cr">REASON (REQUIRED)</label><input id="bg-cr"></div><button class="btn" data-act="bg-cancel-ok" data-id="${C.id}">Cancel invoice</button></div></section>` : ''}
+  <section class="card"><div class="card-h"><h2>Invoices to HQ</h2><span class="muted small">Latest ${G.inv.length}</span></div>
+    ${G.inv.length ? `<div class="scroll"><table style="min-width:720px"><thead><tr><th>INVOICE</th><th>DATE</th><th>LOAD</th><th class="r">KG</th><th class="r">GST</th><th class="r">TOTAL</th><th>STATUS</th><th></th></tr></thead>
+      <tbody>${G.inv.map(v => `<tr><td class="b">${esc(v.code)}${v.status === 'cancelled' && v.cancel_reason ? `<br><span class="muted small">${esc(v.cancel_reason)}</span>` : ''}</td><td>${dlabel(v.invoice_date)}</td><td>${esc(v.load_code || '—')}</td>
+        <td class="r">${kg(v.total_kg)}</td><td class="r muted">${rs2(v.gst_total)}</td><td class="r b">${rs2(v.total)}</td>
+        <td>${bgBadge(v)}${v.payment_status === 'paid' && v.paid_on ? `<br><span class="muted small">${dlabel(v.paid_on)}${v.payment_ref ? ' · ' + esc(v.payment_ref) : ''}</span>` : ''}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn ghost sm" data-act="bg-pdf" data-id="${v.id}" ${G.pdf === v.id ? 'disabled' : ''}>${G.pdf === v.id ? 'Preparing…' : 'Download PDF'}</button>
+          ${v.status === 'issued' && v.payment_status === 'unpaid' ? ` <button class="btn ghost sm" data-act="bg-cancel-open" data-id="${v.id}">Cancel</button>` : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No invoices yet.</div>'}</section>`;
+}
+async function billingClick(a, b) {
+  const G = S.bg, id = +b.dataset.id;
+  const val = sel => ($(sel) || {}).value || ''
+  if (a === 'bg-details-save') {
+    const f = G.form;
+    const ok = await act(b, () => rpc('set_billing_details', { p_gstin: f.gstin, p_address: f.address, p_phone: f.phone, p_email: f.email, p_state: f.state }), 'Billing details saved.');
+    if (ok) { G.dirty = false; bgSyncForm(); render(); }
+  }
+  if (a === 'bg-create') {
+    if (!confirm(`Create the invoice for ${b.dataset.t}: ${rs2(b.dataset.total)} including GST?\nIt goes to HQ and cannot be edited, only cancelled.`)) return;
+    await act(b, () => rpc('bill_create_purchase_invoice', { p_dispatch_id: id }), r => `Invoice ${r.code} created: ${rs2(r.total)}.`);
+  }
+  if (a === 'bg-pdf') { G.pdf = id; render(); try { await downloadInvoice(id); } catch (e) { toast(e.message, true); } G.pdf = null; render(); }
+  if (a === 'bg-cancel-open') { G.cancel = id; render(); setTimeout(() => $('#bg-cr') && $('#bg-cr').scrollIntoView({ block: 'center' }), 0); }
+  if (a === 'bg-cancel-close') { G.cancel = null; render(); }
+  if (a === 'bg-cancel-ok') {
+    const reason = val('#bg-cr').trim(); if (!reason) { toast('Say why the invoice is cancelled.', true); return; }
+    const ok = await act(b, () => rpc('bill_cancel_invoice', { p_invoice_id: id, p_reason: reason }), c => `${c} cancelled. The load can be invoiced again.`); if (ok) { G.cancel = null; render(); }
+  }
+}
+document.addEventListener('input', e => { const k = e.target.dataset.bgf; if (k) { S.bg.form[k] = e.target.value; S.bg.dirty = true; } });
 
 /* ---------- finance ---------- */
 const routesInRange = () => S.routes.filter(r => inRange(r.route_date) && (S.fd === 'all' || r.driver_id === S.fd));
@@ -1019,12 +1113,13 @@ function settleDetail(r) {
 }
 
 /* ---------- routing and render ---------- */
-const VIEWS = { overview: vOverview, leads: vLeads, reconcile: vReconcile, inventory: vInventory, requirements: vRequirements, dispatch: vDispatch, prices: vPrices, finance: vFinance };
+const VIEWS = { overview: vOverview, leads: vLeads, reconcile: vReconcile, inventory: vInventory, requirements: vRequirements, dispatch: vDispatch, prices: vPrices, billing: vBilling, finance: vFinance };
 const curView = () => VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview';
 function navCounts() {
   const w = waitingLoads().length, r = S.reqs.filter(x => x.status === 'open' || x.status === 'partial').length, f = needsFin();
   $('#nav-wait').textContent = w || ''; $('#nav-req').textContent = r || ''; $('#nav-fin').textContent = f || '';
   { const n = S.dp.filter(d => d.status === (canFinalize() ? 'pending' : 'rejected')).length; $('#nav-dp').textContent = n || ''; $('#nav-prices').style.display = seesPrice() ? '' : 'none'; }
+  { $('#nav-billing').style.display = seesPrice() ? '' : 'none'; $('#nav-bgc').textContent = (seesPrice() && S.bg.pending.length) || ''; }
   { const lc = S.lc || {}; $('#nav-leads').textContent = (num(lc.unassigned) + num(lc.failed_recent)) || ''; }
 }
 function render() {
@@ -1063,7 +1158,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.act === 'w') { const L = S.loads.find(l => l.id === S.sel); (S.draft[L.id] || (S.draft[L.id] = {}))[t.dataset.item] = t.value; updateRows(L); }
   if (t.id === 'note' && S.sel) S.notes[S.sel] = t.value;
-  if (t.dataset.act === 'dpkg') { S.dpd.kg[t.dataset.id] = t.value; const el = $('#dp-total'); if (el) el.textContent = kg(Object.values(S.dpd.kg).reduce((a, v) => a + num(v), 0)) + ' kg'; }
+  if (t.dataset.act === 'dpkg' || t.dataset.act === 'dpex') { S.dpd[t.dataset.act === 'dpkg' ? 'kg' : 'ex'][t.dataset.id] = t.value; const el = $('#dp-total'); if (el) el.textContent = kg(dpTotal(S.dpd)) + ' kg'; }
   if (t.id === 'dp-veh') S.dpd.veh = t.value;
   if (t.id === 'dp-note') S.dpd.note = t.value;
   if (t.dataset.act === 'cnt') {
@@ -1089,6 +1184,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
   const a = b.dataset.act, L = S.loads.find(l => l.id === S.sel), val = id => ($(id) || {}).value || '';
   if (a === 'logout') logout();
+  if (a.startsWith('bg-')) { await billingClick(a, b); return; }
   if (a === 'preset') { const p = b.dataset.p; S.preset = p; S.to = todayIST(); S.from = p === 'today' ? S.to : p === '7' ? addDays(S.to, -6) : p === '30' ? addDays(S.to, -29) : FAR_PAST; try { await refresh(); } catch (err) { toast(err.message, true); } render(); }
   if (a === 'goto') { if (b.dataset.s) S.status = b.dataset.s; if (b.dataset.lt) { S.lf.tab = b.dataset.lt; S.lsel = []; } location.hash = b.dataset.v; render(); }
   if (a === 'pick') { S.sel = +b.dataset.id; render(); }
@@ -1143,23 +1239,25 @@ document.addEventListener('click', async e => {
   }
   if (a === 'dptab') { S.dpf = b.dataset.t; render(); }
   if (a === 'dp-send') {
-    const D = S.dpd, lines = Object.entries(D.kg).map(([id, v]) => ({ requirement_id: +id, kg: Math.round(num(v) * 10) / 10 })).filter(x => x.kg > 0);
+    const D = S.dpd, round1 = v => Math.round(num(v) * 10) / 10;
+    const lines = Object.entries(D.kg).map(([id, v]) => ({ requirement_id: +id, kg: round1(v) })).concat(Object.entries(D.ex).map(([id, v]) => ({ item_id: +id, kg: round1(v) }))).filter(x => x.kg > 0);
     if (!lines.length) { toast('Enter the quantity of at least one material.', true); return; }
     if (!D.veh.trim()) { toast('Enter the vehicle number.', true); return; }
     const ok = await act(b, () => rpc('wh_submit_dispatch', { p_lines: lines, p_vehicle_no: D.veh.trim(), p_note: D.note.trim() || null, p_dispatch_id: D.edit || null }),
       c => `${c} sent to the supervisor for approval.`);
-    if (ok) { S.dpd = { veh: '', note: '', kg: {}, edit: null }; render(); }
+    if (ok) { S.dpd = { veh: '', note: '', kg: {}, ex: {}, edit: null }; render(); }
   }
   if (a === 'dp-edit') {
     const d = S.dp.find(x => x.id === +b.dataset.id); if (!d) return;
-    S.dpd = { veh: d.vehicle_no, note: d.note || '', kg: Object.fromEntries(d.lines.map(x => [x.requirement_id, String(num(x.kg))])), edit: d.id };
+    S.dpd = { veh: d.vehicle_no, note: d.note || '', kg: Object.fromEntries(d.lines.filter(x => x.requirement_id).map(x => [x.requirement_id, String(num(x.kg))])),
+      ex: Object.fromEntries(d.lines.filter(x => !x.requirement_id).map(x => [x.item_id, String(num(x.kg))])), edit: d.id };
     S.dpf = 'active'; render(); window.scrollTo(0, 0);
   }
-  if (a === 'dp-cancel-edit') { S.dpd = { veh: '', note: '', kg: {}, edit: null }; render(); }
+  if (a === 'dp-cancel-edit') { S.dpd = { veh: '', note: '', kg: {}, ex: {}, edit: null }; render(); }
   if (a === 'dp-withdraw') {
     const id = +b.dataset.id; if (!confirm('Withdraw this load? It will not go to HQ.')) return;
     const ok = await act(b, () => rpc('wh_withdraw_dispatch', { p_dispatch_id: id, p_note: null }), c => `${c} withdrawn.`);
-    if (ok && S.dpd.edit === id) S.dpd = { veh: '', note: '', kg: {}, edit: null };
+    if (ok && S.dpd.edit === id) S.dpd = { veh: '', note: '', kg: {}, ex: {}, edit: null };
   }
   if (a === 'dp-finalize' || a === 'dp-reject') {
     const id = +b.dataset.id, n = val('#dpn-' + id).trim(), fin = a === 'dp-finalize';
@@ -1260,7 +1358,7 @@ async function start() {
 }
 
 /* ---------- look and feel: icons, screen-change animation, busy bar ---------- */
-const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>","dispatch":"<rect x=\"2\" y=\"7\" width=\"12\" height=\"9\" rx=\"1.5\"/><path d=\"M14 10h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"18\" r=\"1.8\"/><circle cx=\"17\" cy=\"18\" r=\"1.8\"/>","prices":"<path d=\"M6 5h12M6 9h12M9 5c5 0 5 7 0 7H6l7 7\"/>"};
+const NAV_ICONS = {"overview":"<rect x=\"3\" y=\"3\" width=\"7.5\" height=\"9\" rx=\"1.5\"/><rect x=\"13.5\" y=\"3\" width=\"7.5\" height=\"5.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"11.5\" width=\"7.5\" height=\"9.5\" rx=\"1.5\"/><rect x=\"3\" y=\"15\" width=\"7.5\" height=\"6\" rx=\"1.5\"/>","reconcile":"<path d=\"M12 3v18M5 7h14M5 7l-2.5 7a3 3 0 0 0 5 0L5 7zM19 7l-2.5 7a3 3 0 0 0 5 0L19 7z\"/>","inventory":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","requirements":"<path d=\"M8 3h8l1.5 2H20a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2.5z\"/><path d=\"M8 12l2.5 2.5L16 9\"/>","finance":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","franchises":"<path d=\"M3 10l1.5-5h15L21 10M3 10h18M3 10v10h18V10\"/><path d=\"M9 20v-6h6v6\"/>","leads":"<path d=\"M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z\"/><circle cx=\"12\" cy=\"9.5\" r=\"2.5\"/>","pickups":"<path d=\"M6 3h12l2 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7z\"/><path d=\"M4 7h16M9 11a3 3 0 0 0 6 0\"/>","loads":"<path d=\"M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"17.5\" r=\"1.8\"/><circle cx=\"17\" cy=\"17.5\" r=\"1.8\"/>","stock":"<path d=\"M12 2.5 3.5 7v10L12 21.5 20.5 17V7z\"/><path d=\"M3.5 7 12 11.5 20.5 7M12 11.5v10\"/>","cash":"<path d=\"M3 7.5A2.5 2.5 0 0 1 5.5 5H18v3\"/><path d=\"M3 7.5V18a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5.5A2.5 2.5 0 0 1 3 7.5z\"/><circle cx=\"16.5\" cy=\"14.5\" r=\"1\"/>","team":"<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3 20a6 6 0 0 1 12 0M16 4.8a3.2 3.2 0 0 1 0 6.4M18 14.5a6 6 0 0 1 3 5.5\"/>","rates":"<path d=\"M3 12V4h8l10 10-8 8z\"/><circle cx=\"7.5\" cy=\"8.5\" r=\"1.3\"/>","activity":"<path d=\"M3 12h4l3-8 4 16 3-8h4\"/>","dispatch":"<rect x=\"2\" y=\"7\" width=\"12\" height=\"9\" rx=\"1.5\"/><path d=\"M14 10h4l3 3v3h-7z\"/><circle cx=\"7\" cy=\"18\" r=\"1.8\"/><circle cx=\"17\" cy=\"18\" r=\"1.8\"/>","prices":"<path d=\"M6 5h12M6 9h12M9 5c5 0 5 7 0 7H6l7 7\"/>","billing":"<path d=\"M6 3h12v18l-3-2-3 2-3-2-3 2z\"/><path d=\"M9 8h6M9 12h6\"/>"};
 document.querySelectorAll('nav a[data-view]').forEach(a => { const d = NAV_ICONS[a.dataset.view]; if (d) a.insertAdjacentHTML('afterbegin', '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>'); });
 function busyBar(on) { const b = document.getElementById('topbar'); if (!b) return; b.classList.remove('on'); if (on) { void b.offsetWidth; b.classList.add('on'); } }
 function shake() { const f = document.getElementById('login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
