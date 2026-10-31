@@ -937,8 +937,6 @@ $('#login-form').addEventListener('submit', async e => {
 function logoutLocal(msg) {
   if (session) fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
   session = null; store(SESSION_KEY, undefined); lastKey = null;
-  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
-  $('#login-err').textContent = msg || '';
 }
 async function start() {
   $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
@@ -974,8 +972,9 @@ setInterval(checkSession, 20000);
 document.addEventListener('visibilitychange', checkSession);
 /* lets the phone install this page as an app (full screen, no address bar) */
 if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
-function logout(msg) { logoutLocal(msg); location.replace('../' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+function logout(msg) { logoutLocal(msg); location.replace('/logout/' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
 session && session.access_token ? start() : logout();
 </script>
+<script src="../account-password.js?v=20261031-2"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ services:
 
   web:
     build: .
+    entrypoint: ["sh", "deploy/entrypoint.sh"]
     environment:
       DJANGO_DEBUG: "1"
       DATABASE_URL: postgresql://scrappy:scrappy-local-only@db:5432/scrappy
@@ -27,6 +28,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
+      - .:/app:ro
       - ../dashboards:/source:ro
     command: >-
       sh -c "python tools/point_frontend.py /source /tmp/scrappy-site && python manage.py seed_demo

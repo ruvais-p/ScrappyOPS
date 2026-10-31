@@ -14,7 +14,8 @@ export function TopBar({ profile, label, onSwitch }) {
     <div class="who">
       <span class="hide-sm">${profile.full_name}</span>
       ${onSwitch ? html`<button class="icon-btn" data-nav="switch" aria-label="Switch module" title="Switch module">${Icon('swap')}</button>` : ''}
-      <button class="icon-btn" data-nav="signout" aria-label="Sign out" title="Sign out">${Icon('logout')}</button>
+      <button class="icon-btn" data-change-password aria-label="Change password" title="Change password">${Icon('key', 20)}</button>
+      <button class="icon-btn" data-nav="signout" data-password-native aria-label="Sign out" title="Sign out">${Icon('logout')}</button>
     </div>
   </header>`
 }
@@ -44,7 +45,8 @@ export function SideNav({ brand, groups, active, counts = {}, profile, roleLabel
     <div class="me">
       ${Avatar(profile.full_name, 34)}
       <div><b>${profile.full_name}</b><small>${roleLabel}</small></div>
-      <button class="icon-btn" data-nav="signout" aria-label="Sign out" title="Sign out">${Icon('logout', 18)}</button>
+      <button class="icon-btn" data-change-password aria-label="Change password" title="Change password">${Icon('key', 18)}</button>
+      <button class="icon-btn" data-nav="signout" data-password-native aria-label="Sign out" title="Sign out">${Icon('logout', 18)}</button>
     </div>
   </nav>`
 }

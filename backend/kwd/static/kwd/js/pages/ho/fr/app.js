@@ -1,7 +1,7 @@
 /* Head Office's franchise module: its own shell around the franchise screens. */
 import { supabase, Screen, patch, errText, endSession } from '../../../core.js'
 import { Loading } from '../../../ui.js'
-import { TopBar, TabBar, SideNav, Blocked } from '../../../shell.js'
+import { TopBar, TabBar, SideNav, Blocked } from '../../../shell.js?v=20261031-2'
 import { loadProducts, loadDistricts } from '../../../fr.js'
 
 const TABS = [

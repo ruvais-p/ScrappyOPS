@@ -106,6 +106,8 @@ def logout(request):
 
 
 def user_info(request):
+    if request.method not in ("GET", "PUT", "PATCH"):
+        return jr({"msg": "Use GET, PUT, or PATCH"}, 405)
     try:
         ctx = auth.context_from_request(request)
     except auth.AuthError as e:
@@ -115,6 +117,33 @@ def user_info(request):
     u = User.objects.filter(pk=ctx.uid).first()
     if u is None:
         return jr({"code": 403, "error_code": "user_not_found", "msg": "User not found"}, 403)
+    if request.method in ("PUT", "PATCH"):
+        try:
+            data = body_json(request)
+            if not isinstance(data, dict):
+                raise ApiError("The request body must be a JSON object.")
+            current = data.get("current_password")
+            password = data.get("password")
+            if not isinstance(current, str) or not current:
+                raise ApiError("Enter your current password.")
+            if not u.check_password(current):
+                raise ApiError("Your current password is incorrect.", status=403, code="invalid_credentials")
+            if not isinstance(password, str) or not 8 <= len(password) <= 72:
+                raise ApiError("Your new password must be 8 to 72 characters.")
+            if password == current:
+                raise ApiError("Choose a new password that is different from your current password.")
+            with transaction.atomic():
+                locked = User.objects.select_for_update().get(pk=u.pk)
+                # Check again under the row lock in case two password changes raced.
+                if not locked.check_password(current):
+                    raise ApiError("Your current password is incorrect.", status=403, code="invalid_credentials")
+                locked.set_password(password)
+                locked.save(update_fields=["password"])
+                # Keep this browser signed in, but invalidate any other open sessions.
+                AuthSession.objects.filter(user=locked).exclude(pk=ctx.session_id).delete()
+            u = locked
+        except ApiError as e:
+            return err(e.message, e.status, e.code, e.details, e.hint)
     return jr({"id": str(u.pk), "aud": "authenticated", "role": "authenticated", "email": u.email,
                "created_at": u.created_at, "last_sign_in_at": u.last_login})
 
