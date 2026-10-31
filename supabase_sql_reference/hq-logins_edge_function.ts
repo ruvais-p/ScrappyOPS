@@ -42,12 +42,12 @@ Deno.serve(async (req) => {
     if (!token) return json({ error: "Please log in again." }, 401);
     const admin = createClient(SB_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    // 1. who is calling? must be an active HQ login
+    // 1. who is calling? must be an active HQ or Super Admin login
     const { data: who } = await admin.auth.getUser(token);
     const uid = who?.user?.id ?? "";
     if (!uid) return json({ error: "Please log in again." }, 401);
     const { data: me } = await admin.from("profiles").select("role, active").eq("id", uid).maybeSingle();
-    if (!me || !me.active || me.role !== "hq") return json({ error: "Only HQ can create logins." }, 403);
+    if (!me || !me.active || !["hq", "super_admin"].includes(me.role)) return json({ error: "Only HQ or Super Admin can manage logins." }, 403);
 
     const body = await req.json().catch(() => ({}));
     const action = body.action ?? "create";
@@ -56,9 +56,11 @@ Deno.serve(async (req) => {
     if (action === "reset_password") {
       const target = String(body.user_id ?? "");
       if (!UUID.test(target)) return json({ error: "Choose a person." }, 400);
-      const { data: prof } = await admin.from("profiles").select("full_name, role, franchise_id").eq("id", target).maybeSingle();
+      const { data: opsProf } = await admin.from("profiles").select("full_name, role, franchise_id").eq("id", target).maybeSingle();
+      const { data: kwdProf } = opsProf ? { data: null } : await admin.from("kwd_profiles").select("full_name, role").eq("id", target).maybeSingle();
+      const prof = opsProf || (kwdProf ? { ...kwdProf, franchise_id: null } : null);
       if (!prof) return json({ error: "Person not found." }, 404);
-      if (prof.role === "hq") return json({ error: "HQ passwords cannot be reset from here." }, 403);
+      if (opsProf && (prof.role === "super_admin" || (prof.role === "hq" && me.role !== "super_admin"))) return json({ error: "This privileged login cannot be reset from here." }, 403);
       const { data: tu } = await admin.auth.admin.getUserById(target);
       const email = tu?.user?.email ?? "";
       let password = String(body.password ?? "");
@@ -75,6 +77,7 @@ Deno.serve(async (req) => {
     }
 
     if (action !== "create") return json({ error: "Unknown action." }, 400);
+    if (me.role === "super_admin") return json({ error: "Super Admin can manage existing members but cannot create operational logins here." }, 403);
 
     // 2b. create logins for a franchise
     const fid = Number(body.franchise_id);

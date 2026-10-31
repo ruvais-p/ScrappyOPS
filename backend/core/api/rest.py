@@ -32,7 +32,7 @@ TABLES = {
     "profiles": (cols("id:u full_name:t phone:t role:t territory:t vehicle_no:t active:b is_super_admin:b created_at:ts franchise_id:i"),
                  "(id = %(s_uid)s::uuid or %(s_role)s = 'hq' or (%(s_role)s in ('warehouse','supervisor') and (role = 'hq' or franchise_id = %(s_fr)s::integer)))"),
     "franchises": (cols("id:i code:t name:t district:t constituency:t active:b created_at:ts"),
-                   "(%(s_role)s = 'hq' or id = %(s_fr)s::integer)"),
+                   "(%(s_role)s in ('hq','super_admin') or id = %(s_fr)s::integer)"),
     "scrap_items": (cols("id:i name:t active:b"), ANY_LOGIN),
     "rates": (cols("id:i item_id:i rate_per_kg:n effective_from:ts set_by:u"), ANY_LOGIN),
     "current_rates": (cols("item_id:i item_name:t rate_per_kg:n effective_from:ts"), ANY_LOGIN),

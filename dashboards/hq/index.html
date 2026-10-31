@@ -162,6 +162,13 @@ tr.pickrow.on{background:var(--ox-t);box-shadow:inset 4px 0 0 var(--ox)}
 .super-admin-mode .card{border-radius:16px;box-shadow:0 8px 20px -16px rgba(42,36,38,.42)}
 .super-admin-mode .card-h{padding:17px 20px}
 .super-admin-mode .card-h h2{font-size:18px}
+.team-table{table-layout:auto}
+.team-table .actions{width:1%;white-space:nowrap;text-align:right}
+.reset-panel{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;padding:4px 0}
+.reset-panel input{padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;flex:1 1 260px;max-width:420px;min-width:0;font-family:monospace;font-size:14px;background:#fff}
+.reset-panel .help{flex:1 1 100%;text-align:right}
+.reset-row td{background:var(--ox-t);border-top:1px solid #efd3d0;padding-top:12px;padding-bottom:12px}
+@media(max-width:720px){.reset-panel{justify-content:stretch}.reset-panel input{max-width:none;flex-basis:100%}.reset-panel .btn,.reset-panel .linkbtn{flex:1}.reset-panel .help{text-align:left}}
 .dz{border:2px dashed var(--line);background:var(--pearl);padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
 .row-kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--paper)}
 .fr-pick{display:flex;flex-direction:column;gap:5px}
@@ -348,6 +355,7 @@ tr.pickrow{transition:background .15s,box-shadow .2s}
       <a href="#sa-inventory" data-view="sa-inventory" data-sa-nav class="hidden">Inventory</a>
       <a href="#sa-pipeline" data-view="sa-pipeline" data-sa-nav class="hidden">Sales pipeline</a>
       <a href="#sa-expenses" data-view="sa-expenses" data-sa-nav class="hidden">TA / DA</a>
+      <a href="#team" data-view="team" data-sa-nav class="hidden">Team</a>
       <a href="#franchises" data-view="franchises">Franchises</a>
       <a href="#leads" data-view="leads">Leads <span class="count" id="nav-leads"></span></a>
       <a href="#pickups" data-view="pickups">Pickups and bills</a>
@@ -489,7 +497,7 @@ const S = {
 };
 const itemName = id => (S.items.find(i => i.id === id) || S.allItems.find(i => i.id === id) || {}).name || '';
 const personName = id => { const p = S.team.find(x => x.id === id); return p ? p.full_name : '—'; };
-const drivers = () => S.team.filter(p => p.role === 'driver' && (!S.fr || p.franchise_id === S.fr));
+const drivers = () => S.team.filter(p => p.source !== 'kwd' && p.role === 'driver' && (!S.fr || p.franchise_id === S.fr));
 const allDrivers = () => S.team.filter(p => p.role === 'driver');
 const rangeArgs = () => ({ p_from: S.from, p_to: S.to, p_franchise: S.fr || null });
 const frById = id => S.franchises.find(f => f.id === id);
@@ -498,7 +506,7 @@ const frName = id => (frById(id) || {}).name || '';
 const scopeLabel = () => S.fr ? frName(S.fr) + ' (' + frCode(S.fr) + ')' : 'All franchises';
 const frq = () => S.fr ? '&franchise_id=eq.' + S.fr : '';
 const frTag = code => code ? `<span class="frcode">${esc(code)}</span>` : '';
-const curView = () => S.profile && S.profile.role === 'super_admin' ? (VIEWS[location.hash.slice(1)] && location.hash.slice(1).startsWith('sa-') || location.hash === '#business' ? location.hash.slice(1) : 'business') : (VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
+const curView = () => S.profile && S.profile.role === 'super_admin' ? (VIEWS[location.hash.slice(1)] && (location.hash.slice(1).startsWith('sa-') || ['business', 'team'].includes(location.hash.slice(1))) ? location.hash.slice(1) : 'business') : (VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : 'overview');
 
 /* ---------- data: the base is always loaded; each screen loads what it needs ---------- */
 async function loadBase() {
@@ -568,7 +576,10 @@ const LOAD = {
 };
 async function refresh() {
   if (S.profile && S.profile.role === 'super_admin') {
-    await LOAD.business();
+    if (curView() === 'team') {
+      const [fr, team] = await Promise.all([rest('franchises?select=id,code,name,district,constituency,active&order=code'), rpc('hq_team', {})]);
+      S.franchises = fr; S.team = team; S.score = [];
+    } else await LOAD.business();
   } else {
     await Promise.all([loadBase(), LOAD[curView()]()]);
     diffOv();
@@ -680,7 +691,7 @@ function vOverview() {
 }
 
 /* reset a password: type the new one, or leave it empty and one is made */
-const resetBox = id => `<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end"><input id="rp-pw" type="text" autocomplete="off" spellcheck="false" maxlength="72" placeholder="Type the new password (8+ characters)" style="padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;min-width:230px;font-family:monospace;font-size:14px" aria-label="New password"><button class="btn sm" data-act="person-reset" data-id="${id}">Set password</button><button class="linkbtn" data-act="person-reset-cancel">Cancel</button><span class="muted small" style="flex:1 1 100%;text-align:right">Leave it empty and a random password is made for you. Any open login of this person is signed out.</span></span>`;
+const resetBox = id => `<div class="reset-panel"><input id="rp-pw" type="text" autocomplete="off" spellcheck="false" maxlength="72" placeholder="Type a new password (8+ characters)" aria-label="New password"><button class="btn sm" data-act="person-reset" data-id="${id}">Set password</button><button class="linkbtn" data-act="person-reset-cancel">Cancel</button><span class="muted small help">Leave blank to generate a secure password. All open sessions for this person will be signed out.</span></div>`;
 /* ---------- logins just created: shown once, never stored ---------- */
 const ROLE_LOGIN = { driver: 'Collector', warehouse: 'Warehouse manager', supervisor: 'Supervisor' };
 const loginUrl = role => role === 'driver' ? COLLECTOR_URL : WAREHOUSE_URL;
@@ -1088,41 +1099,47 @@ function routeDetail(r) {
 
 /* ---------- team ---------- */
 function vTeam() {
+  const isSuperAdmin = S.profile && S.profile.role === 'super_admin';
   const sc = {}; S.score.forEach(s => { sc[s.driver_id] = s; });
   const ROLE = { hq: 'HQ', supervisor: 'Supervisor', warehouse: 'Warehouse manager', driver: 'Collector' };
+  const KWD_ROLE = { head_office: 'Head Office', zonal_manager: 'Zonal Manager', tso: 'Territory Sales Officer', franchisee: 'Franchise member' };
   const E = S.editPerson && S.team.find(p => p.id === S.editPerson);
-  const staff = S.team.filter(p => p.role !== 'driver' && (p.role === 'hq' || !S.fr || p.franchise_id === S.fr));
+  const staff = S.team.filter(p => p.source !== 'kwd' && p.role !== 'driver' && (p.role === 'hq' || !S.fr || p.franchise_id === S.fr));
+  const kwd = S.team.filter(p => p.source === 'kwd');
   const frOpts = v => selectOptions(S.franchises.filter(f => f.active || f.id === v).map(f => [f.id, f.code + ' · ' + f.name]), v);
   const cols = S.fr ? 11 : 12;
   return `
-  ${credsSheet()}<div class="head"><div><div class="eyebrow">Team</div><h1>Drivers and staff.</h1>
-    <div class="muted">Performance for the dates below. Add people, edit their details, move them to another franchise, or switch a login off.</div></div>
-    <button class="btn" data-act="person-add-toggle">${S.personAdd ? 'Close' : 'Add a person'}</button></div>
-  ${S.personAdd ? `<section class="card pad" style="border:2px solid var(--ox)"><h3>Add a person</h3>
+  ${credsSheet()}<div class="head"><div><div class="eyebrow">Team</div><h1>Company members.</h1>
+    <div class="muted">View contact details, reset passwords, and set each member's status to active or suspended.</div></div>
+    ${isSuperAdmin ? '' : `<button class="btn" data-act="person-add-toggle">${S.personAdd ? 'Close' : 'Add a person'}</button>`}</div>
+  ${!isSuperAdmin && S.personAdd ? `<section class="card pad" style="border:2px solid var(--ox)"><h3>Add a person</h3>
     <span class="muted">A login is created for the person. A password is generated and shown once after you save, or type your own (8 or more characters).</span>
     <div class="inl"><div class="fld"><label for="pa-e">LOGIN EMAIL</label><input id="pa-e" type="email" style="min-width:220px"></div><div class="fld"><label for="pa-n">NAME</label><input id="pa-n"></div>
     <div class="fld"><label for="pa-r">ROLE</label><select id="pa-r"><option value="driver">Collector (driver)</option><option value="warehouse">Warehouse manager</option><option value="supervisor">Supervisor</option></select></div>
     <div class="fld"><label for="pa-f">FRANCHISE</label><select id="pa-f">${S.fr ? '' : '<option value="">Choose…</option>'}${S.franchises.filter(f => f.active).map(f => `<option value="${f.id}" ${f.id === S.fr ? 'selected' : ''}>${esc(f.code)} · ${esc(f.name)}</option>`).join('')}</select></div></div>
     <div class="inl"><div class="fld"><label for="pa-p">PHONE</label><input id="pa-p"></div><div class="fld"><label for="pa-t">AREA (OPTIONAL)</label><input id="pa-t"></div><div class="fld"><label for="pa-v">VEHICLE NO. (COLLECTORS)</label><input id="pa-v"></div><div class="fld"><label for="pa-pw">PASSWORD (OPTIONAL)</label><input id="pa-pw" type="password" autocomplete="new-password" placeholder="blank = generate" style="width:170px"></div>
     <button class="btn green" data-act="person-add-ok">Add person</button></div></section>` : ''}
-  ${filterBar()}
+  ${isSuperAdmin ? '' : filterBar()}
   <section class="card"><div class="card-h"><h2>Drivers</h2><span class="muted small">${drivers().length}</span></div>
-    <div class="scroll"><table style="min-width:960px"><thead><tr><th>DRIVER</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>VEHICLE · AREA</th><th class="r">LEADS</th><th class="r">PICKUPS</th><th class="r">KG</th><th class="r">PAID OUT</th><th class="r">MIN / PICKUP</th><th class="r">WEIGH DIFF</th><th class="r">CASH SHORT</th><th class="r">CASH IN HAND</th><th></th></tr></thead>
+    <div class="scroll"><table class="team-table" style="min-width:1040px"><thead><tr><th>DRIVER</th><th>PHONE</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>VEHICLE · AREA</th><th class="r">LEADS</th><th class="r">PICKUPS</th><th class="r">KG</th><th class="r">PAID OUT</th><th class="r">MIN / PICKUP</th><th class="r">WEIGH DIFF</th><th class="r">CASH SHORT</th><th class="r">CASH IN HAND</th><th></th></tr></thead>
     <tbody>${drivers().map(d => { const s = sc[d.id] || {};
-      return `<tr style="${d.active ? '' : 'opacity:.55'}"><td class="b">${esc(d.full_name)}${d.active ? '' : ' <span class="badge b-flag">off</span>'}<br><span class="muted small">${esc(d.email || '')}</span></td>${!S.fr ? `<td>${frTag(d.franchise_code)}</td>` : ''}<td>${esc(d.vehicle_no || '—')}<br><span class="muted small">${esc(d.territory || '')}</span></td>
+      return `<tr style="${d.active ? '' : 'opacity:.55'}"><td class="b">${esc(d.full_name)}${d.active ? '' : ' <span class="badge b-flag">Suspended</span>'}<br><span class="muted small">${esc(d.email || '')}</span></td><td>${esc(d.phone || '—')}</td>${!S.fr ? `<td>${frTag(d.franchise_code)}</td>` : ''}<td>${esc(d.vehicle_no || '—')}<br><span class="muted small">${esc(d.territory || '')}</span></td>
       <td class="r">${s.leads_assigned ?? 0}</td><td class="r">${s.pickups ?? 0}</td><td class="r">${kg(s.kg)}</td><td class="r">${rs(s.amount)}</td><td class="r">${s.avg_minutes == null ? '—' : num(s.avg_minutes).toFixed(0)}</td>
       <td class="r b" style="color:${s.variance_pct != null && Math.abs(num(s.variance_pct)) > 2 ? 'var(--ox)' : 'inherit'}">${s.variance_pct == null ? '—' : pct(s.variance_pct)}</td><td class="r ${num(s.cash_short) ? 'var-bad' : ''}" style="${num(s.cash_short) ? 'color:var(--ox);font-weight:700' : ''}">${num(s.cash_short) ? rs(s.cash_short) : '—'}</td><td class="r b">${rs(d.cash_in_hand)}</td>
-      <td class="r" style="white-space:nowrap">${S.resetAsk === d.id ? `${resetBox(d.id)}` : `<button class="btn ghost sm" data-act="person-reset-ask" data-id="${d.id}">Reset password</button> <button class="btn ghost sm" data-act="person-edit" data-id="${d.id}">Edit</button>`}</td></tr>`; }).join('') || `<tr><td colspan="${cols}" class="empty">No drivers.</td></tr>`}</tbody></table></div></section>
+      <td class="actions"><button class="btn ghost sm" data-act="person-reset-ask" data-id="${d.id}">Reset password</button> <button class="btn ghost sm" data-act="person-edit" data-id="${d.id}">Edit</button></td></tr>${S.resetAsk === d.id ? `<tr class="reset-row"><td colspan="${cols + 1}">${resetBox(d.id)}</td></tr>` : ''}`; }).join('') || `<tr><td colspan="${cols + 1}" class="empty">No drivers.</td></tr>`}</tbody></table></div></section>
   <section class="card"><div class="card-h"><h2>Warehouse, supervisor and HQ logins</h2></div>
-    <div class="scroll"><table style="min-width:620px"><thead><tr><th>NAME</th><th>ROLE</th><th>FRANCHISE</th><th>EMAIL</th><th>STATUS</th><th></th></tr></thead>
-    <tbody>${staff.map(p => `<tr><td class="b">${esc(p.full_name)}</td><td>${esc(ROLE[p.role] || p.role)}</td><td>${p.role === 'hq' ? '<span class="muted small">All</span>' : frTag(p.franchise_code)}</td><td>${esc(p.email || '')}</td><td>${p.active ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-flag">Off</span>'}</td><td class="r" style="white-space:nowrap">${p.role === 'hq' ? '' : S.resetAsk === p.id ? `${resetBox(p.id)} ` : `<button class="btn ghost sm" data-act="person-reset-ask" data-id="${p.id}">Reset password</button> `}<button class="btn ghost sm" data-act="person-edit" data-id="${p.id}">Edit</button></td></tr>`).join('')}</tbody></table></div></section>
+    <div class="scroll"><table class="team-table" style="min-width:720px"><thead><tr><th>NAME</th><th>ROLE</th><th>FRANCHISE</th><th>EMAIL</th><th>PHONE</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${staff.map(p => `<tr><td class="b">${esc(p.full_name)}</td><td>${esc(ROLE[p.role] || p.role)}</td><td>${p.role === 'hq' ? '<span class="muted small">All</span>' : frTag(p.franchise_code)}</td><td>${esc(p.email || '')}</td><td>${esc(p.phone || '—')}</td><td>${p.active ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-flag">Suspended</span>'}</td><td class="actions">${p.role === 'hq' && !isSuperAdmin ? '' : `<button class="btn ghost sm" data-act="person-reset-ask" data-id="${p.id}">Reset password</button> `}<button class="btn ghost sm" data-act="person-edit" data-id="${p.id}">Edit</button></td></tr>${S.resetAsk === p.id ? `<tr class="reset-row"><td colspan="7">${resetBox(p.id)}</td></tr>` : ''}`).join('')}</tbody></table></div></section>
+  ${isSuperAdmin ? `<section class="card"><div class="card-h"><h2>KWD franchise members and field team</h2><span class="muted small">${kwd.length} members</span></div>
+    <div class="scroll"><table class="team-table" style="min-width:820px"><thead><tr><th>NAME</th><th>ROLE</th><th>BUSINESS / AREA</th><th>EMAIL</th><th>PHONE</th><th>STATUS</th><th></th></tr></thead>
+    <tbody>${kwd.map(p => `<tr><td class="b">${esc(p.full_name)}</td><td>${esc(KWD_ROLE[p.role] || p.role)}</td><td>${esc(p.business_name || p.territory || '—')}${p.business_name && p.territory ? `<br><span class="muted small">${esc(p.territory)}</span>` : ''}</td><td>${esc(p.email || '')}</td><td>${esc(p.phone || '—')}</td><td>${p.active ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-flag">Suspended</span>'}</td><td class="actions"><button class="btn ghost sm" data-act="person-reset-ask" data-id="${p.id}">Reset password</button> <button class="btn ghost sm" data-act="person-edit" data-id="${p.id}">Edit</button></td></tr>${S.resetAsk === p.id ? `<tr class="reset-row"><td colspan="7">${resetBox(p.id)}</td></tr>` : ''}`).join('') || '<tr><td colspan="7" class="empty">No KWD members found.</td></tr>'}</tbody></table></div></section>` : ''}
   ${E ? `<section class="card pad" style="border:2px solid var(--ox)"><div class="row-split" style="flex-wrap:wrap"><h2>Edit ${esc(E.full_name)}</h2><button class="linkbtn" data-act="person-close">Close</button></div>
     <div class="inl"><div class="fld"><label for="pe-n">NAME</label><input id="pe-n" value="${esc(E.full_name)}"></div><div class="fld"><label for="pe-p">PHONE</label><input id="pe-p" value="${esc(E.phone || '')}"></div>
-    <div class="fld"><label for="pe-t">AREA</label><input id="pe-t" value="${esc(E.territory || '')}"></div><div class="fld"><label for="pe-v">VEHICLE NO.</label><input id="pe-v" value="${esc(E.vehicle_no || '')}"></div>
-    ${E.role === 'hq' ? '' : `<div class="fld"><label for="pe-f">FRANCHISE</label><select id="pe-f">${frOpts(E.franchise_id)}</select></div>`}
-    <div class="fld"><label for="pe-a">LOGIN</label><select id="pe-a"><option value="1" ${E.active ? 'selected' : ''}>Active</option><option value="0" ${E.active ? '' : 'selected'}>Off (cannot log in to work)</option></select></div>
+    ${E.source === 'kwd' ? '' : `<div class="fld"><label for="pe-t">AREA</label><input id="pe-t" value="${esc(E.territory || '')}"></div><div class="fld"><label for="pe-v">VEHICLE NO.</label><input id="pe-v" value="${esc(E.vehicle_no || '')}"></div>`}
+    ${E.source === 'kwd' || E.role === 'hq' ? '' : `<div class="fld"><label for="pe-f">FRANCHISE</label><select id="pe-f">${frOpts(E.franchise_id)}</select></div>`}
+    <div class="fld"><label for="pe-a">STATUS</label><select id="pe-a"><option value="1" ${E.active ? 'selected' : ''}>Active</option><option value="0" ${E.active ? '' : 'selected'}>Suspended (cannot log in)</option></select></div>
     <button class="btn green" data-act="person-save" data-id="${E.id}">Save</button></div>
-    <span class="muted small">A driver can only be switched off or moved to another franchise when they have no route on the road, no open leads and no cash in hand. Role and email cannot be changed here.</span></section>` : ''}`;
+    <span class="muted small">${E.source === 'kwd' ? 'Role, business assignment and email are managed in the KWD module.' : 'A driver can only be suspended or moved when they have no route on the road, no open leads and no cash in hand. Role and email cannot be changed here.'}</span></section>` : ''}`;
 }
 
 /* ---------- rates ---------- */
@@ -1694,7 +1711,7 @@ document.addEventListener('click', async e => {
   /* team and rates */
   if (a === 'person-edit') { S.editPerson = b.dataset.id; render(); setTimeout(() => $('#pe-n') && $('#pe-n').scrollIntoView({ block: 'center' }), 0); }
   if (a === 'person-close') { S.editPerson = null; render(); }
-  if (a === 'person-save') { const ok = await act(b, () => rpc('hq_update_profile', { p_id: b.dataset.id, p_full_name: val('#pe-n'), p_phone: val('#pe-p'), p_territory: val('#pe-t'), p_vehicle_no: val('#pe-v'), p_active: val('#pe-a') === '1', p_franchise: $('#pe-f') ? +val('#pe-f') : null }), n => `${n} updated.`); if (ok) { S.editPerson = null; render(); } }
+  if (a === 'person-save') { const p = S.team.find(x => x.id === b.dataset.id); const fn = p && p.source === 'kwd' ? 'hq_update_kwd_profile' : 'hq_update_profile'; const args = p && p.source === 'kwd' ? { p_id: b.dataset.id, p_full_name: val('#pe-n'), p_phone: val('#pe-p'), p_active: val('#pe-a') === '1' } : { p_id: b.dataset.id, p_full_name: val('#pe-n'), p_phone: val('#pe-p'), p_territory: val('#pe-t'), p_vehicle_no: val('#pe-v'), p_active: val('#pe-a') === '1', p_franchise: $('#pe-f') ? +val('#pe-f') : null }; const ok = await act(b, () => rpc(fn, args), n => `${n} updated.`); if (ok) { S.editPerson = null; render(); } }
   if (a === 'item-add-toggle') { S.addItem = !S.addItem; render(); }
   if (a === 'item-add-ok') { const r = num(val('#ni-r')); if (!val('#ni-n').trim()) { toast('Enter the material name.', true); return; } if (!(r > 0)) { toast('Enter the rate per kg.', true); return; } const ok = await act(b, () => rpc('hq_add_item', { p_name: val('#ni-n'), p_rate: r }), () => 'Material added.'); if (ok) { S.addItem = false; render(); } }
   if (a === 'item-remove-open') { S.removeItem = id; render(); setTimeout(() => document.querySelector('[data-act=item-remove-ok]') && document.querySelector('[data-act=item-remove-ok]').scrollIntoView({ block: 'center' }), 0); }

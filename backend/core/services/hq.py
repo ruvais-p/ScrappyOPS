@@ -20,6 +20,12 @@ def _need_hq(ctx):
         raise ApiError("HQ only.")
 
 
+def _need_team_admin(ctx):
+    """Team administration is shared by HQ and the company Super Admin."""
+    if ctx.role not in ("hq", "super_admin"):
+        raise ApiError("HQ or Super Admin access is required.", status=403)
+
+
 # ---------------------------------------------------------------------------------------------- overview and reports
 @rpc()
 def hq_overview(ctx, p_from, p_to, p_franchise=None):
@@ -200,16 +206,52 @@ def hq_loads(ctx, p_from, p_to, p_franchise=None):
 
 @rpc()
 def hq_team(ctx, p_franchise=None):
-    _need_hq(ctx)
+    _need_team_admin(ctx)
     return fetch("""
       select p.id, p.full_name, u.email::text as email, p.role, p.phone, p.territory, p.vehicle_no, p.active,
              (select coalesce(sum(c.amount), 0) from cash_ledger c where c.driver_id = p.id) as cash_in_hand,
              (select count(*) from leads l where l.driver_id = p.id and l.status in ('scheduled','in_progress')) as open_leads,
-             p.franchise_id, fr.code as franchise_code, fr.name as franchise_name
+             p.franchise_id, fr.code as franchise_code, fr.name as franchise_name, 'scrap'::text as source,
+             null::text as business_name, null::text as address
       from profiles p left join users u on u.id = p.id left join franchises fr on fr.id = p.franchise_id
-      where %(f)s::integer is null or p.franchise_id = %(f)s::integer or p.role = 'hq'
-      order by case p.role when 'hq' then 0 when 'supervisor' then 1 when 'warehouse' then 2 else 3 end, fr.code, p.full_name
+      where (%(f)s::integer is null or p.franchise_id = %(f)s::integer or p.role = 'hq')
+        and p.role != 'super_admin' and not p.is_super_admin
+      union all
+      select p.id, p.full_name, coalesce(u.email, p.email)::text, p.role, p.phone,
+             coalesce(ff.territory, string_agg(distinct d.name, ', ' order by d.name))::text as territory,
+             null::text as vehicle_no, p.is_active as active, 0::numeric as cash_in_hand, 0::bigint as open_leads,
+             null::integer as franchise_id, null::text as franchise_code, null::text as franchise_name, 'kwd'::text as source,
+             ff.business_name, ff.address
+      from kwd_profiles p
+      left join users u on u.id = p.id
+      left join kwd_fr_franchises ff on ff.user_id = p.id
+      left join kwd_user_districts ud on ud.user_id = p.id
+      left join kwd_districts d on d.id = ud.district_id
+      group by p.id, p.full_name, u.email, p.email, p.role, p.phone, p.is_active,
+               ff.territory, ff.business_name, ff.address
+      order by source, role, full_name
     """, {"f": p_franchise})
+
+
+@rpc()
+def hq_update_kwd_profile(ctx, p_id, p_full_name, p_phone=None, p_active=True):
+    """Super Admin's narrow account-management path for KWD staff and franchise users."""
+    if ctx.role != "super_admin":
+        raise ApiError("Super Admin access is required.", status=403)
+    if blank(p_full_name):
+        raise ApiError("Enter a name.")
+    old = fetch_one("select id, full_name, role, is_active from kwd_profiles where id = %(u)s for update", {"u": p_id})
+    if old is None:
+        raise ApiError("KWD member not found.")
+    fetch("""update kwd_profiles set full_name = %(n)s, phone = %(p)s, is_active = %(a)s
+             where id = %(u)s returning id""",
+          {"u": p_id, "n": btrim(p_full_name), "p": nullify(p_phone), "a": bool(p_active)})
+    User.objects.filter(pk=p_id).update(is_active=bool(p_active))
+    if not p_active:
+        end_sessions(p_id)
+    hq_log(ctx, "kwd_profile_updated", old["full_name"],
+           {"id": str(p_id), "role": old["role"], "was_active": old["is_active"], "now_active": bool(p_active)})
+    return btrim(p_full_name)
 
 
 @rpc()
@@ -357,7 +399,7 @@ def hq_add_person(ctx, p_email, p_full_name, p_role, p_franchise, p_phone=None, 
 
 @rpc()
 def hq_update_profile(ctx, p_id, p_full_name, p_phone=None, p_territory=None, p_vehicle_no=None, p_active=True, p_franchise=None):
-    _need_hq(ctx)
+    _need_team_admin(ctx)
     old = Profile.objects.select_for_update().filter(pk=p_id).first()
     if old is None:
         raise ApiError("Person not found.")
