@@ -1750,9 +1750,6 @@ function logoutLocal(msg) {
   rtStop();
   if (session) fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` } }).catch(() => {});
   session = null; store(SESSION_KEY, undefined); S.profile = null; S.prevOv = null; S.feed = [];
-  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
-  $('#login-err').textContent = typeof msg === 'string' ? msg : '';
-  $('#password').value = '';
 }
 async function start() {
   $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
@@ -1797,5 +1794,6 @@ if ('serviceWorker' in navigator) window.addEventListener('load', () => { naviga
 function logout(msg) { logoutLocal(msg); location.replace('/logout/' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
 session && session.access_token ? start() : logout();
 </script>
+<script src="../account-password.js?v=20261031-2"></script>
 </body>
 </html>

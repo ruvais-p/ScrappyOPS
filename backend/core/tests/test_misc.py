@@ -235,6 +235,32 @@ class RestFormatTests(World):
             self.assertEqual(self.hq.get(q).status_code, 200, q)
 
 
+class PasswordChangeTests(ScrappyTestCase):
+    def setUp(self):
+        super().setUp()
+        self.person("person@t.test", "Test Person", "driver")
+        self.api = Api(self.client, "person@t.test")
+
+    def change(self, current=PW, password="Changed#Pass456"):
+        return self.client.patch("/auth/v1/user", data=json.dumps({"current_password": current, "password": password}),
+                                 content_type="application/json", **self.api.h)
+
+    def test_user_can_change_own_password_and_keep_current_session(self):
+        self.assertEqual(self.change().status_code, 200)
+        self.assertEqual(self.client.get("/auth/v1/user", **self.api.h).status_code, 200)
+        self.assertEqual(Api(self.client, "person@t.test", "Changed#Pass456").email, "person@t.test")
+        old = self.client.post("/auth/v1/token?grant_type=password", data=json.dumps({"email": "person@t.test", "password": PW}),
+                               content_type="application/json")
+        self.assertEqual(old.status_code, 400)
+
+    def test_current_password_and_new_password_are_validated(self):
+        self.assertEqual(self.change(current="wrong password").status_code, 403)
+        self.assertIn("current password", self.change(current="wrong password").json()["message"].lower())
+        self.assertEqual(self.change(password="short").status_code, 400)
+        self.assertEqual(self.change(password=PW).status_code, 400)
+        self.assertTrue(User.objects.get(email="person@t.test").check_password(PW))
+
+
 class PdfAndLoginTests(World):
     def test_bill_pdf_and_customer_link(self):
         bill = self.pickup(self.drv, "drv@t.test", "Anil", "9446012345", 10)

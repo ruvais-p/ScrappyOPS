@@ -1,7 +1,7 @@
 /* Entry point of the staff app: loads the profile, then starts the field / zone / Head Office / franchise shell for that role. */
 import { supabase, session, Screen, patch, errText, watchSession, endSession, html, raw, when } from './core.js'
 import { Loading, Icon } from './ui.js'
-import { TopBar, TabBar, SideNav, Blocked } from './shell.js'
+import { TopBar, TabBar, SideNav, Blocked } from './shell.js?v=20261031-2'
 
 const TSO_TABS = [
   { id: 'home', label: 'Today', icon: 'home' },

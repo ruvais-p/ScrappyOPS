@@ -88,6 +88,9 @@ td.num, th.num { text-align: right; white-space: nowrap; }
 .wordmark { height: 28px; width: auto; }
 .topbar .role { font-size: 12px; line-height: 15px; color: var(--muted); padding-left: 12px; border-left: 1px solid var(--line-strong); }
 .topbar .who { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--muted); }
+.account-btn { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 10px; background: none; border: 0; border-radius: var(--r-btn); color: var(--muted); font: 600 13px/18px var(--font); }
+.account-btn:hover { background: var(--surface-2); color: var(--text); }
+@media (max-width: 719px) { .account-btn span { display: none; } .account-btn { width: 40px; padding: 0; justify-content: center; } }
 .content { width: 100%; max-width: 760px; margin: 0 auto; padding: 20px 16px calc(var(--tabbar-h) + 40px + env(safe-area-inset-bottom)); }
 .desk { display: block; }
 .sidenav { display: none; }
