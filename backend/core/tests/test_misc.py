@@ -333,6 +333,22 @@ class PdfAndLoginTests(World):
         super_user = self.person("super@t.test", "Super", "super_admin", franchise=None, is_super_admin=True)
         self.assertEqual(post(self.hq, {"action": "reset_password", "user_id": str(super_user.pk)}).status_code, 403)
         self.hq.fail("hq_update_profile", "Super Admin accounts", p_id=str(super_user.pk), p_full_name="Changed")
+        super_admin = Api(self.client, "super@t.test")
+        self.assertEqual(len(super_admin.ok("hq_team")), 9)
+        kwd_user = User.objects.create_user("field@kwd.test", PW)
+        fetch("""insert into kwd_profiles (id, full_name, email, phone, role, is_active)
+                 values (%(u)s, 'KWD Field Member', 'field@kwd.test', '9446000000', 'tso', true) returning id""",
+              {"u": kwd_user.pk})
+        company_team = super_admin.ok("hq_team")
+        self.assertEqual([p["source"] for p in company_team if p["id"] == str(kwd_user.pk)], ["kwd"])
+        self.assertEqual(super_admin.ok("hq_update_kwd_profile", p_id=str(kwd_user.pk), p_full_name="KWD Member",
+                                        p_phone="9446111111", p_active=False), "KWD Member")
+        self.assertFalse(User.objects.get(pk=kwd_user.pk).is_active)
+        self.assertEqual(super_admin.ok("hq_update_profile", p_id=self.hq.uid, p_full_name="HQ Admin", p_phone="9999999999",
+                                        p_territory=None, p_vehicle_no=None, p_active=True), "HQ Admin")
+        reset_hq = post(super_admin, {"action": "reset_password", "user_id": self.hq.uid, "password": "NewHqPass123"})
+        self.assertEqual(reset_hq.status_code, 200)
+        self.assertEqual(post(super_admin, {"action": "reset_password", "user_id": str(super_user.pk)}).status_code, 403)
         self.assertTrue(HqAudit.objects.filter(action="password_reset").exists())
 
     def test_hq_cannot_claim_field_staff_login(self):

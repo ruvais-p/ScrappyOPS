@@ -19,7 +19,7 @@ from core.services import hq as hq_service            # noqa: F401  (registers t
 from core.services import super_admin as super_admin_service  # noqa: F401
 from core.services import lead_import                 # noqa: F401
 from core.services import billing, dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse, stock-to-HQ and billing actions)
-from core.services.common import ApiError, Ctx, UUID_RE, btrim
+from core.services.common import ApiError, Ctx, UUID_RE, btrim, fetch_one
 from core.services.registry import RPC, rpc
 
 log = logging.getLogger("scrappy.api")
@@ -335,8 +335,8 @@ def hq_logins(request):
         ctx = auth.context_from_request(request)
     except auth.AuthError:
         return jr({"error": "Please log in again."}, 401)
-    if ctx.role != "hq":
-        return jr({"error": "Only HQ can create logins."}, 403)
+    if ctx.role not in ("hq", "super_admin"):
+        return jr({"error": "Only HQ or Super Admin can manage logins."}, 403)
     try:
         body = body_json(request)
         if not isinstance(body, dict):
@@ -351,12 +351,16 @@ def hq_logins(request):
             if not UUID_RE.match(target):
                 return jr({"error": "Choose a person."}, 400)
             prof = Profile.objects.filter(pk=target).first()
-            if prof is None:
+            kwd_prof = None if prof else fetch_one(
+                "select id, full_name, role, null::integer as franchise_id from kwd_profiles where id = %(u)s", {"u": target})
+            if prof is None and kwd_prof is None:
                 return jr({"error": "Person not found."}, 404)
-            if prof.role in ("hq", "super_admin") or prof.is_super_admin:
+            role = prof.role if prof else kwd_prof["role"]
+            full_name = prof.full_name if prof else kwd_prof["full_name"]
+            franchise_id = prof.franchise_id if prof else None
+            if prof and (prof.role == "super_admin" or prof.is_super_admin or (prof.role == "hq" and ctx.role != "super_admin")):
                 return jr({"error": "This privileged login cannot be reset from here."}, 403)
-            from core.services.common import fetch_one
-            if fetch_one("select id from kwd_profiles where id = %(u)s", {"u": prof.pk}):
+            if ctx.role != "super_admin" and fetch_one("select id from kwd_profiles where id = %(u)s", {"u": target}):
                 return jr({"error": "This login belongs to the field app."}, 403)
             user = User.objects.get(pk=target)
             password, generated = str(body.get("password") or ""), False
@@ -368,13 +372,15 @@ def hq_logins(request):
                 user.set_password(password)
                 user.save(update_fields=["password"])
                 hq_service.end_sessions(user.pk)           # the old password may be in someone else's hands
-                HqAudit.objects.create(by_id=ctx.uid, action="password_reset", ref=prof.full_name,
-                                       detail={"role": prof.role, "set_by_hq": not generated}, franchise_id=prof.franchise_id)
-            res = {"ok": True, "role": prof.role, "full_name": prof.full_name, "email": user.email}
+                HqAudit.objects.create(by_id=ctx.uid, action="password_reset", ref=full_name,
+                                       detail={"role": role, "set_by_hq": not generated}, franchise_id=franchise_id)
+            res = {"ok": True, "role": role, "full_name": full_name, "email": user.email}
             res.update({"password": password} if generated else {"password_set_by_hq": True})
             return jr({"results": [res]})
         if action != "create":
             return jr({"error": "Unknown action."}, 400)
+        if ctx.role == "super_admin":
+            return jr({"error": "Super Admin can manage existing members but cannot create operational logins here."}, 403)
         try:
             fid = int(body.get("franchise_id"))
         except (TypeError, ValueError):
