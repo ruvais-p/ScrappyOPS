@@ -66,6 +66,18 @@ jobs:
             docker compose exec -T web \
               python manage.py check
 
+            # The website pages are not part of the Docker image: the web container serves the ./site folder.
+            # Rebuild them from dashboards/ and copy them into that folder in place (the folder itself is not
+            # replaced, so the running container keeps seeing it).
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v /opt/ScrappyOPS:/work -w /work/backend \
+              python:3.12-slim \
+              python tools/point_frontend.py ../dashboards site.new
+            mkdir -p site
+            find site -mindepth 1 -delete
+            cp -a site.new/. site/
+            rm -rf site.new
+
             curl --fail --silent --show-error \
               https://scrappymanager.in/healthz
           REMOTE
