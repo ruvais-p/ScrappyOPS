@@ -148,6 +148,9 @@ a.kpi:hover{transform:translateY(-3px)}
 .tab:hover{border-color:var(--ink)}
 .tab:active{transform:scale(.95)}
 .tab.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700}
+.tab.sm{min-height:34px;padding:6px 12px;font-size:12px}
+.sortbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px 0}
+.stopline{font-size:12px;font-weight:600;color:var(--ox)}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{font-size:11px;letter-spacing:.08em;color:var(--stone);font-weight:700;text-align:left;padding:11px 8px}
@@ -486,15 +489,59 @@ async function sharePdfFile(billId, billNo) {
 
 /* ---------- state ---------- */
 const S = {
-  view: 'dashboard', leadTab: 'open', loadTab: null,
+  view: 'dashboard', leadTab: 'open', loadTab: null, pos: null,
+  leadSort: (() => { try { return localStorage.getItem('scrappy_leadsort') === 'time' ? 'time' : 'near'; } catch (e) { return 'near'; } })(),
   profile: null, leads: [], rates: [], cash: 0, ledger: [], loads: [], loadTotals: [], paidBills: [],
   activeLead: null, billItems: [], method: null, busy: false
 };
 const openLoad = () => S.loads.find(l => l.status === 'open');
 const leadById = id => S.leads.find(l => l.lead_id === id);
-const openLeads = () => S.leads.filter(l => l.status !== 'closed' && l.status !== 'failed');
+const openLeads = () => {
+  const o = S.leads.filter(l => l.status !== 'closed' && l.status !== 'failed');
+  return S.leadSort === 'time' ? (S.hops = {}, o) : routeOrder(o);
+};
 const failedLeads = () => S.leads.filter(l => l.status === 'failed');
 const closedLeads = () => S.leads.filter(l => l.status === 'closed');
+/* ---------- route order: the nearest customer first, then the one nearest to that, and so on ----------
+   Straight-line distance from the driver's phone position (or from the pickup in progress, or the last one closed);
+   leads with no map location go to the end in time order. S.hops tells each lead how far it is from the stop before it. */
+const hasPos = l => l.latitude != null && l.longitude != null && isFinite(Number(l.latitude)) && isFinite(Number(l.longitude));
+const at = l => ({ lat: Number(l.latitude), lng: Number(l.longitude) });
+function km(a, b) {
+  const r = x => x * Math.PI / 180, h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
+  return 12742 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function routeOrder(list) {
+  const live = list.filter(l => l.status === 'in_progress'), rest = list.filter(l => l.status !== 'in_progress');
+  const pool = rest.filter(hasPos), none = rest.filter(l => !hasPos(l)), out = [], hops = {};
+  const lastDone = closedLeads().filter(hasPos).pop();
+  const liveAt = live.filter(hasPos).pop();
+  let cur = liveAt ? at(liveAt) : S.pos || (lastDone ? at(lastDone) : null);
+  let kind = liveAt ? 'previous' : S.pos ? 'you' : 'previous';
+  while (pool.length) {
+    let bi = 0, bd = Infinity;
+    if (cur) pool.forEach((l, i) => { const d = km(cur, at(l)); if (d < bd) { bd = d; bi = i; } });
+    const l = pool.splice(bi, 1)[0];
+    if (cur) hops[l.lead_id] = { km: bd, from: kind };
+    out.push(l); cur = at(l); kind = 'previous';
+  }
+  S.hops = hops;
+  return live.concat(out, none);
+}
+const kmText = d => d < 1 ? Math.max(10, Math.round(d * 100) * 10) + ' m' : d.toFixed(1) + ' km';
+const hopText = l => { const h = S.hops && S.hops[l.lead_id]; return h ? 'About ' + kmText(h.km) + (h.from === 'you' ? ' from you' : ' from the stop before') : ''; };
+/* where the driver is now: asked from the phone now and then; if it is refused the order starts from the last pickup */
+function locate() {
+  if (!navigator.geolocation || S.locBusy || !session) return;
+  S.locBusy = true;
+  navigator.geolocation.getCurrentPosition(p => {
+    S.locBusy = false;
+    const n = { lat: p.coords.latitude, lng: p.coords.longitude }, moved = !S.pos || km(S.pos, n) > 0.3;
+    S.pos = n;
+    const h = location.hash.slice(1);
+    if (moved && S.leadSort === 'near' && (!VIEWS[h] || h === 'dashboard') && S.profile) render();
+  }, () => { S.locBusy = false; }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+}
 const rateName = id => (S.rates.find(r => r.item_id === id) || {}).item_name || 'Item';
 
 async function refresh() {
@@ -545,6 +592,11 @@ function animateCounts() {
 }
 function shake() { const f = $('#login-form'); f.classList.remove('shake'); void f.offsetWidth; f.classList.add('shake'); }
 
+function stopLine(l, i) {
+  if (S.leadSort === 'time' || S.leadTab !== 'open' || l.status === 'closed' || l.status === 'failed') return '';
+  const t = hasPos(l) ? hopText(l) : 'No map location, so it is last';
+  return `<span class="stopline">Stop ${i + 1}${t ? ' · ' + t : ''}</span>`;
+}
 function leadCard(l, i) {
   const done = l.status === 'closed', failed = l.status === 'failed', canFail = !done && !failed && (!l.bill_status || l.bill_status === 'draft');
   return `<article class="lead ${l.status === 'in_progress' ? 'live' : ''} ${failed ? 'bad' : ''}" style="--i:${i}">
@@ -553,6 +605,7 @@ function leadCard(l, i) {
       <div class="lead-main"><span class="nm">${esc(l.customer_name)}</span><span class="sub">${esc(l.lead_code)}${l.area ? ' · ' + esc(l.area) : ''}</span>${l.address ? `<span class="addr">${esc(l.address)}</span>` : ''}</div>
       ${badge(l)}
     </div>
+    ${stopLine(l, i)}
     ${l.items_said && !done && !failed ? `<div class="chips"><span class="chip">Said: ${esc(l.items_said)}</span></div>` : ''}
     ${failed ? `<div class="lead-fail"><b>${esc(l.fail_reason)}</b>${l.fail_note ? '<br>' + esc(l.fail_note) : ''}<br><span class="small">${day(l.failed_at)} ${time(l.failed_at)} · the supervisor will give it out again</span></div>`
       : done ? `<div class="lead-done"><span>${esc(l.bill_no || '')}</span><b>${rs(l.total_amount)}</b></div>`
@@ -578,7 +631,7 @@ function vDashboard() {
       <div class="muted">${open.length ? `${open.length} pickup${open.length > 1 ? 's' : ''} waiting for you today.` : 'No open pickups. New leads from HQ will appear here.'}</div></div>
   </div>
   ${next ? `<section class="next">
-    <span class="tag">${next.status === 'in_progress' ? 'IN PROGRESS' : 'NEXT PICKUP'} · ${time(next.slot)}</span>
+    <span class="tag">${next.status === 'in_progress' ? 'IN PROGRESS' : 'NEXT PICKUP'} · ${time(next.slot)}${S.leadSort !== 'time' && hopText(next) ? ' · ' + hopText(next).replace('About ', '~') : ''}</span>
     <h2>${esc(next.customer_name)}</h2>
     <span class="soft">${esc(next.address || '')}${next.area ? ', ' + esc(next.area) : ''}${next.items_said ? ' · Said: ' + esc(next.items_said) : ''}</span>
     <div class="next-act"><button class="btn" data-act="open-lead" data-id="${next.lead_id}">${next.status === 'in_progress' ? 'Continue' : 'Start'} pickup →</button>${mapLink(next)}${callLink(next)}</div>
@@ -597,6 +650,10 @@ function vDashboard() {
           <button class="tab ${S.leadTab === 'closed' ? 'on' : ''}" role="tab" aria-selected="${S.leadTab === 'closed'}" data-act="lead-tab" data-tab="closed">Closed (${closed.length})</button>
           ${failed.length || S.leadTab === 'failed' ? `<button class="tab ${S.leadTab === 'failed' ? 'on' : ''}" role="tab" aria-selected="${S.leadTab === 'failed'}" data-act="lead-tab" data-tab="failed">Not completed (${failed.length})</button>` : ''}
         </div></div>
+      ${S.leadTab === 'open' && open.length > 1 ? `<div class="sortbar"><span class="muted small">Order</span><div class="tabs">
+        <button class="tab sm ${S.leadSort === 'near' ? 'on' : ''}" data-act="lead-sort" data-sort="near">Nearest first</button>
+        <button class="tab sm ${S.leadSort === 'time' ? 'on' : ''}" data-act="lead-sort" data-sort="time">By time</button></div>
+        ${S.leadSort === 'near' && !S.pos ? '<span class="muted small">Allow location to start from where you are.</span>' : ''}</div>` : ''}
       ${rows.length ? `<div class="leads">${rows.map((l, i) => leadCard(l, i)).join('')}</div>` : emptyState((S.leadTab === 'failed' ? 'No pickups marked not completed' : 'No ' + S.leadTab + ' leads'), S.leadTab === 'open' ? 'New leads from HQ will appear here.' : (S.leadTab === 'failed' ? 'Pickups you could not complete are listed here with the reason.' : 'Closed pickups will be listed here.'))}
     </section>
     <section class="card side" style="padding:18px;gap:12px">
@@ -837,6 +894,7 @@ document.addEventListener('click', async e => {
   if (a === 'fail-submit') { submitFail(); return; }
   if (a === 'to-bill') { const s = document.querySelector('#app .side'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (a === 'lead-tab') { S.leadTab = b.dataset.tab; return render(); }
+  if (a === 'lead-sort') { S.leadSort = b.dataset.sort === 'time' ? 'time' : 'near'; try { localStorage.setItem('scrappy_leadsort', S.leadSort); } catch (e) { /* the choice just is not remembered */ } return render(); }
   if (a === 'load-tab') { S.loadTab = +b.dataset.id; return render(); }
   if (a === 'back') { S.activeLead = null; return render(); }
   if (a === 'open-lead') {
@@ -957,6 +1015,7 @@ async function start() {
     const inProg = S.leads.find(l => l.status === 'in_progress');
     if (inProg) { S.activeLead = inProg.lead_id; await refresh(); }
     render();
+    locate();
   } catch (e) { $('#app').innerHTML = `<div class="card pad"><b>Could not load your data.</b><span class="muted">${esc(e.message)}</span><button class="btn" onclick="location.reload()">Try again</button></div>`; }
 }
 /* one login per person: the newest login wins; an older device is signed out within about 20 seconds */
@@ -969,6 +1028,8 @@ async function checkSession() {
   finally { sessChecking = false; }
 }
 setInterval(checkSession, 20000);
+setInterval(locate, 120000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') locate(); });
 document.addEventListener('visibilitychange', checkSession);
 /* lets the phone install this page as an app (full screen, no address bar) */
 if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
