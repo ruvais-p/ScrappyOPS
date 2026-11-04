@@ -84,7 +84,7 @@ def read_login(request):
     if raw:
         try:
             data = signing.loads(raw, salt=SALT, max_age=settings.REFRESH_TOKEN_DAYS * 86400)
-            if AuthSession.objects.filter(pk=data["s"], user_id=data["u"], expires_at__gt=timezone.now()).exists():
+            if AuthSession.objects.filter(pk=data["s"], user_id=data["u"], user__is_active=True, expires_at__gt=timezone.now()).exists():
                 found = (data["u"], data["s"])
         except (signing.BadSignature, KeyError, ValueError):
             found = None

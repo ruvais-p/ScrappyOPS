@@ -22,7 +22,7 @@ class KCtx:
     def session_valid(self):
         if self._valid is None:
             self._valid = True if not self.session_id else AuthSession.objects.filter(
-                id=self.session_id, user_id=self.uid, expires_at__gt=timezone.now()).exists()
+                id=self.session_id, user_id=self.uid, user__is_active=True, expires_at__gt=timezone.now()).exists()
         return self._valid
 
     @property

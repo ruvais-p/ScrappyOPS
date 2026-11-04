@@ -39,7 +39,7 @@ class Ctx:
             if not self.session_id:
                 self._valid = True
             else:
-                self._valid = AuthSession.objects.filter(id=self.session_id, user_id=self.uid, expires_at__gt=timezone.now()).exists()
+                self._valid = AuthSession.objects.filter(id=self.session_id, user_id=self.uid, user__is_active=True, expires_at__gt=timezone.now()).exists()
         return self._valid
 
     @property

@@ -40,6 +40,17 @@ function setFromTokens(d) {
 }
 
 async function tokenCall(grant, body) {
+  if (grant === 'refresh_token') {
+    return navigator.locks.request('scrappy-refresh-' + SESSION_KEY, async () => {
+      const latest = session.get()
+      if (!latest) throw new Error('Please sign in again.')
+      if (latest.refresh_token !== body.refresh_token) { cur = latest; return latest }
+      return tokenCallUnlocked(grant, body)
+    })
+  }
+  return tokenCallUnlocked(grant, body)
+}
+async function tokenCallUnlocked(grant, body) {
   const r = await fetch(`/auth/v1/token?grant_type=${grant}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const d = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(d.error_description || d.msg || d.message || 'Login failed')

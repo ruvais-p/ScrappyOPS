@@ -22,6 +22,8 @@ if not SECRET_KEY:
         SECRET_KEY = "dev-only-insecure-key-change-me-0123456789abcdef0123456789abcdef"
     else:
         raise RuntimeError("Set DJANGO_SECRET_KEY (a long random string) before running in production.")
+if not DEBUG and len(SECRET_KEY) < 32:
+    raise RuntimeError("DJANGO_SECRET_KEY must be at least 32 characters in production.")
 
 ALLOWED_HOSTS = [h.strip() for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in env("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()]
@@ -109,9 +111,11 @@ USE_I18N = False
 
 # ---- Scrappy settings ----
 JWT_SECRET = env("JWT_SECRET", SECRET_KEY)
+if not DEBUG and len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET must be at least 32 characters in production.")
 ACCESS_TOKEN_SECONDS = int(env("ACCESS_TOKEN_SECONDS", "3600"))
 REFRESH_TOKEN_DAYS = int(env("REFRESH_TOKEN_DAYS", "30"))
-REFRESH_REUSE_SECONDS = 60       # a refresh token that was just replaced still works for a minute (two tabs refreshing at once)
+REFRESH_REUSE_SECONDS = 60       # remember rotated tokens this long so replay can revoke the affected session
 LOGIN_MAX_FAILURES = int(env("LOGIN_MAX_FAILURES", "10"))
 LOGIN_LOCK_SECONDS = int(env("LOGIN_LOCK_SECONDS", "900"))
 SINGLE_SESSION = env_bool("SINGLE_SESSION", True)   # newest login wins, like before

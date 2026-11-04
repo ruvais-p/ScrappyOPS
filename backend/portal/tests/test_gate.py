@@ -144,11 +144,19 @@ class GateTests(KwdCase):
         self.assertFalse(AuthSession.objects.filter(user__email="tso@p.test").exists())
         self.assertEqual(c.get("/kwd/")["Location"], "/login/")
 
-    def test_sign_out_by_address_goes_to_the_login_page(self):
+    def test_sign_out_by_get_is_refused_without_ending_the_session(self):
         c, _ = self.login("tso@p.test")
         r = c.get("/logout/?m=Bye")
-        self.assertEqual((r.status_code, r["Location"]), (302, "/login/?m=Bye"))
-        self.assertEqual(c.get("/kwd/")["Location"], "/login/")
+        self.assertEqual(r.status_code, 405)
+        self.assertEqual(c.get("/kwd/").status_code, 200)
+
+    def test_cross_site_login_and_logout_are_refused(self):
+        c, r = self.login("tso@p.test")
+        self.assertEqual(r.status_code, 200)
+        body = json.dumps({"email": "tso@p.test", "password": PW})
+        self.assertEqual(c.post("/login/", data=body, content_type="application/json", HTTP_ORIGIN="https://evil.test").status_code, 403)
+        self.assertEqual(c.post("/logout/", HTTP_ORIGIN="https://evil.test").status_code, 403)
+        self.assertEqual(c.get("/kwd/").status_code, 200)
 
     def test_a_forged_or_tampered_cookie_opens_nothing(self):
         c, _ = self.login("tso@p.test")

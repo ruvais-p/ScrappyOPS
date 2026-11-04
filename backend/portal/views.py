@@ -1,6 +1,7 @@
 """The login page, the sign-out address, and the staff app's page."""
 import json
 import time
+from urllib.parse import urlsplit
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -18,6 +19,18 @@ def _json(data, status=200):
     return r
 
 
+def _same_origin_browser_request(request):
+    """Reject cross-site browser POSTs while allowing non-browser API/test clients."""
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        return True
+    try:
+        parsed = urlsplit(source)
+        return parsed.scheme == request.scheme and parsed.netloc == request.get_host()
+    except (ValueError, TypeError):
+        return False
+
+
 def _session_for(dest, out):
     """What the dashboard expects to find in the browser after login."""
     expires_ms = int(time.time() * 1000) + int(out.get("expires_in") or 3600) * 1000
@@ -29,6 +42,8 @@ def _session_for(dest, out):
 @csrf_exempt
 def login(request):
     if request.method == "POST":
+        if not _same_origin_browser_request(request):
+            return _json({"error": "Cross-site login requests are not allowed."}, 403)
         try:
             data = json.loads(request.body or b"{}")
         except ValueError:
@@ -69,11 +84,12 @@ def login(request):
 
 @csrf_exempt
 def logout(request):
+    if request.method != "POST":
+        return _json({"error": "Use POST to sign out."}, 405)
+    if not _same_origin_browser_request(request):
+        return _json({"error": "Cross-site sign-out requests are not allowed."}, 403)
     gate.end_session_of_cookie(request)
-    if request.method == "POST":
-        resp = HttpResponse(status=204)
-    else:
-        resp = gate.to_login(request, keep_query=True)
+    resp = HttpResponse(status=204)
     gate.clear_login_cookie(resp)
     resp.delete_cookie(gate.HOP, path="/")
     return resp

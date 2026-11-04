@@ -111,26 +111,37 @@ def refresh_login(refresh_token):
         raise bad
     h = _hash(refresh_token)
     now = time.time()
+    replayed = False
     with transaction.atomic():
         s = AuthSession.objects.select_for_update().select_related("user").filter(refresh_hash=h).first()
         if s is None:
-            # a token that was replaced a moment ago still works (two pages refreshing at the same time)
+            # A rotated token being presented again is a replay signal.  Do not
+            # exchange it for another valid token: someone other than the
+            # browser may have copied it.  End the affected session so the
+            # attacker cannot race the legitimate client indefinitely.
             cutoff = timezone.now() - timedelta(seconds=settings.REFRESH_REUSE_SECONDS * 2)
             for c in AuthSession.objects.select_for_update().select_related("user").filter(refreshed_at__gte=cutoff):
                 if any(r[0] == h and now - r[1] <= settings.REFRESH_REUSE_SECONDS for r in c.recent):
-                    s = c
+                    c.delete()
+                    replayed = True
                     break
-        if s is None or s.expires_at < timezone.now() or not s.user.is_active:
+        if replayed:
+            # Leave the atomic block normally so revocation is committed before
+            # reporting the invalid grant below.
+            pass
+        elif s is None or s.expires_at < timezone.now() or not s.user.is_active:
             raise bad
-        new = secrets.token_urlsafe(32)
-        recent = [r for r in s.recent if now - r[1] <= settings.REFRESH_REUSE_SECONDS]
-        recent.append([s.refresh_hash, now])
-        s.recent = recent[-5:]
-        s.refresh_hash = _hash(new)
-        s.refreshed_at = timezone.now()
-        s.expires_at = timezone.now() + timedelta(days=settings.REFRESH_TOKEN_DAYS)
-        s.save(update_fields=["recent", "refresh_hash", "refreshed_at", "expires_at"])
-        return _token_response(s.user, s, new)
+        else:
+            new = secrets.token_urlsafe(32)
+            recent = [r for r in s.recent if now - r[1] <= settings.REFRESH_REUSE_SECONDS]
+            recent.append([s.refresh_hash, now])
+            s.recent = recent[-5:]
+            s.refresh_hash = _hash(new)
+            s.refreshed_at = timezone.now()
+            s.expires_at = timezone.now() + timedelta(days=settings.REFRESH_TOKEN_DAYS)
+            s.save(update_fields=["recent", "refresh_hash", "refreshed_at", "expires_at"])
+            return _token_response(s.user, s, new)
+    raise bad
 
 
 def logout_session(session_id):

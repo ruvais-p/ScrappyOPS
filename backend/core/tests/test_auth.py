@@ -13,6 +13,19 @@ from core.tests.base import Api, PW, ScrappyTestCase
 
 
 class AuthTests(ScrappyTestCase):
+    def test_disabled_user_existing_session_is_rejected(self):
+        self.make_team()
+        person = Api(self.client, "drv@t.test")
+        User.objects.filter(pk=person.uid).update(is_active=False)
+        self.assertFalse(person.ok("session_valid"))
+        self.assertEqual(person.get("scrap_items").status_code, 401)
+
+    def test_client_ip_ignores_untrusted_headers(self):
+        from django.test import RequestFactory
+        from core.api.views import _client_ip
+        request = RequestFactory().get("/", REMOTE_ADDR="198.51.100.2", HTTP_X_REAL_IP="198.51.100.99")
+        self.assertEqual(_client_ip(request), "198.51.100.2")
+
     def test_login_wrong_password_and_rate_limit(self):
         self.make_team()
         bad = lambda: self.client.post("/auth/v1/token?grant_type=password", data=json.dumps({"email": "hq@t.test", "password": "nope"}),
@@ -86,20 +99,17 @@ class AuthTests(ScrappyTestCase):
         a, b = Api(self.client, "drv@t.test"), Api(self.client, "drv@t.test")
         self.assertTrue(a.ok("session_valid") and b.ok("session_valid"))
 
-    def test_refresh_and_two_pages_refreshing_together(self):
+    def test_refresh_token_replay_ends_the_session(self):
         self.make_team()
         a = Api(self.client, "wh@t.test")
         post = lambda tok: self.client.post("/auth/v1/token?grant_type=refresh_token", data=json.dumps({"refresh_token": tok}), content_type="application/json")
         r1 = post(a.tok["refresh_token"])
         self.assertEqual(r1.status_code, 200)
-        r2 = post(a.tok["refresh_token"])                # the same old token again, a moment later (another tab)
-        self.assertEqual(r2.status_code, 200)
-        new = r2.json()
-        h = {"HTTP_AUTHORIZATION": "Bearer " + new["access_token"]}
-        self.assertEqual(self.client.post("/rest/v1/rpc/session_valid", data="{}", content_type="application/json", **h).json(), True)
-        # and the token from the first refresh still works as well
+        r2 = post(a.tok["refresh_token"])                # replay of the token that was just rotated
+        self.assertEqual(r2.status_code, 400)
+        # Replay is evidence of theft, so even the replacement token is revoked.
         r3 = post(r1.json()["refresh_token"])
-        self.assertEqual(r3.status_code, 200)
+        self.assertEqual(r3.status_code, 400)
         # a token nobody ever had is refused
         self.assertEqual(post("garbage").status_code, 400)
 
