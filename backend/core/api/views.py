@@ -3,6 +3,7 @@ import inspect
 import json
 import ipaddress
 import logging
+import re
 import time
 from datetime import date, datetime
 from decimal import Decimal
@@ -64,8 +65,9 @@ def healthz(request):
 
 # ---------------------------------------------------------------------------------------------- login
 def _client_ip(request):
-    # Caddy overwrites X-Real-IP; never trust the caller-controlled X-Forwarded-For chain.
-    candidate = request.META.get("HTTP_X_REAL_IP", "") or request.META.get("REMOTE_ADDR", "")
+    # Uvicorn resolves forwarded addresses only for explicitly trusted proxies.
+    # Never read caller-supplied forwarding headers here.
+    candidate = request.META.get("REMOTE_ADDR", "")
     try:
         return str(ipaddress.ip_address(candidate))
     except ValueError:
@@ -231,6 +233,19 @@ def _plain(msg, status):
     return r
 
 
+_BILL_FILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def _bill_pdf_path(bill):
+    """Return a contained PDF path, never a path derived outside the bills directory."""
+    name = str(bill.bill_no or "")
+    if not _BILL_FILE_RE.fullmatch(name):
+        return None
+    folder = (settings.MEDIA_ROOT / "bills").resolve()
+    path = (folder / f"{name}.pdf").resolve()
+    return path if path.parent == folder else None
+
+
 def invoice_pdf(request):
     """POST {invoice_id}: the tax invoice as a PDF file. HQ can open any invoice; a supervisor the invoices of their own franchise."""
     from core.services.tax_invoice import build
@@ -276,7 +291,7 @@ def bill_pdf(request):
         if not UUID_RE.match(t):
             return _plain("This bill link is not valid.", 404)
         bill = Bill.objects.filter(share_token=t).first()
-        path = (settings.MEDIA_ROOT / "bills" / f"{bill.bill_no}.pdf") if bill and bill.pdf_path else None
+        path = _bill_pdf_path(bill) if bill and bill.pdf_path else None
         if not path or not path.exists():
             return _plain("This bill is not ready yet. Please try again in a minute.", 404)
         resp = FileResponse(open(path, "rb"), content_type="application/pdf")
@@ -313,11 +328,15 @@ def bill_pdf(request):
         if not d["items"]:
             return jr({"error": "This bill has no items."}, 400)
         pdf = build_pdf(d)
-        folder = settings.MEDIA_ROOT / "bills"
+        final_path = _bill_pdf_path(bill)
+        if final_path is None:
+            log.error("Refusing unsafe bill filename for bill id %s", bill.pk)
+            return jr({"error": "Could not make the PDF bill. Try again."}, 500)
+        folder = final_path.parent
         folder.mkdir(parents=True, exist_ok=True)
         tmp = folder / f".{bill.bill_no}.tmp"
         tmp.write_bytes(pdf)
-        tmp.replace(folder / f"{bill.bill_no}.pdf")          # replaced in one step, so a customer never gets half a file
+        tmp.replace(final_path)          # replaced in one step, so a customer never gets half a file
         Bill.objects.filter(pk=bill.pk).update(pdf_path=f"{bill.bill_no}.pdf")
         return jr({"url": f"{settings.PUBLIC_BASE_URL}/functions/v1/bill-pdf?t={bill.share_token}", "bill_no": bill.bill_no,
                    "status": bill.status, "bytes": len(pdf)})

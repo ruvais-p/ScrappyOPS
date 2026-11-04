@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgresql://scrappy:${POSTGRES_APP_PASSWORD}@db:5432/scrappy
       MEDIA_ROOT: /data/media
       REDIS_URL: redis://redis:6379/0
+      FORWARDED_ALLOW_IPS: ${TRUSTED_PROXY_IPS:?set TRUSTED_PROXY_IPS to the Caddy proxy address or dedicated proxy network CIDR}
     depends_on:
       db:
         condition: service_healthy

@@ -192,7 +192,7 @@ docker compose exec web python manage.py regenerate_pdfs                        
 2. PDFs are drawn with ReportLab instead of pdf-lib. The layout was compared by eye with the approved design and matches;
    the badge picture is read from `core/static_assets/bill-badge.png` (no download at bill time).
 3. PDFs are files in `MEDIA_ROOT` (in Docker: the `media` volume) instead of Supabase storage. Back that folder up.
-4. Added: login rate limit, a 60-second grace for a refresh token that was just replaced (two tabs refreshing together),
+4. Added: login rate limiting and refresh-token rotation with replay detection,
    database-level guards, and tests. Removed: the temporary "test key" mode of the PDF function.
 5. Needs **PostgreSQL** (it uses row locks, advisory locks, `LISTEN/NOTIFY` and a few Postgres-only report queries).
 6. Not tested here: the Docker/Caddy files themselves (no Docker on the build machine) and a run against a real Supabase export

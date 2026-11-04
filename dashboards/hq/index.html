@@ -418,6 +418,17 @@ const val = id => ($(id) || {}).value || '';
 /* ---------- Supabase connection ---------- */
 let session = load(SESSION_KEY);
 async function authCall(grant, body) {
+  if (grant === 'refresh_token') {
+    return navigator.locks.request('scrappy-refresh-' + SESSION_KEY, async () => {
+      const latest = load(SESSION_KEY);
+      if (!latest) throw new Error('Please sign in again.');
+      if (latest.refresh_token !== body.refresh_token) { session = latest; return latest; }
+      return authCallUnlocked(grant, body);
+    });
+  }
+  return authCallUnlocked(grant, body);
+}
+async function authCallUnlocked(grant, body) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${grant}`, {
     method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
@@ -1808,7 +1819,7 @@ setInterval(checkSession, 20000);
 document.addEventListener('visibilitychange', checkSession);
 /* lets the phone install this page as an app (full screen, no address bar) */
 if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
-function logout(msg) { logoutLocal(msg); location.replace('/logout/' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : '')); }
+function logout(msg) { logoutLocal(msg); fetch('/logout/', {method:'POST'}).catch(()=>{}).finally(()=>location.replace('/login/' + (typeof msg === 'string' && msg ? '?m=' + encodeURIComponent(msg) : ''))); }
 session && session.access_token ? start() : logout();
 </script>
 <script src="../account-password.js?v=20261031-2"></script>
