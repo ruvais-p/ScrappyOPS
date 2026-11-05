@@ -88,24 +88,12 @@ def _check_and_create(ctx, d):
     if len(phone) != 10:
         raise ApiError(f'Phone must have 10 digits (got "{_s(d["phone"])}")')
 
-    em, fc = nullify(d["driver_email"]), nullify(d["franchise_code"])
-    fc = fc.upper() if fc else None
-    driver_id, franchise_id = None, None
-    if em:
-        row = fetch("""select p.id, p.active, p.franchise_id, f.code from users u join profiles p on p.id = u.id and p.role = 'driver'
-                       left join franchises f on f.id = p.franchise_id where lower(u.email) = lower(%(e)s)""", {"e": em})
-        if not row:
-            raise ApiError(f'No driver with email "{em}"')
-        row = row[0]
-        if not row["active"]:
-            raise ApiError(f"Driver {em} is inactive")
-        if fc and fc != (row["code"] or "").upper():
-            raise ApiError(f"Driver {em} belongs to franchise {row['code']}, not {fc}")
-        driver_id, franchise_id = row["id"], row["franchise_id"]
-    else:
-        if not fc:
-            raise ApiError("Give the franchise code (for example KKD)")
-        fr = Franchise.objects.filter(code__iexact=fc, active=True).first()
+    # HQ no longer picks drivers: a lead is created without one. The franchise code is optional: a row without it waits in HQ's
+    # list to be given to a franchise, and the franchise's supervisor then gives it to a driver.
+    fc = nullify(d["franchise_code"])
+    franchise_id = None
+    if fc:
+        fr = Franchise.objects.filter(code__iexact=fc.upper(), active=True).first()
         if fr is None:
             raise ApiError(f'No active franchise with code "{fc}"')
         franchise_id = fr.pk
@@ -133,10 +121,11 @@ def _check_and_create(ctx, d):
     if dup:
         return "duplicate", dup[0]["code"], "Lead already exists for this customer on this day"
 
-    lead = Lead.objects.create(customer_id=cust_id, driver_id=driver_id, status="unassigned" if driver_id is None else "scheduled",
-                               franchise_id=franchise_id, slot=slot, items_said=nullify(d["items"]), created_by_id=ctx.uid,
+    lead = Lead.objects.create(customer_id=cust_id, driver_id=None, status="unassigned", franchise_id=franchise_id, slot=slot, items_said=nullify(d["items"]), created_by_id=ctx.uid,
                                latitude=lat, longitude=lng)
-    msg = ("Created, waiting for the supervisor to assign a driver" if driver_id is None else "Created")
+    msg = "Created, waiting for the supervisor to assign a driver" if franchise_id else "Created, waiting for HQ to give it to a franchise"
+    if nullify(d["driver_email"]):
+        msg += " (driver_email ignored: the supervisor assigns drivers)"
     if not btrim(d["pickup_time"]):
         msg += " (no time given, set to 9:00 AM)"
     if lat is None:

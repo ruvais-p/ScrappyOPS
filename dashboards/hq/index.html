@@ -484,7 +484,7 @@ const FAR_PAST = '2026-01-01';
 const S = {
   profile: null, from: addDays(todayIST(), -6), to: todayIST(), preset: '7',
   ov: null, daily: [], isum: [], team: [], items: [], metric: 'kg',
-  lf: { status: '', driver: '', q: '' }, leads: [], leadTab: 'list', leadAct: null, imports: [], upload: null,
+  lf: { status: '', driver: '', q: '' }, leads: [], leadTab: 'list', leadAct: null, lsel: [], lfr: '', imports: [], upload: null,
   bf: { status: '', driver: '', q: '' }, bills: [], billSel: null, billItems: {},
   loads: [], loadFilter: 'attention', loadSel: null, loadDetail: {}, score: [],
   inventory: [], stock: [], reqs: [], rels: [], reqFilter: 'active', cancelReq: null,
@@ -643,6 +643,7 @@ function vOverview() {
     [o.counts_waiting, 'Drivers are back and the cash is not counted yet', 'cash', '', false],
     [o.counts_unverified, 'Cash counts wait for a supervisor', 'cash', '', false],
     [o.loads_waiting, 'Loads wait for weighing at the warehouse', 'loads', 'waiting', false],
+    [o.leads_no_franchise, 'Leads wait for you to give them to a franchise', 'leads', 'no_franchise', true],
     [o.leads_unassigned, 'Leads wait for a supervisor to give them to a driver', 'leads', 'unassigned', false],
     [o.leads_failed, 'Pickups could not be completed in this period (reasons on the Leads page)', 'leads', 'failed', false],
     [o.leads_late, 'Scheduled pickups are more than 3 hours late', 'leads', 'late', true],
@@ -776,33 +777,39 @@ function vLeads() {
   const tabs = `<div class="tabs"><button class="tab ${S.leadTab === 'list' ? 'on' : ''}" data-act="leadtab" data-t="list">All leads</button><button class="tab ${S.leadTab === 'upload' ? 'on' : ''}" data-act="leadtab" data-t="upload">Upload from Excel</button></div>`;
   return `
   <div class="head"><div><div class="eyebrow">Leads</div><h1>Plan the day's pickups.</h1>
-    <div class="muted">Upload leads from Excel, assign each to a driver, and move or cancel any that have not started.</div></div>${tabs}</div>
+    <div class="muted">Upload leads from Excel, give them to franchises (one at a time or many together), and cancel any that have not started. Each franchise's supervisor then gives its leads to drivers.</div></div>${tabs}</div>
   ${S.leadTab === 'upload' ? vUpload() : vLeadList()}`;
 }
 function vLeadList() {
-  const extra = `<div class="f"><label for="lst">STATUS</label><select id="lst" data-act="lstatus">${selectOptions([['', 'All'], ['unassigned', 'Not assigned'], ['scheduled', 'Scheduled'], ['in_progress', 'In progress'], ['closed', 'Closed'], ['failed', 'Not completed'], ['cancelled', 'Cancelled']], S.lf.status)}</select></div>
+  const extra = `<div class="f"><label for="lst">STATUS</label><select id="lst" data-act="lstatus">${selectOptions([['', 'All'], ['no_franchise', 'Not given to a franchise'], ['unassigned', 'With a franchise, no driver'], ['scheduled', 'Scheduled'], ['in_progress', 'In progress'], ['closed', 'Closed'], ['failed', 'Not completed'], ['cancelled', 'Cancelled']], S.lf.status)}</select></div>
     ${driverSelect('ldr', 'ldriver', S.lf.driver)}${searchBox('lq', 'lsearch', S.lf.q)}`;
   const L = S.leads, cnt = s => L.filter(x => x.status === s).length;
+  const noFr = L.filter(x => x.status === 'unassigned' && !x.franchise_code).length, waitSup = L.filter(x => x.status === 'unassigned' && x.franchise_code).length;
+  const pick = L.filter(x => x.status === 'unassigned'), sel = S.lsel.filter(i => pick.some(x => x.lead_id === i));
+  const giveBar = pick.length ? `<div class="inl" style="padding:12px 16px;border-bottom:1px solid var(--line)"><b>${sel.length} selected</b>
+      <div class="fld"><label for="lfr">GIVE TO FRANCHISE</label><select id="lfr" data-act="lfrsel"><option value="">Choose a franchise</option>${(S.franchises || []).filter(f => f.active).map(f => `<option value="${f.id}" ${String(S.lfr) === String(f.id) ? 'selected' : ''}>${esc(f.code)} · ${esc(f.name)}</option>`).join('')}</select></div>
+      <button class="btn green sm" data-act="lgive" ${sel.length && S.lfr ? '' : 'disabled'}>Give ${sel.length || ''} selected to franchise</button>
+      <button class="linkbtn" data-act="lpick" data-w="nofr">Select all not given to a franchise</button><button class="linkbtn" data-act="lpick" data-w="none">Clear</button></div>` : '';
   return `${filterBar(extra)}
   <div class="kpis">
     <div class="kpi"><span class="l">Leads shown</span><span class="v">${L.length}</span><span class="s">By pickup date in range</span></div>
-    <div class="kpi"><span class="l">Not assigned</span><span class="v" style="color:${cnt('unassigned') ? 'var(--ox)' : 'inherit'}">${cnt('unassigned')}</span><span class="s">Waiting for the supervisor</span></div>
+    <div class="kpi"><span class="l">To give to a franchise</span><span class="v" style="color:${noFr ? 'var(--ox)' : 'inherit'}">${noFr}</span><span class="s">Waiting for you</span></div>
+    <div class="kpi"><span class="l">Waiting for a supervisor</span><span class="v">${waitSup}</span><span class="s">Franchise has them, no driver yet</span></div>
     <div class="kpi"><span class="l">Scheduled</span><span class="v">${cnt('scheduled')}</span><span class="s">Not started yet</span></div>
     <div class="kpi"><span class="l">Not completed</span><span class="v" style="color:${cnt('failed') ? 'var(--ox)' : 'inherit'}">${cnt('failed')}</span><span class="s">Driver gave a reason</span></div>
     <div class="kpi"><span class="l">In progress</span><span class="v">${cnt('in_progress')}</span><span class="s">Driver is with the customer</span></div>
     <div class="kpi"><span class="l">Closed</span><span class="v">${cnt('closed')}</span><span class="s">Paid and done</span></div>
   </div>
   <section class="card"><div class="card-h"><h2>Leads</h2><span class="muted small">Up to 300 shown. Narrow the dates or filters for more.</span></div>
-    <div class="scroll"><table style="min-width:980px"><thead><tr><th>LEAD</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>CUSTOMER</th><th>AREA</th><th>DRIVER</th><th>PICKUP</th><th>ITEMS SAID</th><th>STATUS</th><th>BILL</th><th></th></tr></thead>
-    <tbody>${L.map(l => `<tr><td class="b">${esc(l.code)}</td>${!S.fr ? `<td>${frTag(l.franchise_code)}</td>` : ''}<td>${esc(l.customer_name)}<br><span class="muted small">${esc(l.phone)}</span></td><td>${esc(l.area || '—')}</td><td>${l.driver_name ? esc(l.driver_name) : '<span class="muted">Not assigned yet</span>'}</td>
+    ${giveBar}
+    <div class="scroll"><table style="min-width:980px"><thead><tr><th style="width:34px">${pick.length ? `<input type="checkbox" data-act="lall" aria-label="Select every lead that has no driver" ${sel.length && sel.length === pick.length ? 'checked' : ''}>` : ''}</th><th>LEAD</th>${!S.fr ? '<th>FRANCHISE</th>' : ''}<th>CUSTOMER</th><th>AREA</th><th>DRIVER</th><th>PICKUP</th><th>ITEMS SAID</th><th>STATUS</th><th>BILL</th><th></th></tr></thead>
+    <tbody>${L.map(l => `<tr><td>${l.status === 'unassigned' ? `<input type="checkbox" data-act="lchk" data-id="${l.lead_id}" aria-label="Select ${esc(l.code)}" ${sel.includes(l.lead_id) ? 'checked' : ''}>` : ''}</td><td class="b">${esc(l.code)}</td>${!S.fr ? `<td>${l.franchise_code ? frTag(l.franchise_code) : '<span class="badge b-cash">Not given</span>'}</td>` : ''}<td>${esc(l.customer_name)}<br><span class="muted small">${esc(l.phone)}</span></td><td>${esc(l.area || '—')}</td><td>${l.driver_name ? esc(l.driver_name) : `<span class="muted">${l.franchise_code ? 'Supervisor will assign' : 'Not given to a franchise'}</span>`}</td>
       <td>${dlabel(dayOf(l.slot))}<br><span class="muted small">${tlabel(l.slot)}</span></td><td>${esc(l.items_said || '—')}</td><td>${chip(LST, l.status)}${l.status === 'failed' ? `<div class="small" style="color:var(--ox);margin-top:4px"><b>${esc(l.fail_reason)}</b>${l.fail_note ? '<br>' + esc(l.fail_note) : ''}<br><span class="muted">${dlabel(dayOf(l.failed_at))} ${tlabel(l.failed_at)}</span></div>` : ''}</td>
       <td>${l.bill_no ? esc(l.bill_no) + '<br><span class="muted small">' + esc((BST[l.bill_status] || [l.bill_status])[0]) + '</span>' : '—'}</td>
-      <td class="r" style="white-space:nowrap">${['unassigned', 'scheduled', 'failed'].includes(l.status) ? `<button class="btn ghost sm" data-act="lead-move" data-id="${l.lead_id}">${l.status === 'scheduled' ? 'Reassign' : 'Assign'}</button> <button class="btn ghost sm" data-act="lead-cancel" data-id="${l.lead_id}">Cancel</button>` : ''}</td></tr>
-      ${S.leadAct && S.leadAct.id === l.lead_id ? `<tr><td colspan="10" style="background:var(--pearl)">${leadActPanel(l)}</td></tr>` : ''}`).join('') || '<tr><td colspan="10" class="empty">No leads match.</td></tr>'}</tbody></table></div></section>`;
+      <td class="r" style="white-space:nowrap">${['unassigned', 'scheduled', 'failed'].includes(l.status) ? `<button class="btn ghost sm" data-act="lead-cancel" data-id="${l.lead_id}">Cancel</button>` : ''}</td></tr>
+      ${S.leadAct && S.leadAct.id === l.lead_id ? `<tr><td colspan="11" style="background:var(--pearl)">${leadActPanel(l)}</td></tr>` : ''}`).join('') || '<tr><td colspan="11" class="empty">No leads match.</td></tr>'}</tbody></table></div></section>`;
 }
 function leadActPanel(l) {
-  if (S.leadAct.mode === 'move') return `<div class="inl"><div class="fld"><label for="mv-d">${l.status === 'scheduled' ? 'MOVE' : 'ASSIGN'} ${esc(l.code)} TO</label><select id="mv-d">${allDrivers().filter(d => d.active && d.id !== l.driver_id).sort((a, b) => (b.franchise_code === l.franchise_code) - (a.franchise_code === l.franchise_code) || String(a.full_name).localeCompare(String(b.full_name))).map(d => `<option value="${d.id}">${esc(d.full_name)} (${esc(d.franchise_code || '')})</option>`).join('')}</select></div>
-    <button class="btn green sm" data-act="lead-move-ok" data-id="${l.lead_id}">Reassign</button><button class="linkbtn" data-act="lead-close">Close</button></div>`;
   return `<div class="inl"><div class="fld" style="flex:1 1 280px"><label for="cx-r">REASON FOR CANCELLING ${esc(l.code)} (REQUIRED)</label><input id="cx-r"></div>
     <button class="btn sm" data-act="lead-cancel-ok" data-id="${l.lead_id}">Cancel this lead</button><button class="linkbtn" data-act="lead-close">Keep it</button></div>`;
 }
@@ -810,25 +817,23 @@ function vUpload() {
   const U = S.upload;
   return `
   <section class="card pad"><h3>Upload leads</h3>
-    <span class="muted">Use the Scrappy lead template (the <b>Leads</b> sheet). Columns: customer_name, phone, address, area, upi_id, franchise_code, driver_email, pickup_date, pickup_time, items, latitude, longitude. Give the <b>franchise_code</b> (for example KKD) and leave driver_email blank: the lead goes to that franchise's supervisor, who splits the leads among the drivers. If you do give a driver_email, the lead is assigned to that driver straight away. Latitude and longitude are optional (for example 10.0159 and 76.3419); when given, the collector gets an Open in Google Maps button on the lead. Dates as DD-MM-YYYY, today or later. A blank time means 9:00 AM. Excel (.xlsx) and CSV both work. One file can hold leads for many franchises.</span>
+    <span class="muted">Use the Scrappy lead template (the <b>Leads</b> sheet). Columns: customer_name, phone, address, area, upi_id, franchise_code, pickup_date, pickup_time, items, latitude, longitude. The <b>franchise_code</b> (for example KKD) is optional: with it the lead goes straight to that franchise's supervisor; without it the lead waits in the Leads list, where you select leads and give them to a franchise together. The supervisor then gives the leads to the franchise's drivers (a driver_email column in an older file is ignored). Latitude and longitude are optional (for example 10.0159 and 76.3419); when given, the collector gets an Open in Google Maps button on the lead. Dates as DD-MM-YYYY, today or later. A blank time means 9:00 AM. Excel (.xlsx) and CSV both work. One file can hold leads for many franchises.</span>
     <div class="dz"><input type="file" id="lf" accept=".xlsx,.xls,.csv" data-act="lfile" aria-label="Choose the leads file"><button class="linkbtn" data-act="template">Download a blank template (CSV)</button></div>
     ${U && U.error ? `<div class="notice bad">${esc(U.error)}</div>` : ''}
     ${U && U.rows ? uploadPreview(U) : ''}
   </section>
   ${U && U.result ? uploadResult(U.result) : ''}
   <section class="card"><div class="card-h"><h2>Recent uploads</h2><span class="muted small">Last 60 rows sent to the import inbox</span></div>
-    <div class="scroll"><table style="min-width:640px"><thead><tr><th>WHEN</th><th>CUSTOMER</th><th>DRIVER / FRANCHISE</th><th>DATE</th><th>RESULT</th><th>LEAD</th><th>MESSAGE</th></tr></thead>
-    <tbody>${S.imports.map(i => `<tr><td class="muted">${dtlabel(i.imported_at)}</td><td>${esc(i.customer_name)}</td><td>${i.driver_email ? esc(i.driver_email) : (i.franchise_code ? frTag(String(i.franchise_code).toUpperCase()) + ' <span class="muted small">to assign</span>' : '')}</td><td>${esc(i.pickup_date)}</td><td>${impChip(i.status)}</td><td class="b">${esc(i.lead_code || '')}</td><td class="muted">${esc(i.message || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nothing uploaded yet.</td></tr>'}</tbody></table></div></section>`;
+    <div class="scroll"><table style="min-width:640px"><thead><tr><th>WHEN</th><th>CUSTOMER</th><th>FRANCHISE</th><th>DATE</th><th>RESULT</th><th>LEAD</th><th>MESSAGE</th></tr></thead>
+    <tbody>${S.imports.map(i => `<tr><td class="muted">${dtlabel(i.imported_at)}</td><td>${esc(i.customer_name)}</td><td>${i.franchise_code ? frTag(String(i.franchise_code).toUpperCase()) : '<span class="muted small">Not given yet</span>'}</td><td>${esc(i.pickup_date)}</td><td>${impChip(i.status)}</td><td class="b">${esc(i.lead_code || '')}</td><td class="muted">${esc(i.message || '')}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Nothing uploaded yet.</td></tr>'}</tbody></table></div></section>`;
 }
 const impChip = s => `<span class="badge ${s === 'created' ? 'b-ok' : s === 'duplicate' ? 'b-cash' : s === 'error' ? 'b-flag' : 'b-sched'}">${esc(s)}</span>`;
 function checkRow(r) {
   const w = [];
   if (!r.customer_name) w.push('name missing'); if (!r.address) w.push('address missing');
   if (String(r.phone).replace(/\D/g, '').length < 10) w.push('phone needs 10 digits');
-  const fc = String(r.franchise_code || '').trim().toUpperCase(), em = String(r.driver_email || '').trim();
-  if (!fc && !em) w.push('franchise code missing');
+  const fc = String(r.franchise_code || '').trim().toUpperCase();
   if (fc && !(S.franchises || []).some(f => String(f.code).toUpperCase() === fc)) w.push('no franchise with code ' + fc);
-  if (em) { const d = allDrivers().find(x => (x.email || '').toLowerCase() === em.toLowerCase()); if (!d) w.push('no driver with this email'); else if (!d.active) w.push('driver is switched off'); else if (fc && d.franchise_code && String(d.franchise_code).toUpperCase() !== fc) w.push('driver belongs to ' + d.franchise_code); }
   if (!r.pickup_date) w.push('date missing');
   const la = String(r.latitude).trim(), lo = String(r.longitude).trim();
   if (la || lo) { if (!la || !lo) { if (!(la && /^-?\d+(\.\d+)?\s*[, ;]\s*-?\d+(\.\d+)?$/.test(la))) w.push('needs both latitude and longitude'); } else if (!(isFinite(la) && isFinite(lo))) w.push('location must be numbers'); else if (+la < 6 || +la > 38 || +lo < 67 || +lo > 98) w.push('location not in India (swapped?)'); }
@@ -837,8 +842,8 @@ function checkRow(r) {
 function uploadPreview(U) {
   const bad = U.rows.filter(r => checkRow(r).length).length;
   return `<div class="notice ${bad ? '' : 'info'}"><b>${U.rows.length} row${U.rows.length === 1 ? '' : 's'}</b> read from <b>${esc(U.name)}</b>${bad ? ` · ${bad} look wrong and will be rejected by the database (see below)` : ' · all look fine'}.</div>
-    <div class="scroll"><table style="min-width:980px"><thead><tr><th>#</th><th>CUSTOMER</th><th>PHONE</th><th>AREA</th><th>FRANCHISE</th><th>DRIVER</th><th>DATE</th><th>TIME</th><th>ITEMS</th><th>MAP</th><th>CHECK</th></tr></thead>
-    <tbody>${U.rows.slice(0, 100).map((r, i) => { const w = checkRow(r); return `<tr><td class="muted">${i + 1}</td><td>${esc(r.customer_name)}</td><td>${esc(r.phone)}</td><td>${esc(r.area)}</td><td>${frTag(String(r.franchise_code || '').trim().toUpperCase() || ((allDrivers().find(x => (x.email || '').toLowerCase() === String(r.driver_email || '').toLowerCase())) || {}).franchise_code) || '—'}</td><td>${r.driver_email ? esc(r.driver_email) : '<span class="muted">Supervisor assigns</span>'}</td><td>${esc(r.pickup_date)}</td><td>${esc(r.pickup_time)}</td><td>${esc(r.items)}</td><td>${r.latitude && r.longitude ? '✓' : ''}</td><td>${w.length ? '<span class="badge b-flag">' + esc(w.join(', ')) + '</span>' : '<span class="badge b-ok">ok</span>'}</td></tr>`; }).join('')}</tbody></table></div>
+    <div class="scroll"><table style="min-width:980px"><thead><tr><th>#</th><th>CUSTOMER</th><th>PHONE</th><th>AREA</th><th>FRANCHISE</th><th>DATE</th><th>TIME</th><th>ITEMS</th><th>MAP</th><th>CHECK</th></tr></thead>
+    <tbody>${U.rows.slice(0, 100).map((r, i) => { const w = checkRow(r); return `<tr><td class="muted">${i + 1}</td><td>${esc(r.customer_name)}</td><td>${esc(r.phone)}</td><td>${esc(r.area)}</td><td>${String(r.franchise_code || '').trim() ? frTag(String(r.franchise_code).trim().toUpperCase()) : '<span class="muted">Give it later</span>'}</td><td>${esc(r.pickup_date)}</td><td>${esc(r.pickup_time)}</td><td>${esc(r.items)}</td><td>${r.latitude && r.longitude ? '✓' : ''}</td><td>${w.length ? '<span class="badge b-flag">' + esc(w.join(', ')) + '</span>' : '<span class="badge b-ok">ok</span>'}</td></tr>`; }).join('')}</tbody></table></div>
     ${U.rows.length > 100 ? `<span class="muted small">Showing the first 100 of ${U.rows.length}.</span>` : ''}
     <div class="inl"><button class="btn green" data-act="import" ${U.busy ? 'disabled' : ''}>Import ${U.rows.length} row${U.rows.length === 1 ? '' : 's'}</button><button class="linkbtn" data-act="upload-clear">Clear</button></div>`;
 }
@@ -853,7 +858,7 @@ async function loadXlsx() {
   if (window.XLSX) return;
   await new Promise((res, rej) => { const s = document.createElement('script'); s.src = XLSX_URL; s.onload = res; s.onerror = () => rej(new Error('Could not load the spreadsheet reader. Check the internet connection and try again.')); document.head.appendChild(s); });
 }
-const COLS = ['customer_name', 'phone', 'address', 'area', 'upi_id', 'franchise_code', 'driver_email', 'pickup_date', 'pickup_time', 'items', 'latitude', 'longitude'];
+const COLS = ['customer_name', 'phone', 'address', 'area', 'upi_id', 'franchise_code', 'pickup_date', 'pickup_time', 'items', 'latitude', 'longitude'];
 const pad2 = n => String(n).padStart(2, '0');
 function cellText(v, col) {
   if (v == null) return '';
@@ -1186,6 +1191,7 @@ function auditText(a) {
     case 'lead_reassigned': return `Moved lead <b>${esc(a.ref)}</b> from ${esc(personName(d.from))} to ${esc(personName(d.to))}.`;
     case 'lead_failed': return `Pickup <b>${esc(a.ref)}</b> could not be completed${d.driver ? ' by ' + esc(personName(d.driver)) : ''}. Reason: ${esc(d.reason)}${d.note ? ' (' + esc(d.note) + ')' : ''}.`;
     case 'leads_assigned': return `Gave ${esc(a.ref)} to <b>${esc(d.driver_name || '')}</b>${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
+    case 'leads_to_franchise': return `Gave ${esc(a.ref)} to franchise <b>${esc(d.franchise || '')}</b>${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
     case 'leads_unassigned': return `Took back ${esc(a.ref)} from drivers${d.codes && d.codes.length <= 8 ? ': ' + d.codes.map(esc).join(', ') : ''}.`;
     case 'lead_cancelled': return `Cancelled lead <b>${esc(a.ref)}</b>. Reason: ${esc(d.reason)}`;
     case 'rate_set': return `Changed the <b>${esc(a.ref)}</b> rate from ₹${esc(d.old)} to ₹${esc(d.new)} per kg.`;
@@ -1516,7 +1522,7 @@ const VIEWS = { overview: vOverview, billing: vBilling, business: vBusiness, 'sa
 function navCounts() {
   const o = S.ov; if (!o) return;
   const set = (id, n, hot) => { const e = $(id); e.textContent = n || ''; e.classList.toggle('hot', !!hot && n > 0); };
-  set('#nav-leads', num(o.leads_late) + num(o.leads_unassigned), num(o.leads_late) > 0); set('#nav-loads', num(o.loads_flagged) + num(o.loads_waiting), num(o.loads_flagged) > 0);
+  set('#nav-leads', num(o.leads_late) + num(o.leads_unassigned) + num(o.leads_no_franchise), num(o.leads_late) > 0 || num(o.leads_no_franchise) > 0); set('#nav-loads', num(o.loads_flagged) + num(o.loads_waiting), num(o.loads_flagged) > 0);
   set('#nav-cash', num(o.disputes_open) + num(o.counts_waiting) + num(o.counts_unverified), num(o.disputes_open) > 0);
 }
 let frHtml = '';
@@ -1583,6 +1589,9 @@ document.addEventListener('change', async e => {
   if (a === 'bi-franchise') { S.biFranchise = t.value; await reload(); }
   if (a === 'bi-inventory-franchise') { S.biInventoryFranchise = t.value; render(); return; }
   if (a === 'bi-inventory-product') { S.biInventoryProduct = t.value; render(); return; }
+  if (a === 'lchk') { const i = +t.dataset.id; S.lsel = t.checked ? [...new Set([...S.lsel, i])] : S.lsel.filter(x => x !== i); render(); return; }
+  if (a === 'lall') { const ids = S.leads.filter(x => x.status === 'unassigned').map(x => x.lead_id); S.lsel = t.checked ? ids : []; render(); return; }
+  if (a === 'lfrsel') { S.lfr = t.value; render(); return; }
   if (a === 'lstatus') { S.lf.status = t.value; await reload(); }
   if (a === 'ldriver') { S.lf.driver = t.value; await reload(); }
   if (a === 'lsearch') { S.lf.q = t.value.trim(); await reload(); }
@@ -1663,16 +1672,26 @@ document.addEventListener('click', async e => {
     finally { b.classList.remove('busy'); render(); setTimeout(() => $('#cred') && $('#cred').scrollIntoView({ block: 'start' }), 0); }
   }
   if (a === 'preset') { const p = b.dataset.p; S.preset = p; S.to = todayIST(); S.from = p === 'today' ? S.to : p === '7' ? addDays(S.to, -6) : p === '30' ? addDays(S.to, -29) : FAR_PAST; await reload(); }
-  if (a === 'go') { if (b.dataset.v === 'loads') S.loadFilter = b.dataset.f || 'attention'; if (b.dataset.v === 'leads' && b.dataset.f === 'late') { S.lf.status = 'scheduled'; } if (b.dataset.v === 'leads' && (b.dataset.f === 'unassigned' || b.dataset.f === 'failed')) { S.lf.status = b.dataset.f; } await go(b.dataset.v); }
+  if (a === 'go') { if (b.dataset.v === 'loads') S.loadFilter = b.dataset.f || 'attention'; if (b.dataset.v === 'leads' && b.dataset.f === 'late') { S.lf.status = 'scheduled'; } if (b.dataset.v === 'leads' && (b.dataset.f === 'unassigned' || b.dataset.f === 'no_franchise' || b.dataset.f === 'failed')) { S.lf.status = b.dataset.f; } await go(b.dataset.v); }
   if (a === 'metric') { S.metric = b.dataset.m; render(); }
   /* leads */
   if (a === 'leadtab') { S.leadTab = b.dataset.t; await reload(); }
-  if (a === 'lead-move') { S.leadAct = { id, mode: 'move' }; render(); }
+  if (a === 'lpick') {
+    S.lsel = b.dataset.w === 'nofr' ? S.leads.filter(x => x.status === 'unassigned' && !x.franchise_code).map(x => x.lead_id) : [];
+    if (b.dataset.w === 'nofr' && !S.lsel.length) toast('No leads are waiting to be given to a franchise. Leads uploaded with a franchise_code already went to that franchise.', true);
+    render();
+  }
+  if (a === 'lgive') {
+    const ids = S.lsel.filter(i => S.leads.some(x => x.lead_id === i && x.status === 'unassigned')), f = +S.lfr;
+    if (!ids.length) { toast('Select at least one lead.', true); return; }
+    if (!f) { toast('Choose a franchise.', true); return; }
+    const ok = await act(b, () => rpc('hq_assign_leads_to_franchise', { p_lead_ids: ids, p_franchise: f }), r => r.count ? `${r.count} lead${r.count === 1 ? '' : 's'} given to ${r.franchise_code}. Its supervisor can now give them to drivers.` : `Those leads were already with ${r.franchise_code}.`);
+    if (ok) S.lsel = [];
+  }
   if (a === 'lead-cancel') { S.leadAct = { id, mode: 'cancel' }; render(); }
   if (a === 'lead-close') { S.leadAct = null; render(); }
-  if (a === 'lead-move-ok') { const d = val('#mv-d'); if (!d) { toast('Choose a driver.', true); return; } const ok = await act(b, () => rpc('hq_reassign_lead', { p_lead_id: id, p_driver_id: d }), n => `Lead moved to ${n}.`); if (ok) { S.leadAct = null; render(); } }
   if (a === 'lead-cancel-ok') { const r = val('#cx-r').trim(); if (!r) { toast('Add a reason for cancelling.', true); return; } const ok = await act(b, () => rpc('hq_cancel_lead', { p_lead_id: id, p_reason: r }), c => `${c} cancelled.`); if (ok) { S.leadAct = null; render(); } }
-  if (a === 'template') downloadFile('scrappy-lead-template.csv', csvLine(COLS) + '\n' + csvLine(['Meera S.', '9847012345', 'Flat 3B, Skyline Apts', 'Kakkanad', 'meera@okaxis', 'KKD', '', addDays(todayIST(), 1).split('-').reverse().join('-'), '11:30 AM', 'Iron, paper', '10.015900', '76.341900']) + '\n');
+  if (a === 'template') downloadFile('scrappy-lead-template.csv', csvLine(COLS) + '\n' + csvLine(['Meera S.', '9847012345', 'Flat 3B, Skyline Apts', 'Kakkanad', 'meera@okaxis', 'KKD', addDays(todayIST(), 1).split('-').reverse().join('-'), '11:30 AM', 'Iron, paper', '10.015900', '76.341900']) + '\n');
   if (a === 'upload-clear') { S.upload = null; render(); }
   if (a === 'import' && S.upload && S.upload.rows) {
     const U = S.upload; U.busy = true; render();

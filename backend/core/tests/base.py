@@ -6,7 +6,7 @@ from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
 
-from core.models import Franchise, Profile, User
+from core.models import Franchise, Lead, Profile, User
 
 PW = "Test#Pass123"
 
@@ -78,12 +78,15 @@ class ScrappyTestCase(TestCase):
     def upload_lead(self, hq, driver_email="drv@t.test", name="Anil Kumar", phone="9446012345", area="Kakkanad", **extra):
         row = {"customer_name": name, "phone": phone, "address": "12, Test Road", "area": area, "pickup_date": today_dmy(),
                "pickup_time": "11:30 AM", "items": "iron, paper"}
-        if driver_email:
-            row["driver_email"] = driver_email
-        else:
-            row["franchise_code"] = "KKD"
+        # HQ's upload only creates the lead for a franchise; giving it to a driver is the supervisor's job. A test that names a driver
+        # gets the lead already given to that driver (as the supervisor would have done).
+        driver = Profile.objects.filter(user__email__iexact=driver_email).select_related("franchise").first() if driver_email else None
+        row["franchise_code"] = driver.franchise.code if driver else "KKD"
         row.update(extra)
         r = hq.client.post("/rest/v1/lead_import", data=json.dumps([row]), content_type="application/json",
                            HTTP_PREFER="return=representation", **hq.h)
         assert r.status_code == 201, r.content
-        return r.json()[0]
+        out = r.json()[0]
+        if driver and out["status"] == "created":
+            Lead.objects.filter(code=out["lead_code"]).update(driver=driver, status="scheduled")
+        return out
