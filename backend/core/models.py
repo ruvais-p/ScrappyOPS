@@ -200,7 +200,7 @@ class Lead(models.Model):
     code = models.TextField(unique=True)
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
     driver = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.PROTECT, related_name="leads")
-    franchise = models.ForeignKey(Franchise, on_delete=models.PROTECT, related_name="leads")
+    franchise = models.ForeignKey(Franchise, null=True, blank=True, on_delete=models.PROTECT, related_name="leads")   # empty until HQ gives the lead to a franchise
     slot = models.DateTimeField(null=True, blank=True)
     items_said = models.TextField(null=True, blank=True)
     status = models.TextField(default="scheduled")

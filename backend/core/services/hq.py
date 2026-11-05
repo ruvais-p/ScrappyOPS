@@ -42,7 +42,8 @@ def hq_overview(ctx, p_from, p_to, p_franchise=None):
         'franchises_active', (select count(*) from franchises where active),
         'drivers_active',    (select count(*) from profiles where role = 'driver' and active and {fr()}),
         'leads_scheduled',   (select count(*) from leads where status = 'scheduled' and {fr()}),
-        'leads_unassigned',  (select count(*) from leads where status = 'unassigned' and {fr()}),
+        'leads_unassigned',  (select count(*) from leads where status = 'unassigned' and franchise_id is not null and {fr()}),
+        'leads_no_franchise', (select count(*) from leads where status = 'unassigned' and franchise_id is null and %(f)s::integer is null),
         'leads_failed',      (select count(*) from leads where status = 'failed' and (failed_at at time zone 'Asia/Kolkata')::date between %(a)s::date and %(b)s::date and {fr()}),
         'leads_today',       (select count(*) from leads where status in ('scheduled','in_progress') and (slot at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date and {fr()}),
         'leads_in_progress', (select count(*) from leads where status = 'in_progress' and {fr()}),
@@ -170,13 +171,15 @@ def hq_leads(ctx, p_from, p_to, p_status=None, p_driver=None, p_search=None, p_l
              l.fail_reason, l.fail_note, l.failed_at, l.latitude, l.longitude
       from leads l
       join customers cu on cu.id = l.customer_id
-      join franchises fr on fr.id = l.franchise_id
+      left join franchises fr on fr.id = l.franchise_id
       left join profiles pr on pr.id = l.driver_id
       left join bills b on b.lead_id = l.id
       where ((l.slot at time zone 'Asia/Kolkata')::date between %(a)s::date and %(b)s::date
              or (l.status in ('unassigned','scheduled','in_progress','failed') and %(st)s::text is not null))
         and (%(f)s::integer is null or l.franchise_id = %(f)s::integer)
-        and (%(st)s::text is null or l.status = %(st)s::text)
+        and (%(st)s::text is null
+             or (%(st)s::text = 'no_franchise' and l.franchise_id is null and l.status = 'unassigned')
+             or (%(st)s::text <> 'no_franchise' and l.status = %(st)s::text))
         and (%(drv)s::uuid is null or l.driver_id = %(drv)s::uuid)
         and {SEARCH_SQL}
       order by l.slot desc nulls last, l.id desc
@@ -459,6 +462,36 @@ def hq_reassign_lead(ctx, p_lead_id, p_driver_id):
            {"from": str(from_driver) if from_driver else None, "to": str(drv.pk), "from_franchise": from_f,
             "to_franchise": drv.franchise_id, "was": was}, drv.franchise_id)
     return drv.full_name
+
+
+@rpc()
+def hq_assign_leads_to_franchise(ctx, p_lead_ids, p_franchise):
+    """HQ gives leads to a franchise. The franchise's supervisor then gives them to drivers. Only leads that no driver has
+    been given can be given or moved (a supervisor takes a lead back from a driver first)."""
+    _need_hq(ctx)
+    ids = sorted({int(x) for x in (p_lead_ids or [])})
+    if not ids:
+        raise ApiError("Select at least one lead.")
+    if len(ids) > 500:
+        raise ApiError("Give at most 500 leads to a franchise at a time.")
+    fr = Franchise.objects.filter(pk=p_franchise, active=True).first() if p_franchise else None
+    if fr is None:
+        raise ApiError("Choose an active franchise.")
+    leads = list(Lead.objects.select_for_update().filter(pk__in=ids).order_by("id"))
+    if len(leads) != len(ids):
+        raise ApiError("Some of the selected leads were not found.")
+    for lead in leads:
+        if lead.status != "unassigned" or lead.driver_id is not None:
+            raise ApiError(f"Lead {lead.code} is already with a driver or finished, so it cannot be moved to another franchise.")
+    moved = [l for l in leads if l.franchise_id != fr.pk]
+    for lead in moved:
+        lead.franchise_id = fr.pk
+        lead.save(update_fields=["franchise"])
+    n = len(moved)
+    if n:
+        hq_log(ctx, "leads_to_franchise", f"{n} lead{'' if n == 1 else 's'}",
+               {"franchise": fr.code, "codes": [l.code for l in moved]}, fr.pk)
+    return {"count": n, "franchise_code": fr.code, "franchise_name": fr.name}
 
 
 @rpc()

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from core.models import Customer, Lead, LeadImport
+from core.models import Customer, Franchise, Lead, LeadImport
 from core.tests.base import Api, ScrappyTestCase, today_dmy
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -26,12 +26,27 @@ class LeadUploadTests(ScrappyTestCase):
         base.update(kw)
         return base
 
-    def test_good_row_with_a_driver(self):
-        out = self.send(self.row())[0]
-        self.assertEqual((out["status"], out["message"]), ("created", "Created (no map location)"))
+    def test_good_row_goes_to_the_franchise_not_to_a_driver(self):
+        out = self.send(self.row(driver_email=None, franchise_code="KKD"))[0]
+        self.assertEqual((out["status"], out["message"]),
+                         ("created", "Created, waiting for the supervisor to assign a driver (no map location)"))
         lead = Lead.objects.get(code=out["lead_code"])
-        self.assertEqual((lead.status, lead.franchise.code), ("scheduled", "KKD"))
+        self.assertEqual((lead.status, lead.franchise.code, lead.driver_id), ("unassigned", "KKD", None))
         self.assertEqual(lead.slot.astimezone(IST).strftime("%H:%M"), "11:30")
+
+    def test_a_driver_email_in_the_file_is_ignored(self):
+        out = self.send(self.row(franchise_code="KKD"))[0]               # row() names drv@t.test
+        self.assertEqual(out["status"], "created")
+        self.assertIn("driver_email ignored", out["message"])
+        lead = Lead.objects.get(code=out["lead_code"])
+        self.assertEqual((lead.status, lead.driver_id), ("unassigned", None))
+
+    def test_a_row_without_a_franchise_waits_for_hq(self):
+        out = self.send(self.row(driver_email=None))[0]
+        self.assertEqual(out["status"], "created")
+        self.assertIn("waiting for HQ to give it to a franchise", out["message"])
+        lead = Lead.objects.get(code=out["lead_code"])
+        self.assertEqual((lead.status, lead.franchise_id, lead.driver_id), ("unassigned", None, None))
 
     def test_row_for_a_franchise_waits_for_the_supervisor(self):
         out = self.send(self.row(driver_email=None, franchise_code="kkd", latitude="10.0159, 76.3419"))[0]
@@ -46,11 +61,7 @@ class LeadUploadTests(ScrappyTestCase):
             (dict(customer_name=""), "Customer name is missing"),
             (dict(address=" "), "Address is missing"),
             (dict(phone="12345"), "Phone must have 10 digits"),
-            (dict(driver_email="nobody@t.test"), 'No driver with email "nobody@t.test"'),
-            (dict(driver_email="sup@t.test"), "No driver with email"),
-            (dict(driver_email=None), "Give the franchise code"),
-            (dict(driver_email=None, franchise_code="ZZZ"), 'No active franchise with code "ZZZ"'),
-            (dict(franchise_code="TVM"), "belongs to franchise KKD, not TVM"),
+            (dict(franchise_code="ZZZ"), 'No active franchise with code "ZZZ"'),
             (dict(pickup_date="tomorrow"), "not understood"),
             (dict(pickup_date="31-02-2030"), "not a real date"),
             (dict(pickup_date=(datetime.now(IST) - timedelta(days=5)).strftime("%d-%m-%Y")), "in the past"),
@@ -67,12 +78,6 @@ class LeadUploadTests(ScrappyTestCase):
             self.assertIn(expect, out["message"], (fields, out))
         self.assertEqual(Lead.objects.count(), 0)                         # a bad row leaves nothing behind
         self.assertEqual(Customer.objects.count(), 0)
-
-    def test_inactive_driver(self):
-        from core.models import Profile
-        Profile.objects.filter(user__email="drv@t.test").update(active=False)
-        out = self.send(self.row())[0]
-        self.assertIn("is inactive", out["message"])
 
     def test_times_and_dates_in_every_format(self):
         d = datetime.now(IST).strftime("%Y-%m-%d")
@@ -175,3 +180,55 @@ class AssignmentTests(ScrappyTestCase):
         lid2 = list(self.ids.values())[1]
         self.hq.ok("hq_reassign_lead", p_lead_id=lid2, p_driver_id=tvm_drv.uid)
         self.assertEqual(Lead.objects.get(pk=lid2).franchise.code, "TVM")
+
+
+class HqGivesLeadsToFranchiseTests(ScrappyTestCase):
+    """HQ uploads leads and gives them to franchises (in bulk); the franchise's supervisor gives them to drivers."""
+
+    def setUp(self):
+        super().setUp()
+        self.make_team()
+        self.hq, self.sup, self.tsup = Api(self.client, "hq@t.test"), Api(self.client, "sup@t.test"), Api(self.client, "tvm-sup@t.test")
+        self.drv = Api(self.client, "drv@t.test")
+        self.ids = []
+        for i in range(4):
+            out = self.upload_lead(self.hq, driver_email=None, name=f"Cust {i}", phone=f"94461000{i:02d}", franchise_code="")
+            self.ids.append(Lead.objects.get(code=out["lead_code"]).pk)
+        self.kkd = Franchise.objects.get(code="KKD").pk
+        self.tvm = Franchise.objects.get(code="TVM").pk
+
+    def mine(self, who):
+        return who.ok("wh_leads", p_from="2020-01-01", p_to="2099-01-01")
+
+    def test_nobody_but_hq_sees_a_lead_before_it_is_given(self):
+        self.assertEqual(self.mine(self.sup), [])
+        self.assertEqual(self.sup.ok("wh_lead_counts")[0]["unassigned"], 0)
+        self.assertEqual(len(self.hq.ok("hq_leads", p_from="2020-01-01", p_to="2099-01-01", p_status="no_franchise")), 4)
+        self.assertEqual(self.hq.ok("hq_overview", p_from="2020-01-01", p_to="2099-01-01")["leads_no_franchise"], 4)
+
+    def test_bulk_give_then_supervisor_gives_to_a_driver(self):
+        out = self.hq.ok("hq_assign_leads_to_franchise", p_lead_ids=self.ids[:3], p_franchise=self.kkd)
+        self.assertEqual((out["count"], out["franchise_code"]), (3, "KKD"))
+        self.assertEqual(len(self.mine(self.sup)), 3)
+        self.assertEqual(self.mine(self.tsup), [])                        # another franchise sees nothing
+        self.assertEqual(len(self.hq.ok("hq_leads", p_from="2020-01-01", p_to="2099-01-01", p_status="no_franchise")), 1)
+        self.assertEqual(self.sup.ok("wh_assign_leads", p_lead_ids=self.ids[:2], p_driver=self.drv.uid), 2)
+        self.assertEqual(len(self.drv.ok("my_leads")), 2)
+        audit = self.hq.rows("hq_audit?select=action,detail&action=eq.leads_to_franchise")
+        self.assertEqual(len(audit), 1)
+
+    def test_a_lead_can_move_to_another_franchise_until_a_driver_has_it(self):
+        self.hq.ok("hq_assign_leads_to_franchise", p_lead_ids=[self.ids[0]], p_franchise=self.kkd)
+        self.hq.ok("hq_assign_leads_to_franchise", p_lead_ids=[self.ids[0]], p_franchise=self.tvm)
+        self.assertEqual(Lead.objects.get(pk=self.ids[0]).franchise_id, self.tvm)
+        self.hq.ok("hq_assign_leads_to_franchise", p_lead_ids=[self.ids[1]], p_franchise=self.kkd)
+        self.sup.ok("wh_assign_leads", p_lead_ids=[self.ids[1]], p_driver=self.drv.uid)
+        self.hq.fail("hq_assign_leads_to_franchise", "already with a driver", p_lead_ids=[self.ids[1]], p_franchise=self.tvm)
+        self.assertEqual(Lead.objects.get(pk=self.ids[1]).franchise_id, self.kkd)
+
+    def test_checks(self):
+        self.hq.fail("hq_assign_leads_to_franchise", "Select at least one", p_lead_ids=[], p_franchise=self.kkd)
+        self.hq.fail("hq_assign_leads_to_franchise", "Choose an active franchise", p_lead_ids=self.ids, p_franchise=None)
+        self.hq.fail("hq_assign_leads_to_franchise", "not found", p_lead_ids=[999999], p_franchise=self.kkd)
+        self.sup.fail("hq_assign_leads_to_franchise", "", p_lead_ids=self.ids, p_franchise=self.kkd)
+        self.assertEqual(Lead.objects.filter(franchise__isnull=True).count(), 4)
