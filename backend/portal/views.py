@@ -3,7 +3,7 @@ import json
 import time
 from urllib.parse import urlsplit
 
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
@@ -84,12 +84,17 @@ def login(request):
 
 @csrf_exempt
 def logout(request):
+    if request.method == "GET":
+        resp = render(request, "portal/logout.html", {"storage_keys": list(gate.STORAGE_KEY.values())})
+        resp["Cache-Control"] = "no-store"
+        return resp
     if request.method != "POST":
         return _json({"error": "Use POST to sign out."}, 405)
     if not _same_origin_browser_request(request):
         return _json({"error": "Cross-site sign-out requests are not allowed."}, 403)
     gate.end_session_of_cookie(request)
-    resp = HttpResponse(status=204)
+    resp = HttpResponseRedirect("/login/?m=You+have+signed+out.") if request.POST.get("browser") == "1" else HttpResponse(status=204)
+    resp["Cache-Control"] = "no-store"
     gate.clear_login_cookie(resp)
     resp.delete_cookie(gate.HOP, path="/")
     return resp
