@@ -1,0 +1,32 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#8B1E24">
+  <title>Sign out · Scrappy</title>
+  <link rel="icon" href="{% static 'kwd/brand/favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'kwd/css/theme.css' %}">
+</head>
+<body>
+  <main class="center">
+    <div class="card accent narrow">
+      <h1>Sign out?</h1>
+      <p class="muted">Your session on this device will end.</p>
+      <form id="logout-form" action="/logout/" method="post">
+        <input type="hidden" name="browser" value="1">
+        <button class="btn primary block" type="submit">Sign out</button>
+      </form>
+      <a class="btn block" href="/">Go back</a>
+    </div>
+  </main>
+  {{ storage_keys|json_script:"logout-storage-keys" }}
+  <script>
+    document.getElementById('logout-form').addEventListener('submit', function () {
+      JSON.parse(document.getElementById('logout-storage-keys').textContent).forEach(function (key) {
+        try { localStorage.removeItem(key) } catch (e) { /* The server still ends the session. */ }
+      })
+    })
+  </script>
+</body>
+</html>

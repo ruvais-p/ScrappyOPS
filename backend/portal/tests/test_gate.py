@@ -144,11 +144,21 @@ class GateTests(KwdCase):
         self.assertFalse(AuthSession.objects.filter(user__email="tso@p.test").exists())
         self.assertEqual(c.get("/kwd/")["Location"], "/login/")
 
-    def test_sign_out_by_get_is_refused_without_ending_the_session(self):
+    def test_sign_out_page_requires_confirmation_without_ending_the_session(self):
         c, _ = self.login("tso@p.test")
         r = c.get("/logout/?m=Bye")
-        self.assertEqual(r.status_code, 405)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'action="/logout/" method="post"')
+        self.assertContains(r, 'name="browser" value="1"')
+        self.assertEqual(r["Cache-Control"], "no-store")
         self.assertEqual(c.get("/kwd/").status_code, 200)
+
+    def test_confirmed_browser_sign_out_returns_to_login(self):
+        c, _ = self.login("tso@p.test")
+        r = c.post("/logout/", data={"browser": "1"})
+        self.assertEqual((r.status_code, r["Location"]), (302, "/login/?m=You+have+signed+out."))
+        self.assertFalse(AuthSession.objects.filter(user__email="tso@p.test").exists())
+        self.assertEqual(c.cookies[gate.COOKIE].value, "")
 
     def test_cross_site_login_and_logout_are_refused(self):
         c, r = self.login("tso@p.test")
