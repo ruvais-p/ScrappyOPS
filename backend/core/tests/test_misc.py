@@ -351,6 +351,23 @@ class PdfAndLoginTests(World):
         self.assertEqual(post(super_admin, {"action": "reset_password", "user_id": str(super_user.pk)}).status_code, 403)
         self.assertTrue(HqAudit.objects.filter(action="password_reset").exists())
 
+    def test_super_admin_creates_accountant_login(self):
+        from core.services.common import fetch_one
+        post = lambda who, body: self.client.post("/functions/v1/hq-logins", data=json.dumps(body), content_type="application/json", **who.h)
+        body = {"action": "create_accountant", "full_name": "Fiona Finance", "email": "fiona@t.test", "phone": "9446000011", "password": ""}
+        self.assertEqual(post(self.hq, body).status_code, 403)                     # only Super Admin
+        super_user = self.person("super@t.test", "Super", "super_admin", franchise=None, is_super_admin=True)
+        super_admin = Api(self.client, "super@t.test")
+        res = post(super_admin, body).json()["results"][0]
+        self.assertTrue(res["ok"] and res["role"] == "accountant" and len(res["password"]) == 14)
+        row = fetch_one("select full_name, role, phone, is_active from kwd_profiles where email = 'fiona@t.test'")
+        self.assertEqual((row["full_name"], row["role"], row["phone"], row["is_active"]), ("Fiona Finance", "accountant", "9446000011", True))
+        Api(self.client, "fiona@t.test", res["password"])                          # the new accountant can log in at once
+        self.assertEqual(post(super_admin, body).json()["error"], "A login with this email already exists. Use a different email.")
+        self.assertEqual(post(super_admin, {"action": "create_accountant", "full_name": "Bad", "email": "not-an-email"}).json()["error"],
+                         "Enter a valid email address.")
+        self.assertTrue(HqAudit.objects.filter(action="create_accountant").exists())
+
     def test_hq_cannot_claim_field_staff_login(self):
         staff = User.objects.create_user("field@t.test", PW)
         fetch("insert into kwd_profiles (id, full_name, email, role, is_active) values (%(u)s, 'Field User', 'field@t.test', 'tso', true) returning id",

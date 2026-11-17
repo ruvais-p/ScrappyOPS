@@ -171,7 +171,13 @@ export default {
     },
     select(el) { this.set({ selected: el.dataset.id }) },
     openCreate() { this.set({ create: true, cErr: '', f: emptyForm(), items2: [emptyItem()] }) },
-    closeCreate() { this.set({ create: false }) },
+    closeCreate() {
+      const f = this.S.f
+      const touched = f.customer_name.trim() || f.phone.trim() || f.place.trim() || f.received.trim()
+        || this.S.items2.some((x) => x.product_id || x.unit_price || Number(x.qty) !== 1)
+      if (touched && !confirm('Discard this bill? What you entered will not be saved.')) return
+      this.set({ create: false })
+    },
     pickProduct(el) {
       const q = this.S.byId[el.value], i = Number(el.dataset.i)
       const it = this.S.items2[i]

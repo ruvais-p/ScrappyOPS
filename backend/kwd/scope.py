@@ -4,7 +4,7 @@ from core.models import AuthSession
 from django.utils import timezone
 from core.services.common import fetch, fetch_one, ApiError, SESSION_MSG
 
-HO, ZM, TSO, FR, TC = "head_office", "zonal_manager", "tso", "franchisee", "telecaller"
+HO, ZM, TSO, FR, TC, FIN = "head_office", "zonal_manager", "tso", "franchisee", "telecaller", "accountant"
 
 
 class KCtx:
@@ -137,28 +137,28 @@ class Scope:
             "expense_policy": lambda: self.has_role(),
             "field_days": lambda: f"({a}.tso_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.tso_id')}))",
             "followups": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",
-            "fr_franchises": lambda: self.fr_can_see(a + ".id"),
-            "fr_company_settings": lambda: self.role_in(HO, FR, TC),
-            "fr_payment_receipts": lambda: self.is_ho(),
+            "fr_franchises": lambda: f"({self.fr_can_see(a + '.id')} or {self.role_in(FIN)})",
+            "fr_company_settings": lambda: self.role_in(HO, FR, TC, FIN),
+            "fr_payment_receipts": lambda: self.role_in(HO, FIN),
             "fr_meetings": lambda: self.is_ho(),
             "fr_lead_events": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_leads": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_presentations": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_product_categories": lambda: self.role_in(HO, FR),
-            "fr_products": lambda: self.role_in(HO, FR, TC),
-            "fr_sale_items": lambda: f"exists (select 1 from kwd_fr_sales _s where _s.id = {a}.sale_id and {self.fr_can_see('_s.franchise_id')})",
-            "fr_sales": lambda: self.fr_can_see(a + ".franchise_id"),
+            "fr_products": lambda: self.role_in(HO, FR, TC, FIN),
+            "fr_sale_items": lambda: f"(exists (select 1 from kwd_fr_sales _s where _s.id = {a}.sale_id and {self.fr_can_see('_s.franchise_id')}) or {self.role_in(FIN)})",
+            "fr_sales": lambda: f"({self.fr_can_see(a + '.franchise_id')} or {self.role_in(FIN)})",
             "fr_stock_moves": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_targets": lambda: self.fr_can_see(a + ".franchise_id"),
             "lsgds": lambda: self.can_see_lsgd(a + ".id"),
             "opportunities": lambda: self.can_see_lsgd(a + ".lsgd_id"),
-            "profiles": lambda: f"({a}.id = {me} or {self.is_ho()} or ({self.is_zm()} and ({a}.manager_id = {me} or {self.shares_district(a + '.id')})))",
+            "profiles": lambda: f"({a}.id = {me} or {self.is_ho()} or {self.role_in(FIN)} or ({self.is_zm()} and ({a}.manager_id = {me} or {self.shares_district(a + '.id')})))",
             "tasks": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",
             "tc_leads": lambda: self.tc_can_see(a + ".assigned_to"),
             "tc_lead_events": lambda: f"exists (select 1 from kwd_tc_leads _l where _l.id = {a}.lead_id and {self.tc_can_see('_l.assigned_to')})",
-            "tc_sales": lambda: self.tc_can_see(a + ".telecaller_id"),
-            "tc_sale_items": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
-            "tc_payment_receipts": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
+            "tc_sales": lambda: f"({self.tc_can_see(a + '.telecaller_id')} or {self.role_in(FIN)})",
+            "tc_sale_items": lambda: f"(exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')}) or {self.role_in(FIN)})",
+            "tc_payment_receipts": lambda: f"(exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')}) or {self.role_in(FIN)})",
             "tc_stock_moves": lambda: self.role_in(HO, TC),
             "user_districts": lambda: f"({a}.user_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.user_id')}))",
             "verification_calls": lambda: self.role_in(ZM, HO),
@@ -209,4 +209,17 @@ class Scope:
                     f"(coalesce(-sum(qty) filter (where kind in ('sale','sale_cancel')), 0::bigint))::integer as sold, "
                     f"(coalesce(sum(qty) filter (where kind in ('damaged','returned','count_adjust')), 0::bigint))::integer as adjusted, "
                     f"max(created_at) as last_move_at from kwd_tc_stock_moves m where {R('tc_stock_moves', 'm')} group by product_id")
+        if api == "v_finance_bills":
+            # Every sales bill, from any dashboard that issues one (franchise and telecaller) - sorted together for Finance.
+            # Bills the field app creates while buying scrap from a customer are a different thing (an expense claim, not a sale) and never appear here.
+            fin = self.role_in(HO, FIN)
+            return (f"select 'franchise'::text as source, s.id, s.invoice_no, s.sale_date, s.customer_name, s.customer_type, s.phone, "
+                    f"s.district_id, s.place, s.total, s.amount_received, s.payment_status, s.status, s.created_at, "
+                    f"f.business_name as seller_name, s.franchise_id, null::uuid as telecaller_id "
+                    f"from kwd_fr_sales s join kwd_fr_franchises f on f.id = s.franchise_id where {fin} "
+                    f"union all "
+                    f"select 'telecaller'::text as source, s.id, s.invoice_no, s.sale_date, s.customer_name, s.customer_type, s.phone, "
+                    f"s.district_id, s.place, s.total, s.amount_received, s.payment_status, s.status, s.created_at, "
+                    f"p.full_name as seller_name, null::uuid as franchise_id, s.telecaller_id "
+                    f"from kwd_tc_sales s join kwd_profiles p on p.id = s.telecaller_id where {fin}")
         raise ApiError(f"Unknown view {api}", 404)

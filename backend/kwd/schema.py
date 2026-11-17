@@ -79,6 +79,8 @@ VIEW_COLUMNS = {
     "v_tc_followups": cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
                             "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts temp_rank:i"),
     "v_tc_stock": cols("product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
+    "v_finance_bills": cols("source:t id:u invoice_no:t sale_date:d customer_name:t customer_type:t phone:t place:t district_id:i "
+                             "total:n amount_received:n payment_status:t status:t created_at:ts seller_name:t franchise_id:u telecaller_id:u"),
 }
 
 # foreign keys, used to resolve embedded selects:  (child table, child column, parent table, constraint name)

@@ -20,7 +20,7 @@ from core.services import hq as hq_service            # noqa: F401  (registers t
 from core.services import super_admin as super_admin_service  # noqa: F401
 from core.services import lead_import                 # noqa: F401
 from core.services import billing, dispatch, pickup, warehouse   # noqa: F401  (register the collector, warehouse, stock-to-HQ and billing actions)
-from core.services.common import ApiError, Ctx, UUID_RE, btrim, fetch_one
+from core.services.common import ApiError, Ctx, UUID_RE, btrim, fetch, fetch_one
 from core.services.registry import RPC, rpc
 
 log = logging.getLogger("scrappy.api")
@@ -394,6 +394,32 @@ def hq_logins(request):
                 HqAudit.objects.create(by_id=ctx.uid, action="password_reset", ref=full_name,
                                        detail={"role": role, "set_by_hq": not generated}, franchise_id=franchise_id)
             res = {"ok": True, "role": role, "full_name": full_name, "email": user.email}
+            res.update({"password": password} if generated else {"password_set_by_hq": True})
+            return jr({"results": [res]})
+        if action == "create_accountant":
+            if ctx.role != "super_admin":
+                return jr({"error": "Only Super Admin can create an accountant login here."}, 403)
+            email = clean(body.get("email"), 120).lower()
+            full_name = clean(body.get("full_name"))
+            phone = clean(body.get("phone"), 20) or None
+            if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$", email):
+                return jr({"error": "Enter a valid email address."}, 400)
+            if not full_name:
+                return jr({"error": "Enter the name."}, 400)
+            if User.objects.filter(email=email).exists():
+                return jr({"error": "A login with this email already exists. Use a different email."}, 400)
+            password, generated = str(body.get("password") or ""), False
+            if password == "":
+                password, generated = auth.new_password(), True
+            elif len(password) < 8 or len(password) > 72:
+                return jr({"error": "A password must be 8 to 72 characters."}, 400)
+            with transaction.atomic():
+                user = User.objects.create_user(email, password)
+                fetch("insert into kwd_profiles (id, full_name, email, phone, role, is_active) values "
+                      "(%(i)s, %(n)s, %(e)s, %(p)s, 'accountant', true) returning 1",
+                      {"i": user.pk, "n": full_name, "e": email, "p": phone})
+                HqAudit.objects.create(by_id=ctx.uid, action="create_accountant", ref=full_name, detail={"email": email})
+            res = {"ok": True, "id": str(user.pk), "full_name": full_name, "email": email, "role": "accountant"}
             res.update({"password": password} if generated else {"password_set_by_hq": True})
             return jr({"results": [res]})
         if action != "create":

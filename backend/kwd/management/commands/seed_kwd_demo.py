@@ -17,6 +17,7 @@ PEOPLE = [
     ("tso@demo.test", "Tina Field Officer", "tso"),
     ("fr@demo.test", "Farid Franchise", "franchisee"),
     ("tc@demo.test", "Tanya Telecaller", "telecaller"),
+    ("fin@demo.test", "Fiona Finance", "accountant"),
 ]
 
 

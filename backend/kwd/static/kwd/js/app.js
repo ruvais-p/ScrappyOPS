@@ -174,7 +174,8 @@ async function boot() {
   if (profile.role === 'tso') startShell(root, { profile, kind: 'field' })
   else if (profile.role === 'zonal_manager') startShell(root, { profile, kind: 'zm' })
   else if (profile.role === 'franchisee') (await import('./pages/fr/app.js?v=20261030-1')).start(root, { profile })
-  else if (profile.role === 'telecaller') (await import('./pages/tc/app.js?v=20261118-2')).start(root, { profile })
+  else if (profile.role === 'telecaller') (await import('./pages/tc/app.js?v=20261118-3')).start(root, { profile })
+  else if (profile.role === 'accountant') (await import('./pages/fin/app.js?v=20261117-1')).start(root, { profile })
   else await startHo(root, profile)
 }
 
