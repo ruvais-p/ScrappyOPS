@@ -12,7 +12,7 @@ const PAGES = {
   sales: () => import('./leads.js?v=20261117-2').then((m) => m.salesLeads),
   franchise: () => import('./leads.js?v=20261117-2').then((m) => m.franchiseLeads),
   followup: () => import('./followup.js?v=20261117-2').then((m) => m.default),
-  billing: () => import('./billing.js?v=20261117-2').then((m) => m.default),
+  billing: () => import('./billing.js?v=20261118-2').then((m) => m.default),
 }
 
 export async function start(root, { profile }) {

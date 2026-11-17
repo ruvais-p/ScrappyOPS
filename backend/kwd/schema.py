@@ -65,6 +65,7 @@ TABLES = {
                                       "total:n amount_received:n payment_status:t status:t cancel_reason:t cancelled_by:u cancelled_at:ts created_by:u created_at:ts"), {"payment_status"}),
     "tc_sale_items": ("kwd_tc_sale_items", cols("id:u sale_id:u product_id:u hsn_sac:t qty:i unit_price:n gst_percent:n gst_amount:n line_total:n"), {"gst_amount", "line_total"}),
     "tc_payment_receipts": ("kwd_tc_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
+    "tc_stock_moves": ("kwd_tc_stock_moves", cols("id:u product_id:u qty:i kind:t sale_id:u ref_no:t note:t created_by:u created_at:ts"), set()),
 }
 
 # views the pages read (computed from the rows the caller may see; see engine.VIEWS)
@@ -77,6 +78,7 @@ VIEW_COLUMNS = {
     "v_fr_stock": cols("franchise_id:u product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
     "v_tc_followups": cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
                             "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts temp_rank:i"),
+    "v_tc_stock": cols("product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
 }
 
 # foreign keys, used to resolve embedded selects:  (child table, child column, parent table, constraint name)
@@ -118,6 +120,9 @@ FKS = [
     ("tc_sale_items", "product_id", "fr_products", "tc_sale_items_product_id_fkey"), ("tc_sale_items", "sale_id", "tc_sales", "tc_sale_items_sale_id_fkey"),
     ("tc_payment_receipts", "sale_id", "tc_sales", "tc_payment_receipts_sale_id_fkey"),
     ("tc_payment_receipts", "received_by", "profiles", "tc_payment_receipts_received_by_fkey"),
+    ("tc_stock_moves", "product_id", "fr_products", "tc_stock_moves_product_id_fkey"),
+    ("tc_stock_moves", "sale_id", "tc_sales", "tc_stock_moves_sale_id_fkey"),
+    ("tc_stock_moves", "created_by", "profiles", "tc_stock_moves_created_by_fkey"),
     ("user_districts", "district_id", "districts", "user_districts_district_id_fkey"), ("user_districts", "user_id", "profiles", "user_districts_user_id_fkey"),
     ("verification_calls", "called_by", "profiles", "verification_calls_called_by_fkey"),
     ("verification_calls", "contact_id", "contacts", "verification_calls_contact_id_fkey"), ("verification_calls", "visit_id", "visits", "verification_calls_visit_id_fkey"),

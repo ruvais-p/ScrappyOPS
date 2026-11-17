@@ -1,5 +1,6 @@
 /* Telecaller: bill a customer directly - same tax invoice as the franchise module, picked from the shared product
-   catalogue. No stock is tracked here and no product can be added; that stays with Head Office. */
+   catalogue. This draws down Head Office's own stock; a telecaller can see what's on hand but never add stock or
+   products - that stays with Head Office. */
 import { html, raw, supabase, errText, toast } from '../../core.js'
 import { Loading, Empty, Icon, PageHead, Stat, SectionHead } from '../../ui.js'
 import { fmtDate, fmtINR, istDate, addDays } from '../../lib.js'
@@ -22,8 +23,9 @@ const emptyItem = () => ({ product_id: '', hsn_sac: '', qty: 1, unit_price: '', 
 const emptyForm = () => ({ customer_name: '', customer_type: 'B2C', phone: '', district_id: '', place: '', sale_date: istDate(), received: '' })
 
 function billForm(S) {
-  const { products, byId, districts } = S, f = S.f, items = S.items2
+  const { products, byId, districts, stock } = S, f = S.f, items = S.items2
   const total = items.reduce((a, x) => a + lineTotal(x), 0)
+  const onHand = (id) => stock[id] ?? 0
   return Sheet({ title: 'Create bill', close: 'closeCreate', body: html`
     <label>Customer name<input data-bind="f.customer_name" value="${f.customer_name}"></label>
     <div class="grid2">
@@ -40,7 +42,7 @@ function billForm(S) {
       return html`<div class="subcard" style="margin-bottom:10px" data-key="item${i}">
         <label>Product<select data-bind="items2.${i}.product_id" data-change="pickProduct" data-i="${i}">
           <option value="">Choose…</option>
-          ${products.filter((q) => q.is_active).map((q) => opt(q.id, x.product_id, q.name))}</select></label>
+          ${products.filter((q) => q.is_active).map((q) => opt(q.id, x.product_id, `${q.name} · ${onHand(q.id)} in stock`))}</select></label>
         <div class="grid2">
           <label>HSN/SAC<input data-bind="items2.${i}.hsn_sac" value="${x.hsn_sac || ''}" placeholder="Enter HSN/SAC"></label>
           <label>Quantity<input type="number" min="1" inputmode="numeric" data-bind="items2.${i}.qty" data-live value="${x.qty}"></label>
@@ -56,6 +58,7 @@ function billForm(S) {
           <span class="muted small grow">${p && p.list_price ? `List price ${fmtINR(p.list_price)} without GST` : ''} · line total ${fmtINR(lineTotal(x))}</span>
           ${items.length > 1 ? html`<button class="btn sm" data-act="removeItem" data-i="${i}">Remove</button>` : ''}
         </div>
+        ${x.product_id && Number(x.qty) > onHand(x.product_id) ? html`<p class="notice warn small"><span>Only ${onHand(x.product_id)} of ${p ? p.name : 'this product'} in Head Office stock.</span></p>` : ''}
       </div>`
     })}
     <button class="btn sm" data-act="addItem">${Icon('plus', 16)} Add another product</button>
@@ -108,7 +111,7 @@ function invoiceDetail(sale, items, S, receipts, downloading = false) {
 }
 
 export default {
-  state: { rows: null, items: [], receipts: [], products: [], byId: {}, districts: [], err: '', q: '', status: '',
+  state: { rows: null, items: [], receipts: [], products: [], byId: {}, districts: [], stock: {}, err: '', q: '', status: '',
     selected: '', create: false, f: emptyForm(), items2: [emptyItem()], cErr: '', busy: false, dl: false,
     payment: null, payForm: { amount: '', method: 'cash', reference: '' }, payErr: '', payBusy: false },
   async init() { await this.actions.load.call(this) },
@@ -124,7 +127,7 @@ export default {
     const due = live.reduce((a, s) => a + Math.max(0, Number(s.total || 0) - Number(s.amount_received || 0)), 0)
     const selected = S.rows.find((s) => s.id === S.selected)
     const productSummary = (saleId) => itemsText(S.items.filter((i) => i.sale_id === saleId), S.byId) || '—'
-    return html`${PageHead({ label: 'Telecalling', title: 'Billing', sub: 'Bill a customer directly and track what is still due. No stock is tracked here.',
+    return html`${PageHead({ label: 'Telecalling', title: 'Billing', sub: 'Bill a customer directly from Head Office stock and track what is still due.',
         actions: html`<button class="btn primary" data-act="openCreate">${Icon('plus', 18)} Create bill</button>` })}
       <div class="stats">
         ${Stat({ lead: true, label: 'Bills recorded', value: invoiced.length, sub: `of ${S.rows.length} sales` })}
@@ -155,14 +158,16 @@ export default {
   },
   actions: {
     async load() {
-      const [s, i, products, districts, receipts] = await Promise.all([
+      const [s, i, products, districts, receipts, stock] = await Promise.all([
         supabase.from('tc_sales').select('*').order('sale_date', { ascending: false }).order('created_at', { ascending: false }),
         supabase.from('tc_sale_items').select('*'),
         loadProducts(), loadDistricts(),
         supabase.from('tc_payment_receipts').select('*').order('received_at', { ascending: false }),
+        supabase.from('v_tc_stock').select('*'),
       ])
-      if (s.error || i.error || receipts.error) return this.set({ err: errText(s.error || i.error || receipts.error) })
-      this.set({ rows: s.data, items: i.data, receipts: receipts.data, products: products.products, byId: products.byId, districts, err: '' })
+      if (s.error || i.error || receipts.error || stock.error) return this.set({ err: errText(s.error || i.error || receipts.error || stock.error) })
+      this.set({ rows: s.data, items: i.data, receipts: receipts.data, products: products.products, byId: products.byId, districts,
+        stock: Object.fromEntries((stock.data || []).map((r) => [r.product_id, r.on_hand])), err: '' })
     },
     select(el) { this.set({ selected: el.dataset.id }) },
     openCreate() { this.set({ create: true, cErr: '', f: emptyForm(), items2: [emptyItem()] }) },
@@ -192,6 +197,11 @@ export default {
       if (f.customer_name.trim().length < 2) return this.set({ cErr: 'Enter the customer name.' })
       if (items.some((x) => !x.product_id || !(Number(x.qty) > 0) || !(Number(x.unit_price) > 0) || !Number.isFinite(Number(x.gst_percent)) || Number(x.gst_percent) < 0 || Number(x.gst_percent) > 100))
         return this.set({ cErr: 'Choose each product and enter its quantity, unit price and valid GST rate.' })
+      for (const x of items) {
+        const need = items.filter((y) => y.product_id === x.product_id).reduce((a, y) => a + Number(y.qty), 0)
+        const have = S.stock[x.product_id] ?? 0
+        if (need > have) return this.set({ cErr: `Only ${have} of ${S.byId[x.product_id].name} in Head Office stock.` })
+      }
       if (Number(f.received || 0) > total) return this.set({ cErr: 'Money received cannot be more than the total.' })
       this.set({ busy: true })
       const { error } = await supabase.rpc('tc_record_sale', {

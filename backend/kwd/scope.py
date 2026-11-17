@@ -159,6 +159,7 @@ class Scope:
             "tc_sales": lambda: self.tc_can_see(a + ".telecaller_id"),
             "tc_sale_items": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
             "tc_payment_receipts": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
+            "tc_stock_moves": lambda: self.role_in(HO, TC),
             "user_districts": lambda: f"({a}.user_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.user_id')}))",
             "verification_calls": lambda: self.role_in(ZM, HO),
             "visit_contacts": lambda: f"exists (select 1 from kwd_visits _v where _v.id = {a}.visit_id and {self.read('visits', '_v')})",
@@ -202,4 +203,10 @@ class Scope:
         if api == "v_tc_followups":
             return (f"select l.*, case l.temperature when 'hot' then 0 when 'warm' then 1 when 'cold' then 2 else 3 end as temp_rank "
                     f"from kwd_tc_leads l where l.next_followup_on is not null and l.status not in ('converted', 'lost') and {R('tc_leads', 'l')}")
+        if api == "v_tc_stock":
+            return (f"select product_id, (sum(qty))::integer as on_hand, "
+                    f"(coalesce(sum(qty) filter (where kind in ('opening','received')), 0::bigint))::integer as received, "
+                    f"(coalesce(-sum(qty) filter (where kind in ('sale','sale_cancel')), 0::bigint))::integer as sold, "
+                    f"(coalesce(sum(qty) filter (where kind in ('damaged','returned','count_adjust')), 0::bigint))::integer as adjusted, "
+                    f"max(created_at) as last_move_at from kwd_tc_stock_moves m where {R('tc_stock_moves', 'm')} group by product_id")
         raise ApiError(f"Unknown view {api}", 404)
