@@ -13,7 +13,7 @@ from core.models import Profile, User
 from core.services.common import ApiError, fetch, fetch_one
 from kwd.scope import HO
 
-ROLES = ("tso", "zonal_manager", "head_office", "franchisee")
+ROLES = ("tso", "zonal_manager", "head_office", "franchisee", "telecaller")
 
 
 # ---------------------------------------------------------------------------------------------- admin-users

@@ -58,6 +58,13 @@ TABLES = {
     "fr_company_settings": ("kwd_fr_company_settings", cols("id:i company_name:t address:t phone:t gstin:t email:t state:t updated_by:u updated_at:ts"), set()),
     "fr_payment_receipts": ("kwd_fr_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
     "fr_meetings": ("kwd_fr_meetings", cols("id:u scheduled_at:ts meeting_type:t description:t status:t created_by:u created_at:ts completed_by:u completed_at:ts"), set()),
+    "tc_leads": ("kwd_tc_leads", cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
+                                      "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts"), set()),
+    "tc_lead_events": ("kwd_tc_lead_events", cols("id:i lead_id:u actor:u from_status:t to_status:t from_temperature:t to_temperature:t note:t at:ts"), set()),
+    "tc_sales": ("kwd_tc_sales", cols("id:u telecaller_id:u lead_id:u customer_name:t customer_type:t phone:t district_id:i place:t sale_date:d invoice_no:t "
+                                      "total:n amount_received:n payment_status:t status:t cancel_reason:t cancelled_by:u cancelled_at:ts created_by:u created_at:ts"), {"payment_status"}),
+    "tc_sale_items": ("kwd_tc_sale_items", cols("id:u sale_id:u product_id:u hsn_sac:t qty:i unit_price:n gst_percent:n gst_amount:n line_total:n"), {"gst_amount", "line_total"}),
+    "tc_payment_receipts": ("kwd_tc_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
 }
 
 # views the pages read (computed from the rows the caller may see; see engine.VIEWS)
@@ -68,6 +75,8 @@ VIEW_COLUMNS = {
     "v_shared_contact_phones": cols("phone:t lsgds:i names:a"),
     "v_fr_sold": cols("franchise_id:u sale_id:u sale_date:d month:d product_id:u qty:i line_total:n"),
     "v_fr_stock": cols("franchise_id:u product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
+    "v_tc_followups": cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
+                            "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts temp_rank:i"),
 }
 
 # foreign keys, used to resolve embedded selects:  (child table, child column, parent table, constraint name)
@@ -101,6 +110,14 @@ FKS = [
     ("profiles", "manager_id", "profiles", "profiles_manager_id_fkey"),
     ("tasks", "assigned_by", "profiles", "tasks_assigned_by_fkey"), ("tasks", "assigned_to", "profiles", "tasks_assigned_to_fkey"),
     ("tasks", "lsgd_id", "lsgds", "tasks_lsgd_id_fkey"),
+    ("tc_leads", "district_id", "districts", "tc_leads_district_id_fkey"), ("tc_leads", "assigned_to", "profiles", "tc_leads_assigned_to_fkey"),
+    ("tc_leads", "created_by", "profiles", "tc_leads_created_by_fkey"),
+    ("tc_lead_events", "lead_id", "tc_leads", "tc_lead_events_lead_id_fkey"), ("tc_lead_events", "actor", "profiles", "tc_lead_events_actor_fkey"),
+    ("tc_sales", "district_id", "districts", "tc_sales_district_id_fkey"), ("tc_sales", "telecaller_id", "profiles", "tc_sales_telecaller_id_fkey"),
+    ("tc_sales", "lead_id", "tc_leads", "tc_sales_lead_id_fkey"), ("tc_sales", "created_by", "profiles", "tc_sales_created_by_fkey"),
+    ("tc_sale_items", "product_id", "fr_products", "tc_sale_items_product_id_fkey"), ("tc_sale_items", "sale_id", "tc_sales", "tc_sale_items_sale_id_fkey"),
+    ("tc_payment_receipts", "sale_id", "tc_sales", "tc_payment_receipts_sale_id_fkey"),
+    ("tc_payment_receipts", "received_by", "profiles", "tc_payment_receipts_received_by_fkey"),
     ("user_districts", "district_id", "districts", "user_districts_district_id_fkey"), ("user_districts", "user_id", "profiles", "user_districts_user_id_fkey"),
     ("verification_calls", "called_by", "profiles", "verification_calls_called_by_fkey"),
     ("verification_calls", "contact_id", "contacts", "verification_calls_contact_id_fkey"), ("verification_calls", "visit_id", "visits", "verification_calls_visit_id_fkey"),

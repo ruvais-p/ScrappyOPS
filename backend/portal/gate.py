@@ -14,7 +14,7 @@ Role -> dashboard
   warehouse, supervisor                  -> /warehouse/
   hq                                     -> /hq/
   super_admin                            -> /super-admin/
-  tso, zonal_manager, head_office, franchisee (Scrappy Field, the staff app) -> /kwd/
+  tso, zonal_manager, head_office, franchisee, telecaller (Scrappy Field, the staff app) -> /kwd/
 """
 import time
 
@@ -32,7 +32,7 @@ SALT = "portal.gate"
 
 SCRAP_ROLES = {"driver": "collector", "warehouse": "warehouse", "supervisor": "warehouse", "hq": "hq",
                "super_admin": "super_admin"}
-KWD_ROLES = {"tso", "zonal_manager", "head_office", "franchisee"}
+KWD_ROLES = {"tso", "zonal_manager", "head_office", "franchisee", "telecaller"}
 DASH_PATH = {"collector": "/collector/", "warehouse": "/warehouse/", "hq": "/hq/", "kwd": "/kwd/",
              "super_admin": "/super-admin/"}
 # where each dashboard keeps its login in the browser (the pages read these)

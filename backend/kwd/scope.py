@@ -4,7 +4,7 @@ from core.models import AuthSession
 from django.utils import timezone
 from core.services.common import fetch, fetch_one, ApiError, SESSION_MSG
 
-HO, ZM, TSO, FR = "head_office", "zonal_manager", "tso", "franchisee"
+HO, ZM, TSO, FR, TC = "head_office", "zonal_manager", "tso", "franchisee", "telecaller"
 
 
 class KCtx:
@@ -106,6 +106,11 @@ class Scope:
         fid = self.ctx.franchise_id
         return f"{expr} = {self.P.add(fid)}::uuid" if fid else "false"
 
+    def tc_can_see(self, expr):
+        if self.role == HO:
+            return "true"
+        return f"{expr} = {self.me}" if self.role == TC else "false"
+
     def is_ho(self):
         return "true" if self.role == HO else "false"
 
@@ -133,14 +138,14 @@ class Scope:
             "field_days": lambda: f"({a}.tso_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.tso_id')}))",
             "followups": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",
             "fr_franchises": lambda: self.fr_can_see(a + ".id"),
-            "fr_company_settings": lambda: self.role_in(HO, FR),
+            "fr_company_settings": lambda: self.role_in(HO, FR, TC),
             "fr_payment_receipts": lambda: self.is_ho(),
             "fr_meetings": lambda: self.is_ho(),
             "fr_lead_events": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_leads": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_presentations": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_product_categories": lambda: self.role_in(HO, FR),
-            "fr_products": lambda: self.role_in(HO, FR),
+            "fr_products": lambda: self.role_in(HO, FR, TC),
             "fr_sale_items": lambda: f"exists (select 1 from kwd_fr_sales _s where _s.id = {a}.sale_id and {self.fr_can_see('_s.franchise_id')})",
             "fr_sales": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_stock_moves": lambda: self.fr_can_see(a + ".franchise_id"),
@@ -149,6 +154,11 @@ class Scope:
             "opportunities": lambda: self.can_see_lsgd(a + ".lsgd_id"),
             "profiles": lambda: f"({a}.id = {me} or {self.is_ho()} or ({self.is_zm()} and ({a}.manager_id = {me} or {self.shares_district(a + '.id')})))",
             "tasks": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",
+            "tc_leads": lambda: self.tc_can_see(a + ".assigned_to"),
+            "tc_lead_events": lambda: f"exists (select 1 from kwd_tc_leads _l where _l.id = {a}.lead_id and {self.tc_can_see('_l.assigned_to')})",
+            "tc_sales": lambda: self.tc_can_see(a + ".telecaller_id"),
+            "tc_sale_items": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
+            "tc_payment_receipts": lambda: f"exists (select 1 from kwd_tc_sales _s where _s.id = {a}.sale_id and {self.tc_can_see('_s.telecaller_id')})",
             "user_districts": lambda: f"({a}.user_id = {me} or {self.is_ho()} or ({self.is_zm()} and {self.is_my_tso(a + '.user_id')}))",
             "verification_calls": lambda: self.role_in(ZM, HO),
             "visit_contacts": lambda: f"exists (select 1 from kwd_visits _v where _v.id = {a}.visit_id and {self.read('visits', '_v')})",
@@ -189,4 +199,7 @@ class Scope:
                     f"(coalesce(-sum(qty) filter (where kind in ('sale','sale_cancel')), 0::bigint))::integer as sold, "
                     f"(coalesce(sum(qty) filter (where kind in ('damaged','returned','count_adjust')), 0::bigint))::integer as adjusted, "
                     f"max(created_at) as last_move_at from kwd_fr_stock_moves m where {R('fr_stock_moves', 'm')} group by franchise_id, product_id")
+        if api == "v_tc_followups":
+            return (f"select l.*, case l.temperature when 'hot' then 0 when 'warm' then 1 when 'cold' then 2 else 3 end as temp_rank "
+                    f"from kwd_tc_leads l where l.next_followup_on is not null and l.status not in ('converted', 'lost') and {R('tc_leads', 'l')}")
         raise ApiError(f"Unknown view {api}", 404)

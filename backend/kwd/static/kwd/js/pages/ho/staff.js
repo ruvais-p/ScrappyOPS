@@ -4,7 +4,7 @@ import { Loading, Empty, Icon, PageHead, Avatar } from '../../ui.js'
 import { fmtDate } from '../../lib.js'
 import { Sheet, adminUsers, errLine } from '../../kit.js'
 
-const ROLE_LABEL = { tso: 'TSO', zonal_manager: 'Zonal Manager', head_office: 'Head Office' }
+const ROLE_LABEL = { tso: 'TSO', zonal_manager: 'Zonal Manager', head_office: 'Head Office', telecaller: 'Telecaller' }
 
 function makePassword() {
   const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
@@ -32,9 +32,9 @@ function formSheet(S, me) {
       <label>Mobile<input type="tel" inputmode="numeric" data-bind="f.phone" value="${f.phone}" placeholder="10 digits"></label>
     </div>
     <label>Role<select data-bind="f.role" data-live ${isSelf ? raw('disabled') : ''}>
-      ${opt('tso', f.role, 'Territory Sales Officer (TSO)')}${opt('zonal_manager', f.role, 'Zonal Manager')}${opt('head_office', f.role, 'Head Office')}</select></label>
+      ${opt('tso', f.role, 'Territory Sales Officer (TSO)')}${opt('zonal_manager', f.role, 'Zonal Manager')}${opt('head_office', f.role, 'Head Office')}${opt('telecaller', f.role, 'Sales telecaller')}</select></label>
     ${f.role === 'tso' ? html`<label>Reports to (Zonal Manager)<select data-bind="f.manager_id" data-live><option value="">Choose…</option>${zms.map((z) => opt(z.id, f.manager_id, z.full_name))}</select></label>` : ''}
-    ${f.role !== 'head_office' ? html`<div class="field-label">${f.role === 'zonal_manager' ? 'Jurisdiction (districts this ZM manages)' : 'Districts this TSO works in'}</div>
+    ${!['head_office', 'telecaller'].includes(f.role) ? html`<div class="field-label">${f.role === 'zonal_manager' ? 'Jurisdiction (districts this ZM manages)' : 'Districts this TSO works in'}</div>
       ${f.role === 'tso' && zm ? html`<p class="small muted">Showing ${zm.full_name}'s districts.</p>` : ''}
       <div class="chips">${shown.map((d) => html`<button class="chip${f.district_ids.includes(d.id) ? ' on' : ''}" data-act="toggleD" data-id="${d.id}" aria-pressed="${f.district_ids.includes(d.id)}">${d.name}</button>`)}</div>` : ''}
     ${isNew ? html`<label>First password<div class="row"><input data-bind="f.password" value="${f.password}" class="grow"><button class="btn sm" data-act="newPw">New</button></div></label>` : ''}
@@ -63,7 +63,7 @@ export default {
       ${gaps.length > 0 && S.rows ? html`<p class="notice warn">Districts not fully covered: ${gaps.map((g) => `${g.name} (${!g.zms ? 'no ZM' : ''}${!g.zms && !g.tsos ? ', ' : ''}${!g.tsos ? 'no TSO' : ''})`).join(' · ')}</p>` : ''}
       <div class="toolbar">
         <div class="search">${Icon('search', 18)}<input placeholder="Search name, email, phone" data-bind="q" data-live value="${S.q}"></div>
-        <div class="seg">${[['', 'All'], ['tso', 'TSOs'], ['zonal_manager', 'ZMs'], ['head_office', 'HO']].map(([k, l]) => html`<button class="${S.role === k ? 'on' : ''}" data-act="role" data-k="${k}">${l}</button>`)}</div>
+        <div class="seg">${[['', 'All'], ['tso', 'TSOs'], ['zonal_manager', 'ZMs'], ['head_office', 'HO'], ['telecaller', 'Telecallers']].map(([k, l]) => html`<button class="${S.role === k ? 'on' : ''}" data-act="role" data-k="${k}">${l}</button>`)}</div>
       </div>
       ${S.err ? html`<p class="error">${S.err}</p>` : ''}
       ${!S.rows ? Loading('Loading staff…') : list.length === 0 ? Empty('No staff match.') : html`<div class="table-wrap"><table>
@@ -71,7 +71,7 @@ export default {
         <tbody>${list.map((r) => html`<tr style="${r.is_active ? '' : 'opacity:.6'}">
           <td><div class="who-cell">${Avatar(r.full_name || r.email, 32)}<div><b>${r.full_name || '—'}</b><div class="muted small">${r.email}${r.phone ? ` · ${r.phone}` : ''}</div></div></div></td>
           <td>${ROLE_LABEL[r.role]}</td>
-          <td style="white-space:normal;max-width:260px">${r.role === 'head_office' ? html`<span class="muted">All</span>` : r.district_ids.map(dName).join(', ') || html`<span class="text-warn">None</span>`}</td>
+          <td style="white-space:normal;max-width:260px">${r.role === 'head_office' ? html`<span class="muted">All</span>` : r.role === 'telecaller' ? html`<span class="muted">—</span>` : r.district_ids.map(dName).join(', ') || html`<span class="text-warn">None</span>`}</td>
           <td>${r.role === 'tso' ? ((byId(r.manager_id) || {}).full_name || html`<span class="text-warn">No ZM</span>`) : html`<span class="muted">—</span>`}</td>
           <td>${r.is_active ? html`<span class="pill ok">Active</span>` : html`<span class="pill bad">Off</span>`}</td>
           <td>${fmtDate(r.created_at)}</td>
@@ -107,12 +107,12 @@ export default {
       if (isNew && !/^\S+@\S+\.\S+$/.test(f.email.trim())) return this.set({ ferr: 'Enter a valid email.' })
       if (f.phone && !/^[6-9]\d{9}$/.test(f.phone.replace(/\D/g, '').slice(-10))) return this.set({ ferr: 'Enter a valid 10-digit mobile number.' })
       if (f.role === 'tso' && !f.manager_id) return this.set({ ferr: 'Choose the Zonal Manager this TSO reports to.' })
-      if (f.role !== 'head_office' && f.district_ids.length === 0) return this.set({ ferr: 'Pick at least one district.' })
+      if (!['head_office', 'telecaller'].includes(f.role) && f.district_ids.length === 0) return this.set({ ferr: 'Pick at least one district.' })
       if (isNew && f.password.length < 8) return this.set({ ferr: 'Password must be at least 8 characters.' })
       this.set({ busy: true, ferr: '' })
       const p = {
         full_name: f.full_name.trim(), phone: f.phone ? f.phone.replace(/\D/g, '').slice(-10) : null, role: f.role,
-        manager_id: f.role === 'tso' ? f.manager_id : null, district_ids: f.role === 'head_office' ? [] : f.district_ids,
+        manager_id: f.role === 'tso' ? f.manager_id : null, district_ids: ['head_office', 'telecaller'].includes(f.role) ? [] : f.district_ids,
         ...(isNew ? {} : { is_active: f.is_active }),
       }
       try {

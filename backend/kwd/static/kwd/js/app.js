@@ -25,6 +25,7 @@ const HO_TABS = [
   { id: 'claims', label: 'TA / DA', icon: 'rupee', countKey: 'claims' },
   { id: 'fraud', label: 'Fraud check', icon: 'alert' },
   { id: 'staff', label: 'Staff', icon: 'users' },
+  { id: 'telecalling', label: 'Telecalling', icon: 'followup' },
   { id: 'zlsgds', label: 'LSGDs', icon: 'building' },
   { id: 'review', label: 'ZM review queue', icon: 'review', countKey: 'review' },
   { id: 'plan', label: 'Visit plans', icon: 'calendar' },
@@ -54,6 +55,7 @@ const MANAGER = {
   signoff: def('./pages/ho/signoff.js'),
   fraud: def('./pages/ho/fraud.js'),
   staff: def('./pages/ho/staff.js'),
+  telecalling: def('./pages/ho/telecalling.js'),
   zlsgds: def('./pages/zm/zmlsgds.js'),
 }
 
@@ -79,7 +81,7 @@ function startShell(root, { profile, kind, onSwitch }) {
     const active = activeTab()
     if (mgr) {
       const groups = ho
-        ? [{ label: 'Head Office', items: HO_TABS.slice(0, 6) }, { label: 'Zone tools', items: HO_TABS.slice(6) }]
+        ? [{ label: 'Head Office', items: HO_TABS.slice(0, 7) }, { label: 'Zone tools', items: HO_TABS.slice(7) }]
         : [{ label: 'My zone', items: [...ZM_TABS, { id: 'visit', label: 'Log my visit', icon: 'camera' }, { id: 'work', label: 'My day & requests', icon: 'clock' }] }]
       patch(el('side'), SideNav({ brand: `Field · ${roleLabel}`, groups, active, counts: state.counts, profile, roleLabel, onSwitch }))
     }
@@ -115,7 +117,7 @@ function startShell(root, { profile, kind, onSwitch }) {
     if (!load) load = pages.home
     const d = await load()
     if (mine !== state.token) return
-    const needsHo = ['signoff', 'fraud', 'staff'].includes(page) && !ho
+    const needsHo = ['signoff', 'fraud', 'staff', 'telecalling'].includes(page) && !ho
     if (needsHo) { pageEl.innerHTML = ''; return }
     state.screen = new Screen(pageEl, d, { profile, go, route: state.route, refreshCounts, ho, kind })
     if (mgr) refreshCounts()
@@ -172,6 +174,7 @@ async function boot() {
   if (profile.role === 'tso') startShell(root, { profile, kind: 'field' })
   else if (profile.role === 'zonal_manager') startShell(root, { profile, kind: 'zm' })
   else if (profile.role === 'franchisee') (await import('./pages/fr/app.js?v=20261030-1')).start(root, { profile })
+  else if (profile.role === 'telecaller') (await import('./pages/tc/app.js?v=20261117-2')).start(root, { profile })
   else await startHo(root, profile)
 }
 

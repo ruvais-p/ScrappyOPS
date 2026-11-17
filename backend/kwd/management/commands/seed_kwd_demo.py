@@ -16,6 +16,7 @@ PEOPLE = [
     ("zm@demo.test", "Zara Zonal Manager", "zonal_manager"),
     ("tso@demo.test", "Tina Field Officer", "tso"),
     ("fr@demo.test", "Farid Franchise", "franchisee"),
+    ("tc@demo.test", "Tanya Telecaller", "telecaller"),
 ]
 
 
@@ -57,4 +58,9 @@ class Command(BaseCommand):
         if not fetch_one("select 1 as x from kwd_fr_leads where franchise_id = %(f)s", {"f": fr["id"]}):
             fetch("insert into kwd_fr_leads (franchise_id, customer_name, customer_type, place, district_id, hq_note) values (%(f)s, 'Aluva Municipality', 'lsgd', 'Aluva', %(d)s, 'Annual plan meeting in March') returning 1",
                   {"f": fr["id"], "d": ekm})
+        if not fetch_one("select 1 as x from kwd_tc_leads where assigned_to = %(t)s", {"t": ids["telecaller"]}):
+            fetch("insert into kwd_tc_leads (kind, customer_name, phone, place, district_id, assigned_to, created_by) values "
+                  "('sales', 'Beena Stores', '9847000111', 'Aluva', %(d)s, %(t)s, %(h)s), "
+                  "('franchise', 'Ravi Kumar', '9847000222', 'Angamaly', %(d)s, %(t)s, %(h)s) returning 1",
+                  {"d": ekm, "t": ids["telecaller"], "h": ids["head_office"]})
         self.stdout.write(self.style.SUCCESS("Demo staff-app logins ready: " + ", ".join(e for e, _, _ in PEOPLE) + f"  (password: {DEMO_PASSWORD})"))
