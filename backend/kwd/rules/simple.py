@@ -1,7 +1,8 @@
-"""The smaller tables: districts, staff profiles, LSGDs, contacts, tasks, deals, follow-ups, verification calls, expense policy."""
-from core.services.common import ApiError
+"""The smaller tables: districts, staff profiles, LSGDs, contacts, LSGD updates, tasks, deals, follow-ups, verification calls,
+expense policy."""
+from core.services.common import ApiError, fetch_one
 from kwd.rules.base import Rules
-from kwd.rules.util import now, trim
+from kwd.rules.util import ist_today, now, trim
 from kwd.scope import FR, HO, TSO, ZM
 
 
@@ -84,17 +85,51 @@ class Contacts(Rules):
         return f"({S.can_see_lsgd(uu(P, new['lsgd_id']))} and {verified_ok})"
 
     def update_using(self, ctx, S, a):
-        return f"({S.role_in(ZM, HO)} and {S.can_see_lsgd(a + '.lsgd_id')})"
+        # a TSO corrects a person's details until a manager has confirmed them by phone; then they are evidence and stay as they are
+        return f"(({S.role_in(ZM, HO)} or ({S.role_in(TSO)} and {a}.verified_at is null)) and {S.can_see_lsgd(a + '.lsgd_id')})"
 
     def update_check(self, ctx, S, P, new):
         return S.can_see_lsgd(uu(P, new["lsgd_id"]))
 
     def before_update(self, ctx, old, new, keys):
         new["created_by"], new["created_at"], new["lsgd_id"] = old["created_by"], old["created_at"], old["lsgd_id"]
-        if new.get("verified_at") is not None and old.get("verified_at") is None:
+        if not trim(new.get("name")):
+            raise ApiError("Enter the person's name.")
+        if ctx.role == TSO:
+            new["verified_by"], new["verified_at"] = old["verified_by"], old["verified_at"]
+        elif new.get("verified_at") is not None and old.get("verified_at") is None:
             new["verified_by"], new["verified_at"] = ctx.uid, now()
         elif old.get("verified_at") is not None:
             new["verified_by"], new["verified_at"] = old["verified_by"], old["verified_at"]
+        return new
+
+
+class LsgdUpdates(Rules):
+    """Work on an LSGD recorded without a check-in: what was said and by whom, for work done before the app or by phone.
+    It is a note for the LSGD's history, not a visit: no GPS, no TA / DA, no review."""
+    api = "lsgd_updates"
+    audit = ("INSERT",)
+    defaults = {"tso_id": lambda c: c.uid, "mode": "visit", "contact_ids": [], "created_at": lambda c: now()}
+
+    def insert_check(self, ctx, S, P, new):
+        return f"({S.role_in(TSO, ZM)} and {S.can_see_lsgd(uu(P, new['lsgd_id']))})"
+
+    def before_insert(self, ctx, new):
+        new["tso_id"], new["created_at"] = ctx.uid, now()
+        new["discussion"], new["outcome"] = trim(new.get("discussion")), trim(new.get("outcome")) or None
+        if len(new["discussion"]) < 20:
+            raise ApiError("Write a few lines about what they said (at least 20 characters).")
+        if new.get("happened_on") is None:
+            raise ApiError("Enter the date it happened.")
+        if new["happened_on"] > ist_today():
+            raise ApiError("The date can't be in the future.")
+        if new.get("interest_level") is not None and not 1 <= new["interest_level"] <= 5:
+            raise ApiError("Choose how interested they are.")
+        ids = list(dict.fromkeys(new.get("contact_ids") or []))
+        if ids and fetch_one("select count(*) as n from kwd_contacts where id = any(%(i)s) and lsgd_id = %(l)s",
+                             {"i": ids, "l": new["lsgd_id"]})["n"] != len(ids):
+            raise ApiError("Pick people from this LSGD only.")
+        new["contact_ids"] = ids
         return new
 
 

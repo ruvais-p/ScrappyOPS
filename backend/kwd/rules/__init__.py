@@ -1,13 +1,13 @@
 """Every table the pages may write to, with the rules for it. A table that is not listed cannot be written to at all."""
 from kwd.rules.days import ExpenseItems, FieldDays
 from kwd.rules.franchise import (FrCompanySettings, FrFranchises, FrLeads, FrMeetings, FrPresentations, FrProductCategories, FrProducts, FrSales, FrStockMoves, FrTargets)
-from kwd.rules.simple import (Contacts, Districts, ExpensePolicy, Followups, Lsgds, Opportunities, Profiles, Tasks, UserDistricts,
-                              VerificationCalls)
+from kwd.rules.simple import (Contacts, Districts, ExpensePolicy, Followups, LsgdUpdates, Lsgds, Opportunities, Profiles, Tasks,
+                              UserDistricts, VerificationCalls)
 from kwd.rules.telecaller import TcLeads, TcStockMoves
 from kwd.rules.visits import Visits, VisitContacts
 
 RULES = {r.api: r for r in (
-    Districts(), Profiles(), UserDistricts(), Lsgds(), Contacts(), Tasks(), Opportunities(), Followups(), VerificationCalls(),
+    Districts(), Profiles(), UserDistricts(), Lsgds(), Contacts(), LsgdUpdates(), Tasks(), Opportunities(), Followups(), VerificationCalls(),
     ExpensePolicy(), Visits(), VisitContacts(), FieldDays(), ExpenseItems(), FrFranchises(), FrProductCategories(), FrProducts(), FrTargets(), FrLeads(),
     FrPresentations(), FrSales(), FrStockMoves(), FrCompanySettings(), FrMeetings(), TcLeads(), TcStockMoves(),
 )}

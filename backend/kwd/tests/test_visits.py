@@ -148,7 +148,40 @@ class VisitTests(KwdCase):
         again = self.zm.update("contacts", {"verified_at": None, "verified_by": None}, [["eq", "id", c["id"]]], select="verified_by, verified_at")[0]
         self.assertEqual(again["verified_by"], str(self.zm_id))
         self.assertIsNotNone(again["verified_at"])
-        self.assertEqual(self.tso.update("contacts", {"name": "Hacked"}, [["eq", "id", c["id"]]], select="id"), [])      # a TSO cannot edit contacts
+        self.assertEqual(self.tso.update("contacts", {"name": "Hacked"}, [["eq", "id", c["id"]]], select="id"), [])      # a TSO cannot edit a verified contact
+
+    def test_a_tso_corrects_an_unverified_contact(self):
+        c = self.contact(self.tso)
+        out = self.tso.update("contacts", {"name": "Mrs Secretary", "phone": "9446099999", "verified_at": "2020-01-01T00:00:00Z", "lsgd_id": self.lsgd_tsr},
+                              [["eq", "id", c["id"]]], select="*")[0]
+        self.assertEqual((out["name"], out["phone"], out["verified_at"], out["lsgd_id"]), ("Mrs Secretary", "9446099999", None, str(self.lsgd)))   # cannot verify or move it
+        self.tso.fails("person's name", self.tso.update, "contacts", {"name": "  "}, [["eq", "id", c["id"]]])
+        self.assertEqual(self.tso2.update("contacts", {"name": "Other"}, [["eq", "id", c["id"]]], select="id"), [])            # not their district
+
+    def test_lsgd_status_updates(self):
+        c = self.contact(self.tso)
+        other = self.contact(self.tso2, lsgd=self.lsgd_tsr, name="Elsewhere", phone="9446011111")
+        u = {"lsgd_id": self.lsgd, "happened_on": "2026-06-10", "mode": "call", "contact_ids": [c["id"]],
+             "discussion": "  Secretary wants 150 units in next year's plan.  ", "outcome": "", "interest_level": 4, "tso_id": self.tso2_id}
+        row = self.tso.insert("lsgd_updates", u, select="*", single=True)
+        self.assertEqual((row["tso_id"], row["contact_ids"], row["discussion"], row["outcome"], row["interest_level"]),
+                         (str(self.tso_id), [c["id"]], "Secretary wants 150 units in next year's plan.", None, 4))
+        self.tso.fails("at least 20 characters", self.tso.insert, "lsgd_updates", {**u, "discussion": "too short"})
+        self.tso.fails("future", self.tso.insert, "lsgd_updates", {**u, "happened_on": str(ist_today() + timedelta(days=1))})
+        self.tso.fails("from this LSGD only", self.tso.insert, "lsgd_updates", {**u, "contact_ids": [other["id"]]})
+        self.tso.fails("interested", self.tso.insert, "lsgd_updates", {**u, "interest_level": 9})
+        self.tso2.fails("row-level security", self.tso2.insert, "lsgd_updates", u)                                        # not their district
+        self.ho.fails("row-level security", self.ho.insert, "lsgd_updates", u)                                            # field staff record work
+        self.zm.insert("lsgd_updates", {**u, "contact_ids": []}, select="id", single=True)                                 # a ZM may, in their districts
+        # a note in the LSGD's history: everyone who can see the LSGD sees it; nobody edits or deletes it
+        self.assertEqual(len(self.zm.select("lsgd_updates", "id")), 2)
+        self.assertEqual(len(self.ho.select("lsgd_updates", "id")), 2)
+        self.assertEqual(self.tso2.select("lsgd_updates", "id"), [])
+        self.assertEqual(self.tso.update("lsgd_updates", {"discussion": "Changed my mind about this one"}, [["eq", "id", row["id"]]], select="id"), [])
+        self.assertEqual(self.tso.q("lsgd_updates", "delete", filters=[["eq", "id", row["id"]]], select="id")["data"], [])
+        # it is not a visit: no visit, no field day
+        self.assertEqual(self.tso.select("visits", "id"), [])
+        self.assertEqual(self.tso.select("field_days", "id"), [])
 
     def test_followups(self):
         f = self.tso.insert("followups", {"lsgd_id": self.lsgd, "due_on": str(ist_today() - timedelta(days=1)), "mode": "call", "notes": "Call the secretary"}, select="*", single=True)

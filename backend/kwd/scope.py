@@ -151,6 +151,7 @@ class Scope:
             "fr_stock_moves": lambda: self.fr_can_see(a + ".franchise_id"),
             "fr_targets": lambda: self.fr_can_see(a + ".franchise_id"),
             "lsgds": lambda: self.can_see_lsgd(a + ".id"),
+            "lsgd_updates": lambda: self.can_see_lsgd(a + ".lsgd_id"),
             "opportunities": lambda: self.can_see_lsgd(a + ".lsgd_id"),
             "profiles": lambda: f"({a}.id = {me} or {self.is_ho()} or {self.role_in(FIN)} or ({self.is_zm()} and ({a}.manager_id = {me} or {self.shares_district(a + '.id')})))",
             "tasks": lambda: f"({a}.assigned_to = {me} or ({self.role_in(ZM, HO)} and {self.can_see_lsgd(a + '.lsgd_id')}))",

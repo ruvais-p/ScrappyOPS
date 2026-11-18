@@ -24,6 +24,7 @@ TABLES = {
                                   "check_out_at:ts photo_path:t discussion:t outcome:t interest_level:i next_followup_on:d fraud_flags:a zm_status:t zm_remark:t "
                                   "zm_reviewed_by:u zm_reviewed_at:ts ho_remark:t ho_signed_by:u ho_signed_at:ts created_at:ts details_at:ts"), set()),
     "visit_contacts": ("kwd_visit_contacts", cols("visit_id:u contact_id:u"), set()),
+    "lsgd_updates": ("kwd_lsgd_updates", cols("id:u lsgd_id:u tso_id:u happened_on:d mode:t contact_ids:ua discussion:t outcome:t interest_level:i created_at:ts"), set()),
     "opportunities": ("kwd_opportunities", cols("id:u lsgd_id:u financial_year:t owner_id:u stage:t expected_units:i unit_price:n expected_value:n probability:i "
                                                 "expected_close:d plan_project_no:t work_order_no:t lost_reason:t updated_at:ts"), {"expected_value"}),
     "followups": ("kwd_followups", cols("id:u lsgd_id:u opportunity_id:u contact_id:u visit_id:u assigned_to:u due_on:d mode:t notes:t done_at:ts done_note:t created_at:ts"), set()),
@@ -109,6 +110,7 @@ FKS = [
     ("fr_stock_moves", "franchise_id", "fr_franchises", "fr_stock_moves_franchise_id_fkey"), ("fr_stock_moves", "product_id", "fr_products", "fr_stock_moves_product_id_fkey"),
     ("fr_stock_moves", "sale_id", "fr_sales", "fr_stock_moves_sale_id_fkey"),
     ("fr_targets", "franchise_id", "fr_franchises", "fr_targets_franchise_id_fkey"), ("fr_targets", "product_id", "fr_products", "fr_targets_product_id_fkey"),
+    ("lsgd_updates", "lsgd_id", "lsgds", "lsgd_updates_lsgd_id_fkey"), ("lsgd_updates", "tso_id", "profiles", "lsgd_updates_tso_id_fkey"),
     ("lsgds", "assigned_tso", "profiles", "lsgds_assigned_tso_fkey"), ("lsgds", "district_id", "districts", "lsgds_district_id_fkey"),
     ("opportunities", "lsgd_id", "lsgds", "opportunities_lsgd_id_fkey"), ("opportunities", "owner_id", "profiles", "opportunities_owner_id_fkey"),
     ("profiles", "manager_id", "profiles", "profiles_manager_id_fkey"),
