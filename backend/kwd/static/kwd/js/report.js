@@ -3,7 +3,7 @@
 import { supabase } from './core.js'
 import { addDays, istDate, financialYear, FLAG_TEXT, LSGD_TYPES, INTEREST, stageLabel } from './lib.js'
 import { istStartISO } from './kit.js'
-import { TRAVEL_MODES, CATEGORIES, CLAIM_STATUS, flagText } from './expenses.js'
+import { dayModeText, CATEGORIES, CLAIM_STATUS, flagText } from './expenses.js'
 
 const OX = 'FF8B1E24', INK = 'FF2A2426', LINE = 'FFE4E1DC', SOFT = 'FFF7F2F2', BAND = 'FFFAFAF9'
 const INR = '"₹"#,##0.00;[Red]-"₹"#,##0.00', KM = '#,##0.0', INT = '#,##0'
@@ -192,7 +192,7 @@ export async function buildWorkbook(data, { title, by }) {
   // ---------- Daily register (attendance + TA/DA)
   sheet('Daily TA-DA register', [
     { h: 'Date', w: 12, ...D }, { h: 'Day', w: 6 }, { h: 'Name', w: 20 }, { h: 'Travel', w: 14 }, { h: 'Vehicle', w: 13 },
-    { h: 'Start', w: 7 }, { h: 'End', w: 7 }, { h: 'Start odo', num: 1, fmt: INT, w: 10 }, { h: 'End odo', num: 1, fmt: INT, w: 10 },
+    { h: 'Start', w: 7 }, { h: 'On route', w: 8 }, { h: 'End', w: 7 }, { h: 'Start odo', num: 1, fmt: INT, w: 10 }, { h: 'End odo', num: 1, fmt: INT, w: 10 },
     { h: 'Odo KM', num: 1, fmt: KM, w: 8 }, { h: 'GPS KM', num: 1, fmt: KM, w: 8 }, { h: 'Visits', num: 1, fmt: INT, w: 7 },
     { h: 'LSGDs visited', w: 28, wrap: true }, { h: 'Night halt', w: 14 },
     { h: 'TA ₹', num: 1, fmt: INR, w: 12 }, { h: 'Allowance (DA) ₹', num: 1, fmt: INR, w: 11 }, { h: 'Lodging ₹', num: 1, fmt: INR, w: 11 }, { h: 'Other ₹', num: 1, fmt: INR, w: 11 },
@@ -203,17 +203,17 @@ export async function buildWorkbook(data, { title, by }) {
     const vs = visits.filter((v) => v.tso_id === d.tso_id && ist(v.check_in_at).toISOString().slice(0, 10) === d.day)
     return [
       isoDate(d.day), new Date(d.day + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short' }), name[d.tso_id],
-      TRAVEL_MODES[d.travel_mode].short, d.vehicle_no || '', time(d.start_at), time(d.end_at), d.start_odo, d.end_odo,
+      dayModeText(d), d.vehicle_no || '', time(d.start_at), time(d.route_at), time(d.end_at), d.start_odo, d.end_odo,
       n(d.odo_km), n(d.gps_km), d.visits_count, vs.map((v) => v.lsgds?.name).join(', '),
       d.night_halt ? `Yes${d.halt_place ? ' · ' + d.halt_place : ''}` : 'No',
       n(d.ta_amount), n(d.da_amount), n(d.lodging_amount), n(d.other_amount), n(d.total_claimed), n(d.approved_amount),
       CLAIM_STATUS[d.status][0], d.zm_remark || '', d.ho_remark || '', istDay(d.paid_at), d.paid_ref || '',
       d.flags.map(flagText).join('; '), d.ho_flag ? 'Yes' : '',
     ]
-  }), { totals: [9, 10, 11, 14, 15, 16, 17, 18, 19] })
+  }), { totals: [10, 11, 12, 15, 16, 17, 18, 19, 20] })
 
   // ---------- Request history (who did what, when)
-  const EVL = { started: 'Day started', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed', submitted: 'Request submitted',
+  const EVL = { started: 'Day started', went_to_route: 'Went to route', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed', submitted: 'Request submitted',
     zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected', ho_approved: 'Approved by Head Office', paid: 'Paid',
     ho_flagged: 'Flagged by Head Office', ho_unflagged: 'Flag removed by Head Office' }
   sheet('Request history', [

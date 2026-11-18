@@ -46,6 +46,55 @@ class ClaimTests(KwdCase):
         again = self.tso.update("field_days", {"end_odo": 9999, "end_at": None}, [["eq", "id", d["id"]]], select="end_odo")[0]
         self.assertEqual(again["end_odo"], 1040)
 
+    def start_home(self, who):
+        return who.insert("field_days", {"work_mode": "home", "travel_mode": "car", "vehicle_no": "KL1", "start_odo": 5,
+                                         "start_lat": 10.0, "start_lng": 76.3, "start_acc": 15}, select="*", single=True)
+
+    def go_to_route(self, who, day, odo=2000, photo=True, mode="two_wheeler", **extra):
+        v = {"route_at": "2026-01-01T00:00:00Z", "travel_mode": mode, "vehicle_no": "kl 07 ab 1234", "start_odo": odo,
+             "start_photo": who.upload() if photo else None, "route_lat": 10.01, "route_lng": 76.31, "route_acc": 12}
+        v.update(extra)
+        return who.update("field_days", v, [["eq", "id", day["id"]]], select="*")[0]
+
+    def test_work_from_home_day(self):
+        self.tso.fails("field work or work at home", self.tso.insert, "field_days", {"work_mode": "office"})
+        d = self.start_home(self.tso)
+        # a day at home has no vehicle or odometer, whatever the browser sends
+        self.assertEqual((d["work_mode"], d["travel_mode"], d["vehicle_no"], d["start_odo"], d["route_at"]), ("home", "none", None, None, None))
+        self.assertIn("work_from_home", d["flags"])
+        self.assertNotIn("no_field_work", d["flags"])
+        e = self.end_day(self.tso, d, odo=None, photo=False)
+        self.assertIsNotNone(e["end_at"])
+        self.assertEqual((e["end_odo"], e["ta_amount"]), (None, 0))
+        self.tso.fails("already ended", self.go_to_route, self.tso, d)
+        events = [x["event"] for x in self.tso.select("claim_events", "event", [["eq", "day_id", d["id"]]], order=[["id", True]])]
+        self.assertEqual(events, ["started", "ended"])
+
+    def test_going_to_route_from_home(self):
+        d = self.start_home(self.tso)
+        self.tso.fails("photo of the odometer", self.go_to_route, self.tso, d, photo=False)
+        self.tso.fails("vehicle number", self.go_to_route, self.tso, d, vehicle_no="")
+        self.tso.fails("how you are travelling", self.go_to_route, self.tso, d, mode="rocket")
+        self.zm.fails("Nothing to change", self.zm.update, "field_days", {"route_at": "2026-01-01T00:00:00Z", "start_odo": 1},
+                      [["eq", "id", d["id"]]])                                                        # only the person themself goes to route
+        r = self.go_to_route(self.tso, d, odo=2000)
+        self.assertEqual((r["travel_mode"], r["vehicle_no"], r["start_odo"]), ("two_wheeler", "KL 07 AB 1234", 2000))
+        self.assertIsNotNone(r["route_at"])
+        self.assertNotEqual(r["route_at"], "2026-01-01T00:00:00Z")                                    # the server's clock, not the browser's
+        self.assertEqual(r["start_at"], d["start_at"])                                                # the login time is kept
+        self.tso.fails("already on route", self.go_to_route, self.tso, d, odo=2500)
+        self.tso.fails("lower than", self.end_day, self.tso, d, odo=1990)
+        e = self.end_day(self.tso, d, odo=2040)
+        self.assertEqual((e["odo_km"], e["ta_km"], e["ta_amount"]), (40, 40, 140))                     # TA counts from the route reading
+        self.assertIn("work_from_home", e["flags"])
+        self.assertIn("no_field_work", e["flags"])                                                    # out on route, but no visit logged
+        events = [x["event"] for x in self.tso.select("claim_events", "event", [["eq", "day_id", d["id"]]], order=[["id", True]])]
+        self.assertEqual(events, ["started", "went_to_route", "ended"])
+
+    def test_a_field_day_cannot_go_to_route(self):
+        d = self.start_day(self.tso)
+        self.tso.fails("already started in the field", self.go_to_route, self.tso, d)
+
     def test_status_jumps_are_refused(self):
         d = self.start_day(self.tso)
         self.tso.fails("only submit your own request", self.tso.update, "field_days", {"status": "ho_approved"}, [["eq", "id", d["id"]]])

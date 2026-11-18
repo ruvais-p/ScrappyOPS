@@ -5,7 +5,7 @@ import { fmtDate, fmtTime, fmtINR, FLAG_TEXT, addDays } from '../lib.js'
 import { Sheet, PhotoButton, photoActions, istStartISO, errLine } from '../kit.js'
 import {
   TRAVEL_MODES, CATEGORIES, CLAIM_STATUS, EVENT_LABEL, EVENT_TONE, flagText, flagTone, loadPolicy, takePhoto, uploadPhoto,
-  signedUrl, mapLink, kmText, payable,
+  signedUrl, mapLink, kmText, payable, dayModeText,
 } from '../expenses.js'
 
 const longDate = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
@@ -21,7 +21,7 @@ export const ClaimRow = (d, { showPerson, ho } = {}) => html`<li><button class="
   ${showPerson ? Avatar(d.person && d.person.full_name, 32) : html`<span class="lead-ico">${Icon('rupee', 18)}</span>`}
   <div class="grow">
     <div class="title">${showPerson ? `${d.person && d.person.full_name} · ` : ''}${fmtDate(d.day)}</div>
-    <div class="muted small">${TRAVEL_MODES[d.travel_mode].short} · ${d.visits_count} visit${d.visits_count === 1 ? '' : 's'}${d.odo_km != null ? ` · ${kmText(d.odo_km)}` : ''}${d.gps_km != null ? ` (GPS ${kmText(d.gps_km)})` : ''}</div>
+    <div class="muted small">${dayModeText(d)} · ${d.visits_count} visit${d.visits_count === 1 ? '' : 's'}${d.odo_km != null ? ` · ${kmText(d.odo_km)}` : ''}${d.gps_km != null ? ` (GPS ${kmText(d.gps_km)})` : ''}</div>
     ${d.ho_flag ? html`<div class="flags"><span class="pill ${ho ? 'bad' : 'warn'}">${ho ? 'Flagged by you' : 'Under Head Office review'}</span></div>` : ''}
     ${d.flags.some((f) => flagTone(f) === 'bad') ? html`<div class="flags">${d.flags.filter((f) => flagTone(f) === 'bad').map((f) => html`<span class="pill bad">${flagText(f)}</span>`)}</div>` : ''}
   </div>
@@ -210,7 +210,7 @@ export default {
       <div class="page-head"><div class="grow">
         <div class="eyebrow">${own ? 'My request' : d.person && d.person.full_name}</div>
         <h1>${longDate(d.day)}</h1>
-        <div class="row wrap" style="gap:8px">${StatusPill(d.status)}<span class="muted small">${m.short}${d.vehicle_no ? ` · ${d.vehicle_no}` : ''}</span></div>
+        <div class="row wrap" style="gap:8px">${StatusPill(d.status)}<span class="muted small">${dayModeText(d)}${d.vehicle_no ? ` · ${d.vehicle_no}` : ''}</span></div>
       </div></div>
 
       ${d.status === 'open' && (d.zm_remark || d.ho_remark) ? html`<p class="notice warn"><b>Sent back:</b> ${d.ho_remark || d.zm_remark}</p>` : ''}
@@ -238,12 +238,15 @@ export default {
       <section>
         ${SectionHead({ title: 'Day record' })}
         <div class="evidence">
-          ${Evidence('Start', d.start_at, d.start_lat, d.start_lng, d.start_acc, d.start_odo, S.urls[d.start_photo])}
+          ${d.work_mode === 'home'
+            ? html`${Evidence('Started at home', d.start_at, d.start_lat, d.start_lng, d.start_acc, null, null)}
+              ${d.route_at ? Evidence('Went to route', d.route_at, d.route_lat, d.route_lng, d.route_acc, d.start_odo, S.urls[d.start_photo]) : ''}`
+            : Evidence('Start', d.start_at, d.start_lat, d.start_lng, d.start_acc, d.start_odo, S.urls[d.start_photo])}
           ${d.end_at ? Evidence('End', d.end_at, d.end_lat, d.end_lng, d.end_acc, d.end_odo, S.urls[d.end_photo]) : html`<div class="subcard muted small">Day not ended yet.</div>`}
         </div>
         ${m.own ? html`<div class="card km-compare">
           <div class="sum-row"><span>Odometer</span><b>${kmText(d.odo_km)}</b></div>
-          <div class="sum-row"><span>GPS route<small>start → ${S.visits.length} visit${S.visits.length === 1 ? '' : 's'} → end, by road (est.)</small></span><b>${kmText(d.gps_km)}</b></div>
+          <div class="sum-row"><span>GPS route<small>${d.route_at ? 'left for route' : 'start'} → ${S.visits.length} visit${S.visits.length === 1 ? '' : 's'} → end, by road (est.)</small></span><b>${kmText(d.gps_km)}</b></div>
           ${gpsLimit != null && d.odo_km != null ? html`<p class="small ${d.odo_km > gpsLimit ? 'text-bad' : 'muted'}" style="margin:0">${d.odo_km > gpsLimit ? `Odometer is ${Math.round(d.odo_km - d.gps_km)} km more than the route. Ask about the extra travel.` : 'Odometer km matches the route.'}</p>` : ''}
         </div>` : ''}
       </section>

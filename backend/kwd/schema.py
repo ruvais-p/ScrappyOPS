@@ -36,7 +36,7 @@ TABLES = {
                                           "end_at:ts end_lat:f end_lng:f end_acc:f end_odo:i end_photo:t night_halt:b halt_place:t tso_note:t visits_count:i gps_km:n "
                                           "odo_km:i ta_km:n ta_amount:n da_amount:n lodging_amount:n other_amount:n total_claimed:n flags:a status:t submitted_at:ts "
                                           "approved_amount:n zm_by:u zm_at:ts zm_remark:t ho_by:u ho_at:ts ho_remark:t paid_by:u paid_at:ts paid_ref:t created_at:ts "
-                                          "payment_id:u ho_flag:b ho_flag_by:u ho_flag_at:ts da_requested:n"), {"total_claimed"}),
+                                          "payment_id:u ho_flag:b ho_flag_by:u ho_flag_at:ts da_requested:n work_mode:t route_at:ts route_lat:f route_lng:f route_acc:f"), {"total_claimed"}),
     "expense_items": ("kwd_expense_items", cols("id:u day_id:u tso_id:u category:t amount:n description:t from_place:t to_place:t bill_no:t bill_path:t bill_hash:t flags:a created_at:ts"), set()),
     "claim_events": ("kwd_claim_events", cols("id:i day_id:u actor:u event:t amount:n note:t meta:j at:ts"), set()),
     "fr_franchises": ("kwd_fr_franchises", cols("id:u user_id:u business_name:t district_id:i territory:t address:t gstin:t is_active:b created_at:ts"), set()),

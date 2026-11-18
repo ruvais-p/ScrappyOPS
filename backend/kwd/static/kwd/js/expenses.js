@@ -9,6 +9,10 @@ export const TRAVEL_MODES = {
   none: { label: 'No travel (office / walk)', short: 'No travel', own: false },
 }
 
+/** How the day was worked: field travel, a day at home, or home and then out on route. */
+export const dayModeText = (d) => d.work_mode !== 'home' ? TRAVEL_MODES[d.travel_mode].short
+  : d.route_at ? `Work at home, then ${TRAVEL_MODES[d.travel_mode].short.toLowerCase()}` : 'Work at home'
+
 export const CATEGORIES = {
   da_bill: { label: 'DA bill', group: 'DA' },
   meals: { label: 'Meals / food', group: 'DA' },
@@ -54,11 +58,12 @@ export const EXP_FLAGS = {
   late_end: ['Day ended after midnight', 'warn'],
   day_not_ended: ['Day was never ended', 'warn'],
   late_claim: ['Submitted late', 'info'],
+  work_from_home: ['Worked from home', 'info'],
   sunday: ['Sunday', 'info'],
 }
 // history log (claim_events)
 export const EVENT_LABEL = {
-  da_set: 'Allowance requested', started: 'Day started', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed',
+  da_set: 'Allowance requested', started: 'Day started', went_to_route: 'Went to route', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed',
   submitted: 'Request submitted', zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected',
   ho_approved: 'Approved by Head Office', paid: 'Paid', ho_flagged: 'Flagged by Head Office', ho_unflagged: 'Flag removed by Head Office',
 }
