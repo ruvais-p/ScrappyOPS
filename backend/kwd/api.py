@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from core import auth
 from core.api.views import Encoder
 from core.models import ImmutableError
-from core.services.common import ApiError
+from core.services.common import ApiError, fetch_one
 from kwd import functions, invoice_pdf, storage
 from kwd.engine import run_query
 from kwd.rules import RULES, days, franchise, telecaller
@@ -163,8 +163,17 @@ def storage_sign(request, ctx):
     path = b.get("path", "")
     if not storage.valid_name(path):
         raise ApiError("Object not found", status=404)
-    if path.split("/")[0] != str(ctx.uid) and ctx.role not in (ZM, HO):
-        raise ApiError("Object not found", status=404)
+    owner = path.split("/", 1)[0]
+    if owner != str(ctx.uid) and ctx.role != HO:
+        # A zonal manager may inspect evidence from their own team, not photos
+        # uploaded by staff in another zone or by other roles.
+        managed = ctx.role == ZM and fetch_one(
+            "select 1 from kwd_profiles where id = %(owner)s and role = 'tso' "
+            "and manager_id = %(manager)s and is_active",
+            {"owner": owner, "manager": ctx.uid},
+        )
+        if not managed:
+            raise ApiError("Object not found", status=404)
     if not storage.exists(path):
         raise ApiError("Object not found", status=404)
     seconds = min(int(b.get("expiresIn") or 3600), 86400 * 7)
