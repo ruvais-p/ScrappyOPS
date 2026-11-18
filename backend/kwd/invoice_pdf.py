@@ -57,10 +57,11 @@ def file_name(sale):
     return "Invoice-" + (re.sub(r"[^A-Za-z0-9._-]+", "-", sale.get("invoice_no") or "") or str(sale["id"])[:8]).strip("-") + ".pdf"
 
 
-def gather(sale):
-    """Everything the invoice shows, read once the caller has been allowed to see the sale."""
-    items = fetch("""select i.*, p.name as product_name, coalesce(p.unit, 'unit') as unit
-                     from kwd_fr_sale_items i left join kwd_fr_products p on p.id = i.product_id
+def gather(sale, items_table="kwd_fr_sale_items"):
+    """Everything the invoice shows, read once the caller has been allowed to see the sale. A franchise sale's items live in
+    kwd_fr_sale_items, a telecaller's own bill in kwd_tc_sale_items; both point at the same shared product catalogue."""
+    items = fetch(f"""select i.*, p.name as product_name, coalesce(p.unit, 'unit') as unit
+                     from {items_table} i left join kwd_fr_products p on p.id = i.product_id
                      where i.sale_id = %(s)s order by i.id""", {"s": sale["id"]})
     company = fetch_one("select * from kwd_fr_company_settings where id = 1") or {}
     seller = {k: (company.get(k) or SELLER[k]) for k in SELLER}

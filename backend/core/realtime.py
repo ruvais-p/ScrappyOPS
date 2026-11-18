@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import psycopg
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.db import connection
+from django.db import close_old_connections, connection
 from django.utils import timezone as django_timezone
 from psycopg.conninfo import make_conninfo
 
@@ -28,16 +28,19 @@ log = logging.getLogger("scrappy.realtime")
 STAFF_TABLES = {"hq_requirements", "hq_releases", "hq_dispatches", "settlement_resolutions"}
 HQ_ONLY_TABLES = {"hq_audit"}
 HEARTBEAT_TIMEOUT = 90          # seconds of silence before a page is considered gone
+IDENTITY_CHECK_SECONDS = 10     # revoked sessions and role changes stop live notifications promptly
 
 
 def _identity(token):
     """(user id, role, franchise id, token expiry) for a valid login token, else None. Runs in a thread (database access)."""
+    close_old_connections()
     try:
         claims = auth.decode_access_token(token)
     except auth.AuthError:
         return None
     sid, uid = claims.get("session_id"), claims["sub"]
-    if not sid or not AuthSession.objects.filter(pk=sid, user_id=uid, expires_at__gt=django_timezone.now()).exists():
+    if not sid or not AuthSession.objects.filter(pk=sid, user_id=uid, user__is_active=True,
+                                                 expires_at__gt=django_timezone.now()).exists():
         return None
     prof = Profile.objects.filter(pk=uid, active=True).first()
     if prof is None:
@@ -51,6 +54,7 @@ class Client:
         self.queue = asyncio.Queue(maxsize=200)
         self.topics = {}           # topic -> set of table names asked for
         self.who = None
+        self.token = None
         self.last_seen = time.time()
         self.ref = 0
 
@@ -160,7 +164,26 @@ async def handle_websocket(scope, receive, send):
             await raw_send(await client.queue.get())
 
     wtask = asyncio.get_running_loop().create_task(writer())
-    try:
+
+    async def recheck_identity():
+        while True:
+            await asyncio.sleep(IDENTITY_CHECK_SECONDS)
+            token = client.token
+            if not token:
+                continue
+            try:
+                who = await sync_to_async(_identity)(token)
+            except Exception:
+                log.exception("Could not recheck websocket login")
+                who = None
+            # A token replacement may have arrived while the database check ran.
+            if client.token == token:
+                client.who = who
+                if who is None:
+                    return 4401
+
+    vtask = asyncio.get_running_loop().create_task(recheck_identity())
+    async def read_messages():
         while True:
             try:
                 event = await asyncio.wait_for(receive(), timeout=HEARTBEAT_TIMEOUT)
@@ -178,32 +201,55 @@ async def handle_websocket(scope, receive, send):
                 continue
             reply = lambda status, response=None: raw_send({"topic": topic, "event": "phx_reply", "ref": ref,
                                                             "payload": {"status": status, "response": response or {}}})
+            if not isinstance(topic, str) or not isinstance(payload, dict):
+                continue
             if ev == "heartbeat":
                 await reply("ok")
             elif ev == "phx_join":
                 who = await sync_to_async(_identity)(payload.get("access_token", ""))
                 if not who:
                     await reply("error", {"reason": "Please log in again."})
+                    return 4401
+                config = payload.get("config", {})
+                changes = config.get("postgres_changes", []) if isinstance(config, dict) else None
+                if not isinstance(changes, list) or not all(isinstance(c, dict) and isinstance(c.get("table"), str) for c in changes):
+                    await reply("error", {"reason": "Invalid subscription"})
                     continue
                 client.who = who
-                wanted = {c.get("table") for c in (payload.get("config") or {}).get("postgres_changes", []) if c.get("table")}
+                client.token = payload["access_token"]
+                wanted = {c.get("table") for c in changes if c.get("table")}
                 client.topics[topic] = wanted
                 await reply("ok", {"postgres_changes": [{"id": i, "event": "*", "schema": "public", "table": t} for i, t in enumerate(sorted(wanted))]})
             elif ev == "access_token":
                 who = await sync_to_async(_identity)(payload.get("access_token", ""))
                 if who:
                     client.who = who
+                    client.token = payload["access_token"]
                 else:
                     client.who = None
+                    client.token = None
+                    return 4401
             elif ev == "phx_leave":
                 client.topics.pop(topic, None)
                 await reply("ok")
+    tasks = (wtask, vtask, asyncio.create_task(read_messages()))
+    code = 1000
+    try:
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            code = task.result() or code
+    except OSError:
+        pass  # Transport already disconnected.
     except Exception:
+        code = 1011
         log.exception("websocket failed")
     finally:
-        wtask.cancel()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        client.topics.clear()
         hub.clients.discard(client)
         try:
-            await send({"type": "websocket.close", "code": 1000})
+            await send({"type": "websocket.close", "code": code})
         except Exception:
             pass

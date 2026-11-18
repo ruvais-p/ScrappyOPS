@@ -10,10 +10,10 @@ from django.views.decorators.csrf import csrf_exempt
 from core import auth
 from core.api.views import Encoder
 from core.models import ImmutableError
-from core.services.common import ApiError
+from core.services.common import ApiError, fetch_one
 from kwd import functions, invoice_pdf, storage
 from kwd.engine import run_query
-from kwd.rules import RULES, days, franchise
+from kwd.rules import RULES, days, franchise, telecaller
 from kwd.scope import HO, KCtx, ZM
 
 log = logging.getLogger("kwd.api")
@@ -100,6 +100,9 @@ ACTIONS = {
     "fr_record_sale": lambda ctx, a: franchise.record_sale(ctx, **{k: v for k, v in a.items()}),
     "fr_cancel_sale": lambda ctx, a: franchise.cancel_sale(ctx, a.get("p_sale"), a.get("p_reason")),
     "fr_receive_payment": lambda ctx, a: franchise.receive_payment(ctx, a.get("p_sale"), a.get("p_amount"), a.get("p_method"), a.get("p_reference")),
+    "tc_record_sale": lambda ctx, a: telecaller.record_sale(ctx, **{k: v for k, v in a.items()}),
+    "tc_cancel_sale": lambda ctx, a: telecaller.cancel_sale(ctx, a.get("p_sale"), a.get("p_reason")),
+    "tc_receive_payment": lambda ctx, a: telecaller.receive_payment(ctx, a.get("p_sale"), a.get("p_amount"), a.get("p_method"), a.get("p_reference")),
 }
 
 
@@ -160,8 +163,17 @@ def storage_sign(request, ctx):
     path = b.get("path", "")
     if not storage.valid_name(path):
         raise ApiError("Object not found", status=404)
-    if path.split("/")[0] != str(ctx.uid) and ctx.role not in (ZM, HO):
-        raise ApiError("Object not found", status=404)
+    owner = path.split("/", 1)[0]
+    if owner != str(ctx.uid) and ctx.role != HO:
+        # A zonal manager may inspect evidence from their own team, not photos
+        # uploaded by staff in another zone or by other roles.
+        managed = ctx.role == ZM and fetch_one(
+            "select 1 from kwd_profiles where id = %(owner)s and role = 'tso' "
+            "and manager_id = %(manager)s and is_active",
+            {"owner": owner, "manager": ctx.uid},
+        )
+        if not managed:
+            raise ApiError("Object not found", status=404)
     if not storage.exists(path):
         raise ApiError("Object not found", status=404)
     seconds = min(int(b.get("expiresIn") or 3600), 86400 * 7)
@@ -187,14 +199,19 @@ def storage_object(request):
 # ---------------------------------------------------------------------------------------------- invoices
 @guarded
 def sale_invoice_pdf(request, ctx, sale_id):
-    """The tax invoice of one sale as a PDF file. Whoever may see the sale may download its invoice: its franchisee and Head Office."""
+    """The tax invoice of one sale as a PDF file. Whoever may see the sale may download its invoice: a franchise sale (its
+    franchisee and Head Office) or a telecaller's own bill (that telecaller and Head Office)."""
     if request.method != "GET":
         return err("Use GET", 405)
     ctx.need_active()
     sale = run_query(ctx, {"table": "fr_sales", "op": "select", "select": "*", "filters": [["eq", "id", str(sale_id)]], "order": [], "maybe": True}).get("data")
+    items_table = "kwd_fr_sale_items"
+    if not sale:
+        sale = run_query(ctx, {"table": "tc_sales", "op": "select", "select": "*", "filters": [["eq", "id", str(sale_id)]], "order": [], "maybe": True}).get("data")
+        items_table = "kwd_tc_sale_items"
     if not sale:
         raise ApiError("Invoice not found", status=404)
-    items, seller, district = invoice_pdf.gather(sale)
+    items, seller, district = invoice_pdf.gather(sale, items_table)
     resp = HttpResponse(invoice_pdf.build(sale, items, seller, district), content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{invoice_pdf.file_name(sale)}"'
     resp["Cache-Control"] = "no-store"

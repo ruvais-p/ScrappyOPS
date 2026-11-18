@@ -13,6 +13,25 @@ from kwd.rules.util import haversine_m, ist_date, ist_today, now, photo_ok, trim
 from kwd.scope import HO, TSO, ZM
 
 OWN_VEHICLE = ("two_wheeler", "car")
+TRAVEL_MODES = ("two_wheeler", "car", "public_transport", "none")
+ROUTE_FIELDS = ("travel_mode", "vehicle_no", "start_odo", "start_photo", "route_lat", "route_lng", "route_acc")
+
+
+def check_vehicle(ctx, new):
+    """The travel details at the moment the person sets off: an own vehicle needs its number, odometer reading and photo."""
+    veh = trim(new.get("vehicle_no")).upper()
+    new["vehicle_no"] = veh or None
+    if new.get("travel_mode") in OWN_VEHICLE:
+        if new["vehicle_no"] is None:
+            raise ApiError("Enter the vehicle number.")
+        if new.get("start_odo") is None:
+            raise ApiError("Enter the odometer reading.")
+        if not photo_ok(ctx, new.get("start_photo")):
+            raise ApiError("Take a photo of the odometer.")
+    else:
+        new["start_odo"] = None
+        if new.get("start_photo") is not None and not photo_ok(ctx, new["start_photo"]):
+            raise ApiError("Invalid photo.")
 
 
 def policy():
@@ -45,9 +64,12 @@ def recalc_field_day(day_id):
                   {"t": d["tso_id"], "d": d["day"]})
     v_ok, v_rej, first_in = v["ok"], v["rej"], v["first_in"]
 
+    # a day that began at home travels from where the person set off on route
+    home = d["work_mode"] == "home"
+    set_off = (d["route_lat"], d["route_lng"]) if home else (d["start_lat"], d["start_lng"])
     pts = []
-    if d["start_lat"] is not None and d["start_lng"] is not None:
-        pts.append((d["start_lat"], d["start_lng"]))
+    if set_off[0] is not None and set_off[1] is not None:
+        pts.append(set_off)
     for r in fetch("select check_in_lat as lat, check_in_lng as lng from kwd_visits where tso_id = %(t)s and zm_status <> 'rejected' "
                    "and (check_in_at at time zone 'Asia/Kolkata')::date = %(d)s and check_in_lat is not null and check_in_lng is not null order by check_in_at",
                    {"t": d["tso_id"], "d": d["day"]}):
@@ -84,7 +106,9 @@ def recalc_field_day(day_id):
     allowance = d["da_requested"]
     ta_amount = r2(tkm * rate, 2) + travel
 
-    if v_ok == 0:
+    if home:
+        f.append("work_from_home")
+    if v_ok == 0 and not (home and d["route_at"] is None):
         f.append("no_field_work")
     if v_rej > 0:
         f.append("visits_rejected")
@@ -96,7 +120,7 @@ def recalc_field_day(day_id):
         f.append("weak_gps")
     if d["end_at"] is None and d["day"] < ist_today():
         f.append("day_not_ended")
-    if first_in is not None and d["start_at"] > first_in:
+    if first_in is not None and (d["route_at"] or d["start_at"]) > first_in:
         f.append("late_start")
     if d["end_at"] is not None and ist_date(d["end_at"]) > d["day"]:
         f.append("late_end")
@@ -132,7 +156,8 @@ class FieldDays(Rules):
     audit = ("INSERT", "UPDATE")
     defaults = {"tso_id": lambda c: c.uid, "day": lambda c: ist_today(), "travel_mode": "two_wheeler", "start_at": lambda c: now(),
                 "night_halt": False, "visits_count": 0, "ta_km": 0, "ta_amount": 0, "da_amount": 0, "lodging_amount": 0,
-                "other_amount": 0, "flags": [], "status": "open", "created_at": lambda c: now(), "ho_flag": False, "da_requested": 0}
+                "other_amount": 0, "flags": [], "status": "open", "created_at": lambda c: now(), "ho_flag": False, "da_requested": 0,
+                "work_mode": "field"}
 
     def insert_check(self, ctx, S, P, new):
         return new["tso_id"] == ctx.uid
@@ -151,32 +176,29 @@ class FieldDays(Rules):
                    end_odo=None, end_photo=None, visits_count=0, gps_km=None, odo_km=None, ta_km=0, ta_amount=0, da_amount=0,
                    da_requested=0, lodging_amount=0, other_amount=0, flags=[], status="open", submitted_at=None, approved_amount=None,
                    zm_by=None, zm_at=None, zm_remark=None, ho_by=None, ho_at=None, ho_remark=None, paid_by=None, paid_at=None,
-                   paid_ref=None, payment_id=None, ho_flag=False, ho_flag_by=None, ho_flag_at=None)
-        veh = trim(new.get("vehicle_no")).upper()
-        new["vehicle_no"] = veh or None
-        if new.get("travel_mode") in OWN_VEHICLE:
-            if new["vehicle_no"] is None:
-                raise ApiError("Enter the vehicle number.")
-            if new.get("start_odo") is None:
-                raise ApiError("Enter the odometer reading.")
-            if not photo_ok(ctx, new.get("start_photo")):
-                raise ApiError("Take a photo of the odometer.")
-        else:
-            new["start_odo"] = None
-            if new.get("start_photo") is not None and not photo_ok(ctx, new["start_photo"]):
-                raise ApiError("Invalid photo.")
+                   paid_ref=None, payment_id=None, ho_flag=False, ho_flag_by=None, ho_flag_at=None,
+                   route_at=None, route_lat=None, route_lng=None, route_acc=None)
+        if new.get("work_mode") not in ("field", "home"):
+            raise ApiError("Choose field work or work at home.")
+        if new["work_mode"] == "home":
+            # nothing to travel with yet: the vehicle and odometer are recorded when the person goes to route
+            new.update(travel_mode="none", vehicle_no=None, start_odo=None, start_photo=None)
+        elif new.get("travel_mode") not in TRAVEL_MODES:
+            raise ApiError("Choose how you are travelling.")
+        check_vehicle(ctx, new)
         return new
 
     def after_insert(self, ctx, row):
         recalc_field_day(row["id"])
-        event(row["id"], ctx.uid, "started", meta={"mode": row["travel_mode"], "odo": row["start_odo"]})
+        event(row["id"], ctx.uid, "started", meta={"mode": row["travel_mode"], "odo": row["start_odo"], "work_mode": row["work_mode"]})
 
     def before_update(self, ctx, old, new, keys):
         r = ctx.role
-        own_vehicle = old["travel_mode"] in OWN_VEHICLE
+        asked = {c: new.get(c) for c in ROUTE_FIELDS}
+        going = "route_at" in keys and new.get("route_at") is not None
         for c in ("id", "tso_id", "day", "created_at", "travel_mode", "vehicle_no", "start_at", "start_lat", "start_lng", "start_acc",
                   "start_odo", "start_photo", "visits_count", "gps_km", "odo_km", "ta_km", "ta_amount", "da_amount", "lodging_amount",
-                  "other_amount", "flags", "ho_flag", "ho_flag_by", "ho_flag_at"):
+                  "other_amount", "flags", "ho_flag", "ho_flag_by", "ho_flag_at", "work_mode", "route_at", "route_lat", "route_lng", "route_acc"):
             new[c] = old[c]
         if r is None:
             raise ApiError("Account inactive")
@@ -187,6 +209,19 @@ class FieldDays(Rules):
                 raise ApiError("This request is submitted and locked.")
             for c in ("approved_amount", "zm_by", "zm_at", "zm_remark", "ho_by", "ho_at", "ho_remark", "paid_by", "paid_at", "paid_ref"):
                 new[c] = old[c]
+            if going:
+                # working from home, now setting off on route: record the travel details at this moment, once
+                if old["work_mode"] != "home":
+                    raise ApiError("Your day already started in the field.")
+                if old["route_at"] is not None:
+                    raise ApiError("You are already on route.")
+                if old["end_at"] is not None or new.get("end_at") is not None:
+                    raise ApiError("Your day is already ended.")
+                if asked["travel_mode"] not in TRAVEL_MODES:
+                    raise ApiError("Choose how you are travelling.")
+                new.update(asked, route_at=t)
+                check_vehicle(ctx, new)
+            own_vehicle = new["travel_mode"] in OWN_VEHICLE
             ends = ("end_at", "end_lat", "end_lng", "end_acc", "end_odo", "end_photo")
             if old["end_at"] is not None:
                 for c in ends:
@@ -292,6 +327,8 @@ class FieldDays(Rules):
         if row["da_requested"] != old["da_requested"]:
             event(row["id"], ctx.uid, "da_set", row["da_requested"],
                   f"Changed from Rs {old['da_requested']}" if old["da_requested"] > 0 else None)
+        if old["route_at"] is None and row["route_at"] is not None:
+            event(row["id"], ctx.uid, "went_to_route", meta={"mode": row["travel_mode"], "odo": row["start_odo"]})
         if old["end_at"] is None and row["end_at"] is not None:
             event(row["id"], ctx.uid, "ended", meta={"odo": row["end_odo"]})
         if row["status"] != old["status"]:

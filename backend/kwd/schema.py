@@ -24,6 +24,7 @@ TABLES = {
                                   "check_out_at:ts photo_path:t discussion:t outcome:t interest_level:i next_followup_on:d fraud_flags:a zm_status:t zm_remark:t "
                                   "zm_reviewed_by:u zm_reviewed_at:ts ho_remark:t ho_signed_by:u ho_signed_at:ts created_at:ts details_at:ts"), set()),
     "visit_contacts": ("kwd_visit_contacts", cols("visit_id:u contact_id:u"), set()),
+    "lsgd_updates": ("kwd_lsgd_updates", cols("id:u lsgd_id:u tso_id:u happened_on:d mode:t contact_ids:ua discussion:t outcome:t interest_level:i created_at:ts"), set()),
     "opportunities": ("kwd_opportunities", cols("id:u lsgd_id:u financial_year:t owner_id:u stage:t expected_units:i unit_price:n expected_value:n probability:i "
                                                 "expected_close:d plan_project_no:t work_order_no:t lost_reason:t updated_at:ts"), {"expected_value"}),
     "followups": ("kwd_followups", cols("id:u lsgd_id:u opportunity_id:u contact_id:u visit_id:u assigned_to:u due_on:d mode:t notes:t done_at:ts done_note:t created_at:ts"), set()),
@@ -36,7 +37,7 @@ TABLES = {
                                           "end_at:ts end_lat:f end_lng:f end_acc:f end_odo:i end_photo:t night_halt:b halt_place:t tso_note:t visits_count:i gps_km:n "
                                           "odo_km:i ta_km:n ta_amount:n da_amount:n lodging_amount:n other_amount:n total_claimed:n flags:a status:t submitted_at:ts "
                                           "approved_amount:n zm_by:u zm_at:ts zm_remark:t ho_by:u ho_at:ts ho_remark:t paid_by:u paid_at:ts paid_ref:t created_at:ts "
-                                          "payment_id:u ho_flag:b ho_flag_by:u ho_flag_at:ts da_requested:n"), {"total_claimed"}),
+                                          "payment_id:u ho_flag:b ho_flag_by:u ho_flag_at:ts da_requested:n work_mode:t route_at:ts route_lat:f route_lng:f route_acc:f"), {"total_claimed"}),
     "expense_items": ("kwd_expense_items", cols("id:u day_id:u tso_id:u category:t amount:n description:t from_place:t to_place:t bill_no:t bill_path:t bill_hash:t flags:a created_at:ts"), set()),
     "claim_events": ("kwd_claim_events", cols("id:i day_id:u actor:u event:t amount:n note:t meta:j at:ts"), set()),
     "fr_franchises": ("kwd_fr_franchises", cols("id:u user_id:u business_name:t district_id:i territory:t address:t gstin:t is_active:b created_at:ts"), set()),
@@ -58,6 +59,14 @@ TABLES = {
     "fr_company_settings": ("kwd_fr_company_settings", cols("id:i company_name:t address:t phone:t gstin:t email:t state:t updated_by:u updated_at:ts"), set()),
     "fr_payment_receipts": ("kwd_fr_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
     "fr_meetings": ("kwd_fr_meetings", cols("id:u scheduled_at:ts meeting_type:t description:t status:t created_by:u created_at:ts completed_by:u completed_at:ts"), set()),
+    "tc_leads": ("kwd_tc_leads", cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
+                                      "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts"), set()),
+    "tc_lead_events": ("kwd_tc_lead_events", cols("id:i lead_id:u actor:u from_status:t to_status:t from_temperature:t to_temperature:t note:t at:ts"), set()),
+    "tc_sales": ("kwd_tc_sales", cols("id:u telecaller_id:u lead_id:u customer_name:t customer_type:t phone:t district_id:i place:t sale_date:d invoice_no:t "
+                                      "total:n amount_received:n payment_status:t status:t cancel_reason:t cancelled_by:u cancelled_at:ts created_by:u created_at:ts"), {"payment_status"}),
+    "tc_sale_items": ("kwd_tc_sale_items", cols("id:u sale_id:u product_id:u hsn_sac:t qty:i unit_price:n gst_percent:n gst_amount:n line_total:n"), {"gst_amount", "line_total"}),
+    "tc_payment_receipts": ("kwd_tc_payment_receipts", cols("id:u sale_id:u amount:n method:t reference:t received_by:u received_at:ts"), set()),
+    "tc_stock_moves": ("kwd_tc_stock_moves", cols("id:u product_id:u qty:i kind:t sale_id:u ref_no:t note:t created_by:u created_at:ts"), set()),
 }
 
 # views the pages read (computed from the rows the caller may see; see engine.VIEWS)
@@ -68,6 +77,11 @@ VIEW_COLUMNS = {
     "v_shared_contact_phones": cols("phone:t lsgds:i names:a"),
     "v_fr_sold": cols("franchise_id:u sale_id:u sale_date:d month:d product_id:u qty:i line_total:n"),
     "v_fr_stock": cols("franchise_id:u product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
+    "v_tc_followups": cols("id:u kind:t customer_name:t contact_person:t phone:t district_id:i place:t address:t notes:t status:t temperature:t "
+                            "lost_reason:t next_followup_on:d tc_note:t last_call_at:ts last_update_at:ts assigned_to:u created_by:u created_at:ts temp_rank:i"),
+    "v_tc_stock": cols("product_id:u on_hand:i received:i sold:i adjusted:i last_move_at:ts"),
+    "v_finance_bills": cols("source:t id:u invoice_no:t sale_date:d customer_name:t customer_type:t phone:t place:t district_id:i "
+                             "total:n amount_received:n payment_status:t status:t created_at:ts seller_name:t franchise_id:u telecaller_id:u"),
 }
 
 # foreign keys, used to resolve embedded selects:  (child table, child column, parent table, constraint name)
@@ -96,11 +110,23 @@ FKS = [
     ("fr_stock_moves", "franchise_id", "fr_franchises", "fr_stock_moves_franchise_id_fkey"), ("fr_stock_moves", "product_id", "fr_products", "fr_stock_moves_product_id_fkey"),
     ("fr_stock_moves", "sale_id", "fr_sales", "fr_stock_moves_sale_id_fkey"),
     ("fr_targets", "franchise_id", "fr_franchises", "fr_targets_franchise_id_fkey"), ("fr_targets", "product_id", "fr_products", "fr_targets_product_id_fkey"),
+    ("lsgd_updates", "lsgd_id", "lsgds", "lsgd_updates_lsgd_id_fkey"), ("lsgd_updates", "tso_id", "profiles", "lsgd_updates_tso_id_fkey"),
     ("lsgds", "assigned_tso", "profiles", "lsgds_assigned_tso_fkey"), ("lsgds", "district_id", "districts", "lsgds_district_id_fkey"),
     ("opportunities", "lsgd_id", "lsgds", "opportunities_lsgd_id_fkey"), ("opportunities", "owner_id", "profiles", "opportunities_owner_id_fkey"),
     ("profiles", "manager_id", "profiles", "profiles_manager_id_fkey"),
     ("tasks", "assigned_by", "profiles", "tasks_assigned_by_fkey"), ("tasks", "assigned_to", "profiles", "tasks_assigned_to_fkey"),
     ("tasks", "lsgd_id", "lsgds", "tasks_lsgd_id_fkey"),
+    ("tc_leads", "district_id", "districts", "tc_leads_district_id_fkey"), ("tc_leads", "assigned_to", "profiles", "tc_leads_assigned_to_fkey"),
+    ("tc_leads", "created_by", "profiles", "tc_leads_created_by_fkey"),
+    ("tc_lead_events", "lead_id", "tc_leads", "tc_lead_events_lead_id_fkey"), ("tc_lead_events", "actor", "profiles", "tc_lead_events_actor_fkey"),
+    ("tc_sales", "district_id", "districts", "tc_sales_district_id_fkey"), ("tc_sales", "telecaller_id", "profiles", "tc_sales_telecaller_id_fkey"),
+    ("tc_sales", "lead_id", "tc_leads", "tc_sales_lead_id_fkey"), ("tc_sales", "created_by", "profiles", "tc_sales_created_by_fkey"),
+    ("tc_sale_items", "product_id", "fr_products", "tc_sale_items_product_id_fkey"), ("tc_sale_items", "sale_id", "tc_sales", "tc_sale_items_sale_id_fkey"),
+    ("tc_payment_receipts", "sale_id", "tc_sales", "tc_payment_receipts_sale_id_fkey"),
+    ("tc_payment_receipts", "received_by", "profiles", "tc_payment_receipts_received_by_fkey"),
+    ("tc_stock_moves", "product_id", "fr_products", "tc_stock_moves_product_id_fkey"),
+    ("tc_stock_moves", "sale_id", "tc_sales", "tc_stock_moves_sale_id_fkey"),
+    ("tc_stock_moves", "created_by", "profiles", "tc_stock_moves_created_by_fkey"),
     ("user_districts", "district_id", "districts", "user_districts_district_id_fkey"), ("user_districts", "user_id", "profiles", "user_districts_user_id_fkey"),
     ("verification_calls", "called_by", "profiles", "verification_calls_called_by_fkey"),
     ("verification_calls", "contact_id", "contacts", "verification_calls_contact_id_fkey"), ("verification_calls", "visit_id", "visits", "verification_calls_visit_id_fkey"),

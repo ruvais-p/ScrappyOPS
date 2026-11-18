@@ -15,6 +15,7 @@ Open it at `/kwd/` after signing in at `/login/` (one login page for every Scrap
 | `zonal_manager` | `/kwd/` | Overview, visit review, TA/DA verification, planning, LSGDs, call-backs, plus their own field day |
 | `head_office` | `/kwd/` | A choice: **Staff monitoring** (network LSGDs, sign-off, TA/DA approval + monthly settlement, fraud check, staff logins, rates) or **Franchise** (leads, sales, stock, meetings, franchisees, targets and prices) |
 | `franchisee` | `/kwd/` | Home, leads (from Head Office, plus their own: `fr_leads.source = own`, which Head Office sees and cannot reassign), sales, stock, meetings, targets |
+| `telecaller` | `/kwd/` | Their own telecalling leads (`tc_leads`, assigned by Head Office): a sales list and a franchise list, a call button, status updates, and a follow-up section split into hot / warm / cold |
 
 The scrap app's roles (`driver`, `warehouse`, `supervisor`, `hq`) open `/collector/`, `/warehouse/`, `/hq/` as before.
 

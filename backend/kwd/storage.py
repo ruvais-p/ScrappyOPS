@@ -12,9 +12,9 @@ from django.conf import settings
 from django.core import signing
 
 ROOT_NAME = "kwd-photos"
-SALT = "kwd-photo-link"
+SALT = "kwd-photo-link-v2"  # revoke links issued before manager access was scoped to their own team
 # <user id>/<file>, or with up to two sub-folders (the visit screen files photos under <user id>/<date>/<file>)
-NAME_RE = re.compile(r"^[0-9a-f\-]{36}(?:/[A-Za-z0-9_.\-]{1,120}){1,3}$")
+NAME_RE = re.compile(r"^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?:/[A-Za-z0-9_.\-]{1,120}){1,3}$")
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
 MAX_PHOTO_PIXELS = 24_000_000
 
@@ -26,7 +26,7 @@ def root():
 
 
 def valid_name(path):
-    return bool(path) and bool(NAME_RE.fullmatch(path)) and ".." not in path and path.lower().endswith(".jpg")
+    return isinstance(path, str) and bool(NAME_RE.fullmatch(path)) and ".." not in path and path.lower().endswith(".jpg")
 
 
 def file_of(path):
@@ -41,7 +41,11 @@ def etag(path):
     """Same file content -> same value. Used to catch the same bill photo being used twice."""
     if not exists(path):
         return None
-    return hashlib.md5(file_of(path).read_bytes()).hexdigest()
+    digest = hashlib.md5()
+    with file_of(path).open("rb") as photo:
+        while chunk := photo.read(64 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def save(path, data):
@@ -54,9 +58,12 @@ def save(path, data):
             if image.format not in ("JPEG", "PNG", "WEBP") or image.width * image.height > MAX_PHOTO_PIXELS:
                 raise ValueError("Unsupported or oversized image")
             image.load()
-            rgb = image.convert("RGB")
             output = io.BytesIO()
-            rgb.save(output, format="JPEG", quality=88, optimize=True)
+            if image.mode == "RGB":
+                image.save(output, format="JPEG", quality=88, optimize=True)
+            else:
+                with image.convert("RGB") as rgb:
+                    rgb.save(output, format="JPEG", quality=88, optimize=True)
             data = output.getvalue()
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
         raise ValueError("Invalid image") from exc

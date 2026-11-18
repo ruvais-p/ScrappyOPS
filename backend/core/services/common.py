@@ -101,7 +101,7 @@ def fetch(sql, params=None):
         cols = [c.name for c in cur.description]
         jsoncols = [i for i, c in enumerate(cur.description) if c.type_code in (114, 3802)]   # json / jsonb arrive as text
         out = []
-        for row in cur.fetchall():
+        for row in cur:
             if jsoncols:
                 row = list(row)
                 for i in jsoncols:

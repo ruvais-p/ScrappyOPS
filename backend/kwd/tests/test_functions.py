@@ -108,6 +108,19 @@ class StorageTests(KwdCase):
         too_deep = f"{self.tso_id}/a/b/c/d.jpg"
         self.assertEqual(self.client.post(f"/kwd/api/storage/upload?path={too_deep}", data=PNG, content_type="image/jpeg", **self.tso.h).status_code, 403)
 
+    def test_zonal_manager_cannot_sign_another_teams_photos(self):
+        import time
+        from django.core import signing
+
+        own = self.tso.upload("own-evidence.jpg")
+        other = self.tso2.upload("other-evidence.jpg")
+        self.assertEqual(self.zm.raw("/kwd/api/storage/sign", {"path": own}).status_code, 200)
+        self.assertEqual(self.zm.raw("/kwd/api/storage/sign", {"path": other}).status_code, 404)
+        self.assertEqual(self.zm2.raw("/kwd/api/storage/sign", {"path": own}).status_code, 404)
+        self.assertEqual(self.ho.raw("/kwd/api/storage/sign", {"path": other}).status_code, 200)
+        old_link = signing.dumps({"p": other, "exp": int(time.time()) + 3600}, salt="kwd-photo-link")
+        self.assertEqual(self.client.get(f"/kwd/api/storage/object?token={old_link}").status_code, 404)
+
     def test_upload_sign_and_read(self):
         path = self.tso.upload("evidence.jpg")
         r = self.client.post(f"/kwd/api/storage/upload?path={path}", data=PNG, content_type="image/png", **self.tso.h)
@@ -119,6 +132,10 @@ class StorageTests(KwdCase):
         self.assertEqual(r.status_code, 400)
         r = self.client.post(f"/kwd/api/storage/upload?path={self.tso_id}/../hack.jpg", data=PNG, content_type="image/png", **self.tso.h)
         self.assertEqual(r.status_code, 403)
+        r = self.tso.raw("/kwd/api/storage/sign", {"path": 123})
+        self.assertEqual(r.status_code, 404)
+        r = self.zm.raw("/kwd/api/storage/sign", {"path": "not-a-valid-uuid--------------------/photo.jpg"})
+        self.assertEqual(r.status_code, 404)
         for who, ok in ((self.tso, True), (self.zm, True), (self.ho, True), (self.tso2, False), (self.fr, False)):
             r = who.raw("/kwd/api/storage/sign", {"path": path, "expiresIn": 300})
             self.assertEqual(r.status_code == 200, ok, who.email)
