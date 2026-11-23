@@ -272,7 +272,9 @@ class FieldDays(Rules):
 
         if new["status"] == old["status"]:
             raise ApiError("Nothing to change.")
-        if old["status"] == "submitted" and new["status"] in ("zm_approved", "rejected", "open"):
+        if old["status"] == "rejected":
+            return self._guard_payment(old, self._undo_reject(ctx, old, new))
+        if r == ZM and old["status"] == "submitted" and new["status"] in ("zm_approved", "rejected", "open"):
             if new["status"] == "zm_approved":
                 new["approved_amount"] = new["approved_amount"] if new.get("approved_amount") is not None else old["total_claimed"]
                 if new["approved_amount"] < 0 or new["approved_amount"] > old["total_claimed"]:
@@ -314,6 +316,30 @@ class FieldDays(Rules):
             raise ApiError(f"This step is not allowed ({old['status']} to {new['status']}).")
         return self._guard_payment(old, new)
 
+    def _undo_reject(self, ctx, old, new):
+        """A rejection made by mistake: the request goes back to the step it was rejected from, waiting for review again."""
+        ev = fetch_one("select actor, meta from kwd_claim_events where day_id = %(i)s and event = 'rejected' order by id desc limit 1", {"i": old["id"]})
+        meta = (ev and ev["meta"]) or {}
+        back = meta.get("from") or "submitted"
+        if ctx.role == ZM and (ev is None or ev["actor"] != ctx.uid):
+            raise ApiError("Only the person who rejected it, or Head Office, can undo this rejection.")
+        if new["status"] != back:
+            raise ApiError(f"Undoing this rejection puts the request back to {back}.")
+        for c in ("paid_by", "paid_at", "paid_ref"):
+            new[c] = old[c]
+        for c in ("ho_by", "ho_at", "ho_remark"):
+            new[c] = None
+        if back == "zm_approved":                                 # Head Office rejected after the ZM had verified it: keep the ZM's verification
+            for c in ("zm_by", "zm_at", "zm_remark"):
+                new[c] = old[c]
+            amt = meta.get("approved_amount")
+            new["approved_amount"] = D(amt) if amt is not None else old["total_claimed"]
+        else:
+            for c in ("zm_by", "zm_at", "zm_remark"):
+                new[c] = None
+            new["approved_amount"] = None
+        return new
+
     def _guard_payment(self, old, new):
         """A day is paid only by the monthly settlement, never one by one."""
         new["payment_id"] = old["payment_id"]
@@ -331,7 +357,13 @@ class FieldDays(Rules):
             event(row["id"], ctx.uid, "went_to_route", meta={"mode": row["travel_mode"], "odo": row["start_odo"]})
         if old["end_at"] is None and row["end_at"] is not None:
             event(row["id"], ctx.uid, "ended", meta={"odo": row["end_odo"]})
-        if row["status"] != old["status"]:
+        if row["status"] != old["status"] and old["status"] == "rejected":
+            event(row["id"], ctx.uid, "reject_undone", row["approved_amount"], None, {"to": row["status"]})
+        elif row["status"] == "rejected":
+            # where it came from, so a mistaken rejection can be undone to exactly that step
+            event(row["id"], ctx.uid, "rejected", None, row["ho_remark"] if r == HO else row["zm_remark"],
+                  {"from": old["status"], "approved_amount": str(old["approved_amount"]) if old["approved_amount"] is not None else None})
+        elif row["status"] != old["status"]:
             ev = {"submitted": "submitted", "zm_approved": "zm_verified", "ho_approved": "ho_approved", "paid": "paid", "rejected": "rejected"}.get(row["status"], "sent_back")
             if row["status"] == "submitted":
                 amt = fetch_one("select total_claimed from kwd_field_days where id = %(i)s", {"i": row["id"]})["total_claimed"]

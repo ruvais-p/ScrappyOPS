@@ -87,6 +87,23 @@ function ownActions(S, d, policy) {
   </section>`
 }
 
+// the last rejection, and the step undoing it returns to (older rejections did not record it: they came from "submitted")
+const lastReject = (events) => events.filter((e) => e.event === 'rejected').at(-1)
+const undoTarget = (events) => { const e = lastReject(events); return (e && e.meta && e.meta.from) || 'submitted' }
+
+function undoRejectBox(S, ho, me) {
+  const e = lastReject(S.events)
+  const mine = ho || (e && e.actor && e.actor.id === me)
+  if (!mine) return html`<p class="notice small">Rejected by ${(e && e.actor && e.actor.full_name) || 'a reviewer'}. Only they or Head Office can undo it.</p>`
+  const back = undoTarget(S.events)
+  return html`<section class="card">
+    <h2>Rejected by mistake?</h2>
+    <p class="small muted" style="margin-top:0">Undo the rejection and the request goes back to <b>${CLAIM_STATUS[back][0]}</b>, to be reviewed again. The undo is kept in the history.</p>
+    ${errLine(S.err)}
+    <button class="btn block" ${S.busy ? raw('disabled') : ''} data-act="undoReject">${Icon('left', 18)} ${S.busy ? 'Undoing…' : 'Undo rejection'}</button>
+  </section>`
+}
+
 function reviewActions(S, d, ho) {
   const zmStep = d.status === 'submitted'
   const hoStep = ho && ['submitted', 'zm_approved'].includes(d.status)
@@ -101,6 +118,7 @@ function reviewActions(S, d, ho) {
     ${d.flags.length > 0 ? html`<p class="small muted">Check the flags above against the bills, photos and visits before ${ho ? 'approving' : 'verifying'}.</p>` : ''}
     <label>Amount to ${ho ? 'approve' : 'verify'} (₹)<input data-bind="amount" data-change="decimal" data-oninput data-live value="${S.amount}" inputmode="decimal"></label>
     <label>Remark ${amt < payable(d) ? '(required: why it was cut)' : '(needed to send back or reject)'}<textarea rows="2" data-bind="remark">${S.remark}</textarea></label>
+    ${errLine(S.err)}
     <div class="row wrap">
       <button class="btn primary grow" ${S.busy ? raw('disabled') : ''} data-act="review" data-status="${ho ? 'ho_approved' : 'zm_approved'}">${Icon('check', 18)} ${ho ? 'Approve' : 'Verify'} ${fmtINR(amt || 0)}</button>
       <button class="btn" ${S.busy ? raw('disabled') : ''} data-act="review" data-status="open">Send back</button>
@@ -275,11 +293,11 @@ export default {
       </section>
 
       ${editable ? ownActions(S, d, policy) : ''}
-      ${!own ? reviewActions(S, d, ho) : ''}
+      ${!own ? (d.status === 'rejected' ? undoRejectBox(S, ho, ctx.profile.id) : reviewActions(S, d, ho)) : ''}
       ${ho ? flagBox(S, d) : ''}
       ${!editable && d.tso_note ? html`<p class="small"><b>Note from ${own ? 'you' : 'the TSO'}:</b> ${d.tso_note}</p>` : ''}
       ${timeline(S.events, ho)}
-      ${S.err ? html`<p class="error" role="alert">${S.err}</p>` : ''}
+      ${S.err && own ? html`<p class="error" role="alert">${S.err}</p>` : ''}
       ${S.sheet === 'da' ? daBillSheet(S) : ''}${S.sheet === 'exp' ? expenseSheet(S, d, policy) : ''}`
   },
 
@@ -325,6 +343,11 @@ export default {
       const patch = { status, [key]: S.remark.trim() || null }
       if (status === 'zm_approved' || status === 'ho_approved') patch.approved_amount = amt
       return updateDay(this, patch, { zm_approved: 'Verified, sent to Head Office', ho_approved: 'Approved for payment', open: 'Sent back to the TSO', rejected: 'Request rejected' }[status])
+    },
+    undoReject() {
+      const back = undoTarget(this.S.events)
+      if (!confirm(`Undo this rejection? The request goes back to "${CLAIM_STATUS[back][0]}".`)) return
+      return updateDay(this, { status: back }, 'Rejection undone')
     },
     flagOpen() { this.set({ fOpen: true }) },
     flagCancel() { this.set({ fOpen: false, fErr: '' }) },
@@ -429,7 +452,7 @@ async function load(sc, first) {
     })
   }
   sc.set(patch)
-  const ev = await supabase.from('claim_events').select('*, actor:profiles!claim_events_actor_fkey(full_name, role)').eq('day_id', dayId).order('at').order('id')
+  const ev = await supabase.from('claim_events').select('*, actor:profiles!claim_events_actor_fkey(id, full_name, role)').eq('day_id', dayId).order('at').order('id')
   const v = await supabase.from('visits')
     .select('id, check_in_at, check_out_at, distance_from_office_m, fraud_flags, zm_status, lsgds(name, districts(name))')
     .eq('tso_id', data.tso_id).gte('check_in_at', istStartISO(data.day)).lt('check_in_at', istStartISO(addDays(data.day, 1))).order('check_in_at')

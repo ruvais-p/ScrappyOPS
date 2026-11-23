@@ -216,6 +216,38 @@ class ClaimTests(KwdCase):
         self.assertEqual(rej["status"], "rejected")
         self.assertEqual(d2["status"], "submitted")
 
+    def test_head_office_rejects_or_sends_back_a_request_waiting_for_the_zm(self):
+        d = self.ready_request()
+        self.ho.fails("Write the reason", self.ho.update, "field_days", {"status": "rejected"}, [["eq", "id", d["id"]]])
+        back = self.ho.update("field_days", {"status": "open", "ho_remark": "Wrong date"}, [["eq", "id", d["id"]]], select="*")[0]
+        self.assertEqual((back["status"], back["ho_by"], back["zm_by"], back["ho_remark"]), ("open", str(self.ho_id), None, "Wrong date"))
+        self.submit(self.tso, d)
+        rej = self.ho.update("field_days", {"status": "rejected", "ho_remark": "Not a field day"}, [["eq", "id", d["id"]]], select="*")[0]
+        self.assertEqual((rej["status"], rej["ho_by"], rej["zm_by"]), ("rejected", str(self.ho_id), None))
+
+    def test_undo_a_zm_rejection(self):
+        d = self.ready_request()
+        self.zm.update("field_days", {"status": "rejected", "zm_remark": "Duplicate day"}, [["eq", "id", d["id"]]])
+        self.tso.fails("submitted and locked", self.tso.update, "field_days", {"status": "submitted"}, [["eq", "id", d["id"]]])
+        self.zm.fails("puts the request back to submitted", self.zm.update, "field_days", {"status": "zm_approved"}, [["eq", "id", d["id"]]])
+        out = self.zm.update("field_days", {"status": "submitted"}, [["eq", "id", d["id"]]], select="*")[0]
+        self.assertEqual((out["status"], out["zm_by"], out["zm_remark"], out["approved_amount"]), ("submitted", None, None, None))
+        events = [e["event"] for e in self.zm.select("claim_events", "event", [["eq", "day_id", d["id"]]], order=[["id", True]])]
+        self.assertEqual(events[-2:], ["rejected", "reject_undone"])
+        ok = self.zm.update("field_days", {"status": "zm_approved"}, [["eq", "id", d["id"]]], select="status")[0]          # reviewed again as normal
+        self.assertEqual(ok["status"], "zm_approved")
+
+    def test_undo_a_head_office_rejection_restores_the_zm_verification(self):
+        d = self.ready_request()
+        self.zm.update("field_days", {"status": "zm_approved", "approved_amount": 200, "zm_remark": "Fuel stop not counted"}, [["eq", "id", d["id"]]])
+        self.ho.update("field_days", {"status": "rejected", "ho_remark": "Not a field day"}, [["eq", "id", d["id"]]])
+        self.zm.fails("Only the person who rejected it", self.zm.update, "field_days", {"status": "zm_approved"}, [["eq", "id", d["id"]]])
+        out = self.ho.update("field_days", {"status": "zm_approved"}, [["eq", "id", d["id"]]], select="*")[0]
+        self.assertEqual((out["status"], out["approved_amount"], out["zm_by"], out["zm_remark"], out["ho_by"], out["ho_remark"]),
+                         ("zm_approved", 200, str(self.zm_id), "Fuel stop not counted", None, None))
+        fin = self.ho.update("field_days", {"status": "ho_approved"}, [["eq", "id", d["id"]]], select="status, approved_amount")[0]
+        self.assertEqual(fin, {"status": "ho_approved", "approved_amount": 200})
+
     def test_a_managers_own_request_goes_to_head_office(self):
         d = self.ready_request(self.zm)
         self.zm.fails("submitted and locked", self.zm.update, "field_days", {"status": "ho_approved"}, [["eq", "id", d["id"]]])           # their own request: locked for them

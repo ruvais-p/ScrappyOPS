@@ -64,10 +64,10 @@ export const EXP_FLAGS = {
 // history log (claim_events)
 export const EVENT_LABEL = {
   da_set: 'Allowance requested', started: 'Day started', went_to_route: 'Went to route', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed',
-  submitted: 'Request submitted', zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected',
+  submitted: 'Request submitted', zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected', reject_undone: 'Rejection undone',
   ho_approved: 'Approved by Head Office', paid: 'Paid', ho_flagged: 'Flagged by Head Office', ho_unflagged: 'Flag removed by Head Office',
 }
-export const EVENT_TONE = { zm_verified: 'ok', ho_approved: 'ok', paid: 'ok', rejected: 'bad', sent_back: 'warn', ho_flagged: 'bad', ho_unflagged: 'ok' }
+export const EVENT_TONE = { zm_verified: 'ok', ho_approved: 'ok', paid: 'ok', rejected: 'bad', reject_undone: 'warn', sent_back: 'warn', ho_flagged: 'bad', ho_unflagged: 'ok' }
 export const flagText = (f) => (EXP_FLAGS[f] || [])[0] ?? f
 export const flagTone = (f) => (EXP_FLAGS[f] || [])[1] ?? 'warn'
 export const riskFlags = (flags = []) => flags.filter((f) => flagTone(f) !== 'info')

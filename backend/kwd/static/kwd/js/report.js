@@ -214,7 +214,7 @@ export async function buildWorkbook(data, { title, by }) {
 
   // ---------- Request history (who did what, when)
   const EVL = { started: 'Day started', went_to_route: 'Went to route', ended: 'Day ended', bill_added: 'Bill added', bill_removed: 'Bill removed', submitted: 'Request submitted',
-    zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected', ho_approved: 'Approved by Head Office', paid: 'Paid',
+    zm_verified: 'Verified by Zonal Manager', sent_back: 'Sent back', rejected: 'Rejected', reject_undone: 'Rejection undone', ho_approved: 'Approved by Head Office', paid: 'Paid',
     ho_flagged: 'Flagged by Head Office', ho_unflagged: 'Flag removed by Head Office' }
   sheet('Request history', [
     { h: 'When', w: 17, ...DT }, { h: 'Request date', w: 12, ...D }, { h: 'Name', w: 20 }, { h: 'What happened', w: 28 }, { h: 'By', w: 20 },
