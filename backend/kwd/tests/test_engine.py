@@ -83,7 +83,8 @@ class ReadTests(KwdCase):
         self.assertEqual(self.ho.insert("districts", {"name": "Test District"}, select="name", single=True), {"name": "Test District"})
         self.tso.fails("row-level security", self.tso.insert, "districts", {"name": "Nope"})
         self.assertEqual(len(self.ho.select("audit_log", "table_name, action", [["eq", "table_name", "lsgds"]])), 2)   # insert + update logged
-        self.zm.q("lsgds", "delete", filters=[["eq", "id", row["id"]]])
+        self.assertEqual(self.zm.q("lsgds", "delete", filters=[["eq", "id", row["id"]]], select="id")["data"], [])    # only Head Office removes LSGDs
+        self.ho.q("lsgds", "delete", filters=[["eq", "id", row["id"]]])
         self.assertEqual(self.ho.select("lsgds", "id", [["eq", "id", row["id"]]]), [])
         self.assertEqual(self.ho.select("audit_log", "action", [["eq", "table_name", "lsgds"], ["eq", "action", "DELETE"]])[0]["action"], "DELETE")
 

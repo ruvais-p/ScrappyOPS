@@ -150,6 +150,26 @@ class VisitTests(KwdCase):
         self.assertIsNotNone(again["verified_at"])
         self.assertEqual(self.tso.update("contacts", {"name": "Hacked"}, [["eq", "id", c["id"]]], select="id"), [])      # a TSO cannot edit a verified contact
 
+    def test_head_office_removes_an_lsgd_without_recorded_work(self):
+        c = self.contact(self.tso, lsgd=self.lsgd_noloc)
+        o = self.tso.insert("opportunities", {"lsgd_id": self.lsgd_noloc, "stage": "first_meeting"}, select="id", single=True)
+        self.tso.insert("followups", {"lsgd_id": self.lsgd_noloc, "opportunity_id": o["id"], "contact_id": c["id"], "due_on": str(ist_today())})
+        self.plan(lsgd=self.lsgd_noloc)
+        gone = self.ho.q("lsgds", "delete", filters=[["eq", "id", self.lsgd_noloc]], select="name")["data"]
+        self.assertEqual([r["name"] for r in gone], ["Edathala Grama Panchayat"])
+        for t in ("contacts", "opportunities", "followups", "tasks"):
+            self.assertEqual(self.ho.select(t, "id", [["eq", "lsgd_id", self.lsgd_noloc]]), [])
+
+    def test_an_lsgd_with_recorded_work_stays(self):
+        self.visit(self.tso)
+        self.ho.fails("1 visit", self.ho.q, "lsgds", "delete", filters=[["eq", "id", self.lsgd]])
+        c = self.contact(self.tso, lsgd=self.lsgd_noloc)
+        self.tso.insert("lsgd_updates", {"lsgd_id": self.lsgd_noloc, "happened_on": str(ist_today()), "contact_ids": [c["id"]],
+                                         "discussion": "Met the secretary before the app was in use."})
+        self.ho.fails("1 status update", self.ho.q, "lsgds", "delete", filters=[["eq", "id", self.lsgd_noloc]])
+        self.assertEqual(len(self.ho.select("contacts", "id", [["eq", "lsgd_id", self.lsgd_noloc]])), 1)              # nothing was removed
+        self.assertEqual(self.zm.q("lsgds", "delete", filters=[["eq", "id", self.lsgd_tsr]], select="id")["data"], [])  # a ZM cannot remove one
+
     def test_a_tso_corrects_an_unverified_contact(self):
         c = self.contact(self.tso)
         out = self.tso.update("contacts", {"name": "Mrs Secretary", "phone": "9446099999", "verified_at": "2020-01-01T00:00:00Z", "lsgd_id": self.lsgd_tsr},

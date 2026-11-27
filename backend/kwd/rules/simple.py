@@ -1,6 +1,6 @@
 """The smaller tables: districts, staff profiles, LSGDs, contacts, LSGD updates, tasks, deals, follow-ups, verification calls,
 expense policy."""
-from core.services.common import ApiError, fetch_one
+from core.services.common import ApiError, fetch, fetch_one
 from kwd.rules.base import Rules
 from kwd.rules.util import ist_today, now, trim
 from kwd.scope import FR, HO, TSO, ZM
@@ -72,7 +72,20 @@ class Lsgds(Rules):
         return self._ok(S, f"{P.add(new['district_id'])}::smallint")
 
     def delete_using(self, ctx, S, a):
-        return self._ok(S, a + ".district_id")
+        return S.is_ho()
+
+    def before_delete(self, ctx, old):
+        """Head Office removes an LSGD added by mistake. Recorded work keeps it: visits are TA / DA evidence, and status
+        updates and verification calls are history. The planning around it (contacts, deal, tasks, follow-ups) goes with it."""
+        p = {"l": old["id"]}
+        n = fetch_one("select (select count(*) from kwd_visits where lsgd_id = %(l)s) as visits, "
+                      "(select count(*) from kwd_lsgd_updates where lsgd_id = %(l)s) as updates, "
+                      "(select count(*) from kwd_verification_calls v join kwd_contacts c on c.id = v.contact_id where c.lsgd_id = %(l)s) as calls", p)
+        work = [f"{n[k]} {label}{'' if n[k] == 1 else 's'}" for k, label in (("visits", "visit"), ("updates", "status update"), ("calls", "verification call")) if n[k]]
+        if work:
+            raise ApiError(f"{old['name']} has recorded work ({', '.join(work)}), so it can't be removed.")
+        for t in ("kwd_followups", "kwd_tasks", "kwd_opportunities", "kwd_contacts"):
+            fetch(f"delete from {t} where lsgd_id = %(l)s returning 1", p)
 
 
 class Contacts(Rules):
