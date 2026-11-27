@@ -29,7 +29,18 @@ function parseCsv(text) {
 }
 const opt = (v, cur, label) => html`<option value="${v}" ${String(cur) === String(v) ? raw('selected') : ''}>${label}</option>`
 
-function formSheet(S) {
+// Head Office removes an LSGD added by mistake; one with logged visits stays (the server also refuses updates and calls)
+function removeBox(S, l) {
+  const visits = l.visits.length
+  return html`<div class="card" style="margin-top:16px">
+    <b>Remove this LSGD</b>
+    ${visits ? html`<p class="small muted" style="margin:4px 0 0">${visits} visit${visits === 1 ? ' was' : 's were'} logged here, so it can't be removed. Visits are TA / DA evidence.</p>`
+      : html`<p class="small muted" style="margin:4px 0 10px">For an LSGD added by mistake or twice. Its contacts, deal, planned visits and follow-ups are removed with it. This can't be undone.</p>
+        <button class="btn danger block" ${S.busy ? raw('disabled') : ''} data-act="removeLsgd">${Icon('x', 18)} Remove ${l.name}</button>`}
+  </div>`
+}
+
+function formSheet(S, isHO) {
   const f = S.f, l = S.edit, isNew = !l.id
   const parsed = f.loc.trim() ? parseLatLng(f.loc) : null
   const ls = S.linkState
@@ -51,7 +62,8 @@ function formSheet(S) {
     ${S.gpsNote ? html`<p class="small muted">${S.gpsNote}</p>` : ''}
     <p class="small muted">TSO check-ins more than 300 m from this point are flagged. Every change is recorded for Head Office.</p>
     ${errLine(S.ferr)}
-    <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="saveLsgd">${S.busy ? 'Saving…' : isNew ? 'Add LSGD' : 'Save changes'}</button>` })
+    <button class="btn primary block" ${S.busy ? raw('disabled') : ''} data-act="saveLsgd">${S.busy ? 'Saving…' : isNew ? 'Add LSGD' : 'Save changes'}</button>
+    ${isHO && !isNew ? removeBox(S, l) : ''}` })
 }
 
 function importSheet(S) {
@@ -106,7 +118,7 @@ export default {
           <td>${l.opp ? html`<span class="pill stage-${l.opp.stage}">${stageLabel(l.opp.stage)}</span>` : html`<span class="muted">—</span>`}</td>
           <td>${l.last ? fmtDate(l.last) : html`<span class="muted">Never</span>`}</td>
           <td><button class="btn sm" data-act="edit" data-id="${l.id}">Edit</button></td></tr>`)}</tbody></table></div>`}
-      ${S.importing ? importSheet(S) : ''}${S.edit ? formSheet(S) : ''}`
+      ${S.importing ? importSheet(S) : ''}${S.edit ? formSheet(S, isHO) : ''}`
   },
   actions: {
     show(el) { this.set({ show: el.dataset.k }) },
@@ -166,6 +178,17 @@ export default {
       this.set({ busy: false })
       if (error) return this.set({ ferr: error.code === '23505' ? 'This LSGD already exists in that district.' : errText(error) })
       toast(isNew ? 'LSGD added' : 'Changes saved')
+      this.set({ edit: null })
+      await this.actions.reload.call(this)
+    },
+    async removeLsgd() {
+      const l = this.S.edit
+      if (!confirm(`Remove ${l.name}? Its contacts, deal, planned visits and follow-ups are removed too. This can't be undone.`)) return
+      this.set({ busy: true, ferr: '' })
+      const { error } = await supabase.from('lsgds').delete().eq('id', l.id)
+      this.set({ busy: false })
+      if (error) return this.set({ ferr: errText(error) })
+      toast(`${l.name} removed`)
       this.set({ edit: null })
       await this.actions.reload.call(this)
     },
